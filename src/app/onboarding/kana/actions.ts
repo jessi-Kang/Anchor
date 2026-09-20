@@ -5,16 +5,22 @@ import { requireUser } from "@/lib/auth/server";
 import { saveKanaResult } from "@/lib/db/settings";
 import { KANA_PASS } from "@/lib/kana";
 
+/** 같은 사이트 경로만 (열린 리다이렉트 방지) */
+function safeNext(next: string | undefined): string {
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/today";
+}
+
 /**
- * O03 결과 저장. 자기 보고로 통과시키지 않는다:
- *  - 인식 기준 이상 → passed
- *  - 미지원·거부·기준 미달 → recheck ("다음에 다시 확인", 카드는 연다)
- *  - "못 읽겠어" → locked (가나 모듈 v2 예고, 한자 카드 잠금)
+ * O03 결과 저장. 자기 보고로 통과시키지 않는다 (docs/FLOW.md 1장 4′):
+ *  - 마이크가 기준 이상 인식 → passed → 카드로
+ *  - 미지원·거부·기준 미달 → recheck ("다음에 다시 확인") → 그래도 카드로
+ *  - "못 읽겠어" → locked → 가나 모듈 예고 화면 (한자 카드 잠금)
  */
-export async function submitKana(input: { recognized: number; total: number; supported: boolean; kanaModule: boolean }) {
+export async function submitKana(input: { recognized: number; total: number; supported: boolean; cannotRead: boolean; next?: string }) {
   const user = await requireUser();
   const recognized = Math.max(0, Math.min(input.total, Math.floor(input.recognized)));
-  const status = input.kanaModule ? "locked" : input.supported && recognized >= KANA_PASS ? "passed" : "recheck";
+  const status = input.cannotRead ? "locked" : input.supported && recognized >= KANA_PASS ? "passed" : "recheck";
   await saveKanaResult(user.id, { status, recognized, total: input.total, supported: input.supported, checked_at: new Date().toISOString() });
-  redirect("/today");
+  const next = safeNext(input.next);
+  redirect(status === "locked" ? `/onboarding/kana?next=${encodeURIComponent(next)}` : next);
 }
