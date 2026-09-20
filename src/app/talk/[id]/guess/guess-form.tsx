@@ -31,12 +31,15 @@ export function GuessForm({ chunkId, preview }: { chunkId: string; preview: bool
         aria-label="영어 추측"
       />
       <Space h={12} />
+      {/* 누르는 동안 글자를 바꾸지 않는다 — 주 버튼은 누른 뒤에도 같은 말이어야 한다. 게다가
+          "영어로 옮기는 중" 은 내 추측을 번역하는 것처럼 읽혔다. 영어 문장은 F13 에 쓴 한국어
+          줄에서 만든다. 꺼짐으로 충분하다. */}
       <Button disabled={pending || line.trim().length === 0} onClick={() => {
           if (preview) return;
           draft.clear();
           start(() => submitGuess(chunkId, line));
         }}>
-        {pending ? "영어로 옮기는 중" : "이제 확인"}
+        이제 확인
       </Button>
     </>
   );

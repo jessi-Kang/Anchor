@@ -17,7 +17,9 @@ export default function ErrorScreen({ error, reset }: { error: Error & { digest?
   }, [error]);
 
   return (
-    <Screen where="문제가 생겼어">
+    // 상단 라벨은 "지금 어디" 가 오는 자리다. "문제가 생겼어" 를 넣으면 바로 아래 제목과 같은 말을
+    // 두 번 하고, 장소가 아닌 것이 장소 자리에 앉는다. 참고 화면(X02.html)의 라벨도 "오류" 다.
+    <Screen where="오류">
       <Grow />
       <Title>잠깐 문제가 생겼어.</Title>
       <Grow />

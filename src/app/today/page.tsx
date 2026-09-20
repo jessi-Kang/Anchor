@@ -105,7 +105,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     .map((l) => ({ id: `lang-${l}`, title: `${LANG_LABEL[l]} 자료 넣기`, sub: LANG_START[l], next: null, href: inputPath(l) }));
 
   const talkRows: HomeRow[] = langs.includes("en")
-    ? [{ id: "talk", title: "못 한 말", sub: talkCount > 0 ? `못 한 말 ${talkCount}개` : "한 줄이면 돼", next: null, href: "/talk" }]
+    // 부제에 "못 한 말" 을 또 쓰지 않는다 — 제목이 이미 그 말이라 한 행에서 같은 낱말을 두 번 쓰게 된다.
+    ? [{ id: "talk", title: "못 한 말", sub: talkCount > 0 ? `${talkCount}개` : "한 줄이면 돼", next: null, href: "/talk" }]
     : [];
 
   const rows = await Promise.all(

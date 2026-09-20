@@ -161,7 +161,7 @@ export function PitchLoop({
       // 이미 화면에 있고 사용자가 할 일이 없다. 알릴 수 없는 일을 알리면 상태 어휘만 늘어난다.
       // (못 보낸 것을 기기에 남겼다 다시 올리는 일은 재전송이 설 때 여기에 붙는다.)
       if (!res.ok) console.error("[recordings] 저장 실패", res.status);
-      setNote("곡선을 봐. 설명 대신 한 번 더.");
+      setNote("곡선을 봐. 한 번 더.");
     } catch (e) {
       console.error(e);
       setNote("녹음을 읽지 못했어. 한 번 더.");
