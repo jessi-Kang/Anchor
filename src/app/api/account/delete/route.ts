@@ -56,12 +56,19 @@ export async function POST(req: Request) {
   }
 
   await withUser(user.id, async (tx) => {
-    // 원장은 앱에게 INSERT 전용이다(0001). ON CONFLICT 는 DO UPDATE 든 DO NOTHING 이든 충돌 행을 보려고
-    // SELECT 권한을 요구해서 여기서 42501 로 막혔다. 원장을 읽을 수 있게 여는 대신 그냥 넣는다.
-    // 같은 id 로 다시 요청해 이미 행이 있으면(23505) 처음 요청 시각을 그대로 둔다 — 백업 사본이
-    // 사라지는 시점의 기준 시각은 데이터가 처음 사라진 때다.
-    // SAVEPOINT 로 감싸는 이유: 한 트랜잭션 안에서 오류가 나면 뒤 문장이 전부 막힌다. 원장 INSERT 와
-    // users DELETE 가 같은 트랜잭션이어야 한다는 전제(docs/SECURITY.md C3)는 그대로 지킨다.
+    // 원장은 앱에게 INSERT 전용이다(0001). 여기서 ON CONFLICT 를 쓰면 42501 로 막힌다.
+    // PG16 에서 갈라 확인한 결과(보안 세션도 같은 결과):
+    //   ON CONFLICT (user_id) DO UPDATE → permission denied  (INSERT·UPDATE·SELECT 를 다 요구)
+    //   ON CONFLICT (user_id) DO NOTHING → permission denied  (충돌 대상을 추론하느라 SELECT 가 필요)
+    //   ON CONFLICT DO NOTHING           → 통과              (대상을 안 적으면 SELECT 가 필요 없다)
+    // 마지막 형태는 권한상 쓸 수 있지만 쓰지 않는다: 대상 없는 DO NOTHING 은 **어떤** 제약 위반이든
+    // 말없이 삼킨다. 나중에 원장에 제약이 하나 더 생기면 삭제가 조용히 아무것도 안 하고 성공처럼 끝난다.
+    // 지우는 경로에서 조용한 실패는 최악이다. 그래서 그냥 INSERT 하고 23505(기본키 충돌)만 좁게 받는다.
+    // 같은 id 로 다시 요청해 이미 행이 있으면 처음 요청 시각을 그대로 둔다 — 백업 사본이 사라지는
+    // 시점의 기준 시각은 데이터가 처음 사라진 때다.
+    // SAVEPOINT 로 감싸는 이유: 한 트랜잭션 안에서 오류가 나면 뒤 문장이 전부 막힌다(current transaction
+    // is aborted). 원장 INSERT 와 users DELETE 가 같은 트랜잭션이어야 한다는 전제(docs/SECURITY.md C3)는
+    // 그대로 지키면서 실패한 INSERT 만 되돌린다.
     await tx.query("SAVEPOINT ledger");
     try {
       await tx.query("INSERT INTO account_deletions (user_id) VALUES ($1)", [user.id]);
