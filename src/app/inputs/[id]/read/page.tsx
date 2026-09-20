@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { getInput, saveInputReadings } from "@/lib/db/inputs";
-import { inputProgress } from "@/lib/cards/progress";
+import { inputProgress, freshKanji } from "@/lib/cards/progress";
 import { kanjiRuns } from "@/lib/kanji/extract";
 import { getFurigana } from "@/lib/kanji/furigana";
 import { isDesignPreview } from "@/lib/design-preview";
@@ -60,7 +60,7 @@ export default async function ReadPage({
     name = inputName(input);
     body = input.body;
     met = prog.anchors;
-    fresh = prog.nodes.filter((n) => !prog.anchors.has(n.key)).map((n) => n.key);
+    fresh = freshKanji(prog);
 
     // 읽기는 한 번만 만들고 자료에 굳힌다. 사전 음이 아니라 이 문장에서 실제로 읽히는 소리다 —
     // 같은 이유로 F04 도 그렇게 한다(車 는 次世代の車 에서 "くるま" 다).
