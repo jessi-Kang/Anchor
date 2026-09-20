@@ -5,16 +5,25 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 
 ## 1. 멤버와 소유 영역
 
-| 세션 | 역할 | 이 세션만 고치는 곳 |
-| --- | --- | --- |
-| PM | 결정·우선순위·통합 순서·완결 판정. 코드/디자인/기획 문서를 직접 고치지 않는다 | `docs/TEAM.md` |
-| 기획 (Plan_main) | 화면 순서·목적·나가는 길·문구 의도 | `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` · `README.md` |
-| 수석 디자이너 | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` |
-| Dev | 코드 전부 | `src/**` · `db/**` · `scripts/**` · `package.json` |
-| UX_QA | 실제로 써 보고 결함을 찾는다. **코드를 고치지 않는다** | (없음. 읽기 전용) |
+세션 이름은 `Anchor · <역할>` 하나로 통일한다. 서로를 부를 때도 이 이름을 쓴다(예전의 `Plan_main`·`UX_QA`·`Dev` 같은 별칭은 쓰지 않는다).
+세션끼리 메시지를 보낼 때는 이름이 아니라 세션 ID 가 주소다: `create_trigger(persistent_session_id=<ID>, 스케줄 없음)` + `fire_trigger`.
 
-- 남의 영역이 고쳐져야 하면 직접 고치지 말고 그 세션에 요청한다. 요청이 기획 변경이면 PM 을 거친다.
-- 코드 소유자는 Dev 하나다. 버그 수정도 Dev 가 한다. 두 세션이 같은 파일을 고치면 둘 중 하나는 반드시 버려진다.
+| 이름 | 하는 일 | 이 세션만 고치는 곳 | 브랜치 | 세션 ID |
+| --- | --- | --- | --- | --- |
+| **Anchor · PM (조율)** | 결정·우선순위·통합 순서·완결 판정. 코드/디자인/기획 문서를 직접 고치지 않는다 | `docs/TEAM.md` | `claude/affectionate-brahmagupta-947f48` | `session_01QPJ4i1hJ5zENanv7ykjp1t` |
+| **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도 | `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` · `README.md` | `claude/create-readme-vibelog-9c5xnb` | `session_01GLHC1ArhYJTqPuDysDoSWt` |
+| **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
+| **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_019gYCLNic9TA9jvmQikfhfk` |
+| **Anchor · QA** | 실제로 써 보고 결함을 찾는다. **코드를 고치지 않는다** | (없음. 읽기 전용) | `claude/optimistic-hopper-kaafdu` | `session_01QxSgxQRsFT1grCVZrxTEhi` |
+| ~~Anchor · 버그픽스~~ | 개발로 통합, 종료. 브랜치만 남긴다 | — | `claude/gallant-clarke-qt36ez` | `session_01ANSrRXJkcbqr7SwicPUVpM` |
+
+모든 세션에 `anchor` 태그가 붙어 있다. 명단을 다시 볼 때는 `list_sessions(tags=["anchor"])`.
+
+보내는 길:
+- QA 가 찾은 것 → 코드 결함은 **개발**, 기획 문제는 **PM**. QA 가 두 곳에 같은 건을 보내지 않는다.
+- 디자인이 화면 순서·화면 추가/삭제·문구 의도를 바꾸고 싶으면 → **PM**. PM 이 결정하고 **기획**이 `docs/FLOW.md` 에 반영한 뒤 **개발**에 알린다.
+- 개발이 기획 문서와 다르게 만들어야 할 이유를 찾으면 → **PM**. 혼자 판단해서 문서와 다르게 만들지 않는다.
+- 남의 영역이 고쳐져야 하면 직접 고치지 말고 그 세션에 요청한다. 두 세션이 같은 파일을 고치면 둘 중 하나는 반드시 버려진다.
 
 ## 2. 브랜치와 통합
 
