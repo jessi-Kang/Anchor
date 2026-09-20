@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { getCard } from "@/lib/db/cards";
-import { countRecordings } from "@/lib/db/recordings";
+import { loadSpeakLoop, type SpeakLoopData } from "@/lib/speak-loop";
 import { cardContext } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Card, uiStyles as s } from "@/components/ui";
@@ -21,8 +21,9 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
   let where = "카드 1 / 4";
   let word = "協力";
   let reading = "きょうりょく";
-  // 회차는 쌓인 사실이다. 화면을 다시 열어도 이어서 센다 (docs/FLOW.md 1′장, docs/SPEC.md 9장).
-  let startAttempt = 0;
+  // 루프가 받을 것(회차·마지막 곡선·원어민 음성 유무)은 한 군데에서 푼다 (lib/speak-loop.ts).
+  // 여기서 회차만 읽고 마지막 곡선을 두고 와서, 다시 열면 "나, 3회차" 라고 써 놓고 곡선이 없었다.
+  let loop: SpeakLoopData = { startAttempt: 0, startPrev: null, nativeVoice: true };
 
   if (!preview) {
     const user = await currentUser();
@@ -35,7 +36,7 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
     const w = card.payload.landing[0];
     word = w?.word ?? card.payload.kanji;
     reading = w?.reading ?? card.payload.reading;
-    startAttempt = await countRecordings(user.id, { card: card.id });
+    loop = await loadSpeakLoop(user.id, { card: card.id }, "ja");
   }
 
   return (
@@ -52,7 +53,7 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
         </div>
       </Card>
       <Space h={16} />
-      <SpeakLoop cardId={id} text={word} preview={preview} startAttempt={startAttempt} />
+      <SpeakLoop cardId={id} text={word} preview={preview} startAttempt={loop.startAttempt} startPrev={loop.startPrev} />
     </Screen>
   );
 }

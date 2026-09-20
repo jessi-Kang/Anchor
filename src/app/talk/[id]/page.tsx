@@ -1,11 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { getChunk, hasEnglish, type ChunkRow } from "@/lib/db/chunks";
-import { countRecordings, lastPitch, type PitchPoint } from "@/lib/db/recordings";
+import { loadSpeakLoop, type SpeakLoopData } from "@/lib/speak-loop";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Card, Label, Mark, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
-import { hasNativeVoice } from "@/lib/tts-voice";
 import { TalkLoop } from "./talk-loop";
 
 export const dynamic = "force-dynamic";
@@ -50,14 +49,9 @@ export default async function TalkChunkPage({
   const { fixed, native } = await searchParams;
   const preview = isDesignPreview();
   let chunk = PREVIEW;
-  // 회차는 쌓인 사실이다. 화면을 다시 열어도 이어서 센다 (docs/FLOW.md 1′장, docs/SPEC.md 9장).
-  let startAttempt = 0;
-  // 마지막 회차 곡선도 같은 사실이다. 회차만 읽고 곡선을 두고 오면 범례가 말하는 회차의 곡선이 없다.
-  let startPrev: PitchPoint[] | null = null;
-  // 원어민 음성이 있는지는 서버만 안다. 값이 채워지면 코드를 안 고쳐도 그 순간부터 F14 로 바뀐다.
-  // 디자인 미리보기에서만 `?native=0` 으로 F14a(원어민 소리 없음)를 띄운다 — 참고 화면이 둘이라
-  // 둘 다 눈으로 견줄 수 있어야 한다. 실제 화면은 이 파라미터를 보지 않는다.
-  const nativeVoice = preview ? native !== "0" : hasNativeVoice("en");
+  // 루프가 받을 것(회차·마지막 곡선·원어민 음성 유무)은 한 군데에서 푼다 (lib/speak-loop.ts).
+  // 페이지마다 따로 고르다가 F10 이 곡선을 두고 왔다 — 범례는 회차를 말하는데 곡선이 없었다.
+  let loop: SpeakLoopData = { startAttempt: 0, startPrev: null, nativeVoice: true };
 
   if (!preview) {
     const user = await currentUser();
@@ -68,14 +62,13 @@ export default async function TalkChunkPage({
     // 추측 화면을 건너뛰는 길이 생긴다 (docs/FLOW.md 1′장: F13 → F17 → F14).
     if (!hasEnglish(row)) redirect(`/talk/${id}/guess`);
     chunk = row;
-    startAttempt = await countRecordings(user.id, { chunk: row.id });
-    // 원어민 음성이 있든 없든 읽는다. 범례가 "나, 2회차" 라고 말하는데 곡선이 없으면, 원어민이
-    // 생기는 순간 F14a 에서 고친 것과 **똑같은 결함**이 F14 에 남는다 (돌려서 확인했다).
-    // 겹치는 것과는 다른 이야기다 — 이건 내 마지막 곡선이고, "지난번" 은 원어민이 없을 때만 겹친다.
-    startPrev = await lastPitch(user.id, { chunk: row.id });
+    loop = await loadSpeakLoop(user.id, { chunk: row.id }, "en");
   }
 
   const highlight = chunk.meta.chunk ?? chunk.text;
+  // 디자인 미리보기에서만 `?native=0` 으로 F14a(원어민 소리 없음)를 띄운다 — 참고 화면이 둘이라
+  // 둘 다 눈으로 견줄 수 있어야 한다. 실제 화면은 이 파라미터를 보지 않는다.
+  const nativeVoice = preview ? native !== "0" : loop.nativeVoice;
 
   return (
     <Screen where="못 한 말" up="/talk" aside={preview ? "오후 7:11" : nowKST()} fixed={fixed === "1"}>
@@ -111,7 +104,7 @@ export default async function TalkChunkPage({
         </div>
       </Card>
       <Space h={16} />
-      <TalkLoop chunkId={chunk.id} text={highlight} preview={preview} startAttempt={startAttempt} nativeVoice={nativeVoice} startPrev={startPrev} />
+      <TalkLoop chunkId={chunk.id} text={highlight} preview={preview} startAttempt={loop.startAttempt} nativeVoice={nativeVoice} startPrev={loop.startPrev} />
     </Screen>
   );
 }
