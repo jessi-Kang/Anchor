@@ -8,8 +8,8 @@
  */
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { Client } from "pg";
 import { loadEnv } from "../lib/load-env";
+import { adminClient } from "../lib/admin-client";
 
 loadEnv();
 
@@ -31,8 +31,6 @@ type Backup = { format: string; version: number; taken_at: string; tables: Recor
 async function main() {
   const file = process.argv[2];
   if (!file) throw new Error("usage: pnpm backup:restore <파일.json.gz>");
-  const url = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL_ADMIN (또는 DATABASE_URL) 이 필요하다");
 
   const raw = readFileSync(file);
   const text = file.endsWith(".gz") ? gunzipSync(raw).toString("utf8") : raw.toString("utf8");
@@ -42,7 +40,7 @@ async function main() {
 
   const deleted = new Set((backup.tables["public.account_deletions"] ?? []).map((r) => String(r.user_id)));
 
-  const client = new Client({ connectionString: url });
+  const client = adminClient();
   await client.connect();
   try {
     await client.query("BEGIN");

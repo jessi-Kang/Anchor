@@ -2,21 +2,27 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { getOnboardingState, saveKanaResult } from "@/lib/db/onboarding";
-import { KANA_PASS } from "@/lib/onboarding-options";
-import { nextPath } from "@/lib/onboarding-flow";
+import { saveKanaResult } from "@/lib/db/settings";
+import { KANA_PASS } from "@/lib/kana";
 
-export async function submitKana(input: { recognized: number; total: number; supported: boolean; kanaModule: boolean }) {
+/** 같은 사이트 경로만 (열린 리다이렉트 방지) */
+function safeNext(next: string | undefined): string {
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/today";
+}
+
+/**
+ * O03 결과 저장. 자기 보고로 통과시키지 않는다 (docs/FLOW.md 1장 4′):
+ *  - 마이크가 기준 이상 인식 → passed → 카드로
+ *  - 미지원·거부·기준 미달 → recheck ("다음에 다시 확인") → O03b(마이크 문구) 1장 → 카드로
+ *  - "못 읽겠어" → module → O03b 가나 모듈 예고 1장 → 그대로 카드로 (잠그지 않는다)
+ */
+export async function submitKana(input: { recognized: number; total: number; supported: boolean; cannotRead: boolean; next?: string }) {
   const user = await requireUser();
   const recognized = Math.max(0, Math.min(input.total, Math.floor(input.recognized)));
-  // 인식이 불가능한 브라우저면 본인이 "다 읽었어"를 누른 것을 통과로 본다.
-  const passed = !input.kanaModule && (input.supported ? recognized >= KANA_PASS : true);
-  await saveKanaResult(
-    user.id,
-    { recognized, total: input.total, passed, supported: input.supported, checked_at: new Date().toISOString() },
-    // 못 읽겠다고 했거나, 인식이 됐는데 기준 미달이면 가나 모듈(v2) 대상
-    !passed,
-  );
-  const state = await getOnboardingState(user.id);
-  redirect(nextPath(state.settings, "ja", "kana"));
+  const status = input.cannotRead ? "module" : input.supported && recognized >= KANA_PASS ? "passed" : "recheck";
+  await saveKanaResult(user.id, { status, recognized, total: input.total, supported: input.supported, checked_at: new Date().toISOString() });
+  const next = safeNext(input.next);
+  if (status === "passed") redirect(next);
+  const why = status === "module" ? "" : "&why=mic";
+  redirect(`/onboarding/kana/module?next=${encodeURIComponent(next)}${why}`);
 }

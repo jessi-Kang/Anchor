@@ -16,16 +16,19 @@
     "design:check": "tsx scripts/design/check-screen.ts",
     "design:lint": "tsx scripts/design/lint-screens.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "backup:restore": "tsx scripts/backup/restore-json.ts"
+    "backup:restore": "tsx scripts/backup/restore-json.ts",
+    "kanji:build": "tsx scripts/kanji/build-kanjidic.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
     "@neondatabase/auth": "0.5.0-beta",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/blob": "^2.8.0",
     "next": "16.3.5",
     "pg": "^8",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22",

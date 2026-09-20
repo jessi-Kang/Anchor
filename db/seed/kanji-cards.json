@@ -1,0 +1,269 @@
+{
+  "_comment": "발견 카드 문안 (Scene1~5). 예시 자료(F02.html 의 トヨタ 기사)의 한자와 참고 HTML 의 協 카드를 손으로 적었다. 없는 한자는 Claude API 가 같은 형태로 만들어 nodes.meta.card 에 캐시한다(src/lib/kanji/card-content.ts). 규칙: 추측 질문은 부품에서 출발, 정답은 한 줄, 착지는 이미 아는 한국어 한자어(일본어 읽기 포함), 패턴은 받침→음독 한 줄. 한국어는 앵커 호출용.",
+  "cards": {
+    "協": {
+      "hook": { "word": "협력", "mark": "협" },
+      "parts_meaning": "열 사람의 힘",
+      "question": "열 사람이 힘을 모으면\n무슨 뜻이 될까?",
+      "answer": "힘을 합쳐 돕다",
+      "landing": [
+        { "word": "協力", "reading": "きょうりょく", "ko": "협력" },
+        { "word": "妥協", "reading": "だきょう", "ko": "타협" }
+      ],
+      "pattern": "ㅂ 받침은 장음 う로 끝나. 협 きょう, 십 じゅう, 업 ぎょう"
+    },
+    "開": {
+      "hook": { "word": "개발", "mark": "개" },
+      "parts_meaning": "문의 빗장을 두 손으로",
+      "question": "문의 빗장을 두 손으로 풀면\n무슨 뜻이 될까?",
+      "answer": "열다",
+      "landing": [
+        { "word": "開発", "reading": "かいはつ", "ko": "개발" },
+        { "word": "公開", "reading": "こうかい", "ko": "공개" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 개 かい, 회 かい, 사 しゃ"
+    },
+    "発": {
+      "hook": { "word": "발표", "mark": "발" },
+      "parts_meaning": "두 발로 딛고 뻗어 나가는 모양",
+      "question": "두 발로 딛고 밖으로 뻗으면\n무슨 뜻이 될까?",
+      "answer": "쏘다, 내보내다, 일어나다",
+      "landing": [
+        { "word": "発表", "reading": "はっぴょう", "ko": "발표" },
+        { "word": "出発", "reading": "しゅっぱつ", "ko": "출발" }
+      ],
+      "pattern": "ㄹ 받침은 つ로 끝나. 발 はつ, 출 しゅつ, 일 いち"
+    },
+    "基": {
+      "hook": { "word": "기반", "mark": "기" },
+      "parts_meaning": "그것(其) 아래의 흙",
+      "question": "무언가를 받치는 흙이면\n무슨 뜻이 될까?",
+      "answer": "터, 바탕",
+      "landing": [
+        { "word": "基盤", "reading": "きばん", "ko": "기반" },
+        { "word": "基本", "reading": "きほん", "ko": "기본" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 기 き, 이 り, 어 ご"
+    },
+    "盤": {
+      "hook": { "word": "기반", "mark": "반" },
+      "parts_meaning": "배(般)처럼 넓은 그릇",
+      "question": "넓고 평평한 그릇이면\n무슨 뜻이 될까?",
+      "answer": "소반, 넓은 판",
+      "landing": [
+        { "word": "基盤", "reading": "きばん", "ko": "기반" },
+        { "word": "円盤", "reading": "えんばん", "ko": "원반" }
+      ],
+      "pattern": "ㄴ 받침은 ん으로 끝나. 반 ばん, 간 かん, 신 しん"
+    },
+    "次": {
+      "hook": { "word": "차세대", "mark": "차" },
+      "parts_meaning": "하품하듯 잠시 멈춘 다음",
+      "question": "잠시 멈추고 그다음이면\n무슨 뜻이 될까?",
+      "answer": "다음, 버금",
+      "landing": [
+        { "word": "次世代", "reading": "じせだい", "ko": "차세대" },
+        { "word": "目次", "reading": "もくじ", "ko": "목차" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 차 じ, 시 し, 의 い"
+    },
+    "世": {
+      "hook": { "word": "세대", "mark": "세" },
+      "parts_meaning": "열(十)이 셋, 서른 해",
+      "question": "서른 해가 한 묶음이면\n무슨 뜻이 될까?",
+      "answer": "세상, 한 세대",
+      "landing": [
+        { "word": "世代", "reading": "せだい", "ko": "세대" },
+        { "word": "世界", "reading": "せかい", "ko": "세계" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 세 せ, 대 だい, 계 かい"
+    },
+    "代": {
+      "hook": { "word": "세대", "mark": "대" },
+      "parts_meaning": "사람이 주살(弋)을 바꿔 든다",
+      "question": "사람이 자리를 바꿔 들어서면\n무슨 뜻이 될까?",
+      "answer": "대신하다, 시대",
+      "landing": [
+        { "word": "世代", "reading": "せだい", "ko": "세대" },
+        { "word": "時代", "reading": "じだい", "ko": "시대" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 대 だい, 시 じ, 세 せ"
+    },
+    "車": {
+      "hook": { "word": "자동차", "mark": "차" },
+      "parts_meaning": "바퀴 달린 수레를 위에서 본 모양",
+      "question": "바퀴 달린 수레면\n무슨 뜻이 될까?",
+      "answer": "수레, 차",
+      "landing": [
+        { "word": "自動車", "reading": "じどうしゃ", "ko": "자동차" },
+        { "word": "電車", "reading": "でんしゃ", "ko": "전차" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 차 しゃ, 사 しゃ, 자 じ"
+    },
+    "両": {
+      "hook": { "word": "양사", "mark": "양" },
+      "parts_meaning": "한 틀 안에 둘이 나란히",
+      "question": "한 틀 안에 둘이 나란하면\n무슨 뜻이 될까?",
+      "answer": "둘, 양쪽",
+      "landing": [
+        { "word": "両社", "reading": "りょうしゃ", "ko": "양사" },
+        { "word": "両方", "reading": "りょうほう", "ko": "양방" }
+      ],
+      "pattern": "ㅇ 받침은 장음 う로 끝나. 양 りょう, 동 どう, 방 ほう"
+    },
+    "社": {
+      "hook": { "word": "회사", "mark": "사" },
+      "parts_meaning": "제단(示) 옆의 흙, 땅의 신을 모시던 곳",
+      "question": "땅의 신을 모시려 사람들이 모이면\n무슨 뜻이 될까?",
+      "answer": "모임, 회사",
+      "landing": [
+        { "word": "会社", "reading": "かいしゃ", "ko": "회사" },
+        { "word": "社会", "reading": "しゃかい", "ko": "사회" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 사 しゃ, 회 かい, 차 しゃ"
+    },
+    "日": {
+      "hook": { "word": "일요일", "mark": "일" },
+      "parts_meaning": "해의 모양",
+      "question": "해 하나가 뜨고 지면\n무슨 뜻이 될까?",
+      "answer": "해, 하루",
+      "landing": [
+        { "word": "日曜日", "reading": "にちようび", "ko": "일요일" },
+        { "word": "毎日", "reading": "まいにち", "ko": "매일" }
+      ],
+      "pattern": "ㄹ 받침은 つ·ち로 끝나. 일 にち, 발 はつ, 출 しゅつ"
+    },
+    "作": {
+      "hook": { "word": "작성", "mark": "작" },
+      "parts_meaning": "사람이 잠깐(乍) 손을 놀린다",
+      "question": "사람이 손을 놀려 무언가 생기면\n무슨 뜻이 될까?",
+      "answer": "만들다",
+      "landing": [
+        { "word": "作成", "reading": "さくせい", "ko": "작성" },
+        { "word": "作品", "reading": "さくひん", "ko": "작품" }
+      ],
+      "pattern": "ㄱ 받침은 く로 끝나. 작 さく, 학 がく, 국 こく"
+    },
+    "表": {
+      "hook": { "word": "발표", "mark": "표" },
+      "parts_meaning": "옷(衣) 위에 털이 난 쪽",
+      "question": "옷의 털이 난 바깥쪽이면\n무슨 뜻이 될까?",
+      "answer": "겉, 드러내다",
+      "landing": [
+        { "word": "発表", "reading": "はっぴょう", "ko": "발표" },
+        { "word": "表現", "reading": "ひょうげん", "ko": "표현" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 표 ひょう, 요 よう, 교 きょう"
+    },
+    "力": {
+      "hook": { "word": "협력", "mark": "력" },
+      "parts_meaning": "팔에 힘을 준 모양",
+      "question": "팔에 힘을 주면\n무슨 뜻이 될까?",
+      "answer": "힘",
+      "landing": [
+        { "word": "協力", "reading": "きょうりょく", "ko": "협력" },
+        { "word": "能力", "reading": "のうりょく", "ko": "능력" }
+      ],
+      "pattern": "ㄱ 받침은 く로 끝나. 력 りょく, 학 がく, 작 さく"
+    },
+    "新": {
+      "hook": { "word": "신제품", "mark": "신" },
+      "parts_meaning": "선 나무를 도끼(斤)로 막 벤 것",
+      "question": "나무를 막 베어 냈으면\n무슨 뜻이 될까?",
+      "answer": "새롭다",
+      "landing": [
+        { "word": "新製品", "reading": "しんせいひん", "ko": "신제품" },
+        { "word": "新聞", "reading": "しんぶん", "ko": "신문" }
+      ],
+      "pattern": "ㄴ 받침은 ん으로 끝나. 신 しん, 간 かん, 반 ばん"
+    },
+    "安": {
+      "hook": { "word": "안전", "mark": "안" },
+      "parts_meaning": "집(宀) 안의 여자",
+      "question": "집 안에 사람이 편히 있으면\n무슨 뜻이 될까?",
+      "answer": "편안하다",
+      "landing": [
+        { "word": "安全", "reading": "あんぜん", "ko": "안전" },
+        { "word": "安心", "reading": "あんしん", "ko": "안심" }
+      ],
+      "pattern": "ㄴ 받침은 ん으로 끝나. 안 あん, 전 ぜん, 신 しん"
+    },
+    "全": {
+      "hook": { "word": "안전", "mark": "전" },
+      "parts_meaning": "들어온(入) 옥(王)이 흠 없음",
+      "question": "흠 하나 없이 다 갖춰지면\n무슨 뜻이 될까?",
+      "answer": "온전하다, 모두",
+      "landing": [
+        { "word": "安全", "reading": "あんぜん", "ko": "안전" },
+        { "word": "全部", "reading": "ぜんぶ", "ko": "전부" }
+      ],
+      "pattern": "ㄴ 받침은 ん으로 끝나. 전 ぜん, 안 あん, 반 ばん"
+    },
+    "運": {
+      "hook": { "word": "운전", "mark": "운" },
+      "parts_meaning": "군대(軍)가 길(辶)을 간다",
+      "question": "군대가 길을 따라 움직이면\n무슨 뜻이 될까?",
+      "answer": "옮기다, 움직이다",
+      "landing": [
+        { "word": "運転", "reading": "うんてん", "ko": "운전" },
+        { "word": "運動", "reading": "うんどう", "ko": "운동" }
+      ],
+      "pattern": "ㄴ 받침은 ん으로 끝나. 운 うん, 전 てん, 안 あん"
+    },
+    "転": {
+      "hook": { "word": "운전", "mark": "전" },
+      "parts_meaning": "수레(車)가 오로지(云) 돈다",
+      "question": "수레 바퀴가 계속 돌면\n무슨 뜻이 될까?",
+      "answer": "구르다, 돌다",
+      "landing": [
+        { "word": "運転", "reading": "うんてん", "ko": "운전" },
+        { "word": "回転", "reading": "かいてん", "ko": "회전" }
+      ],
+      "pattern": "ㄴ 받침은 ん으로 끝나. 전 てん, 운 うん, 회 かい"
+    },
+    "支": {
+      "hook": { "word": "지원", "mark": "지" },
+      "parts_meaning": "손(又)에 든 가지(十)",
+      "question": "손으로 가지를 받치면\n무슨 뜻이 될까?",
+      "answer": "받치다, 가르다",
+      "landing": [
+        { "word": "支援", "reading": "しえん", "ko": "지원" },
+        { "word": "支店", "reading": "してん", "ko": "지점" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 지 し, 시 し, 기 き"
+    },
+    "妥": {
+      "hook": { "word": "타협", "mark": "타" },
+      "parts_meaning": "손(爫)으로 여자를 눌러 앉힘",
+      "question": "누르고 앉혀 가라앉히면\n무슨 뜻이 될까?",
+      "answer": "온당하다, 가라앉다",
+      "landing": [
+        { "word": "妥協", "reading": "だきょう", "ko": "타협" },
+        { "word": "妥当", "reading": "だとう", "ko": "타당" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 타 だ, 협 きょう, 당 とう"
+    },
+    "助": {
+      "hook": { "word": "조력", "mark": "조" },
+      "parts_meaning": "또(且) 힘(力)을 보탬",
+      "question": "힘을 하나 더 보태면\n무슨 뜻이 될까?",
+      "answer": "돕다",
+      "landing": [
+        { "word": "助力", "reading": "じょりょく", "ko": "조력" },
+        { "word": "援助", "reading": "えんじょ", "ko": "원조" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 조 じょ, 력 りょく, 원 えん"
+    },
+    "加": {
+      "hook": { "word": "추가", "mark": "가" },
+      "parts_meaning": "힘(力)에 말(口)을 보탬",
+      "question": "힘에 말까지 얹으면\n무슨 뜻이 될까?",
+      "answer": "더하다",
+      "landing": [
+        { "word": "追加", "reading": "ついか", "ko": "추가" },
+        { "word": "参加", "reading": "さんか", "ko": "참가" }
+      ],
+      "pattern": "받침 없는 소리는 한 박자 그대로. 가 か, 추 つい, 참 さん"
+    }
+  }
+}
