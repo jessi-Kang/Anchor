@@ -23,6 +23,7 @@ export function PitchLoop({
   doneLabel,
   onDone,
   firstNote,
+  startAttempt,
 }: {
   target: { card: string } | { chunk: string };
   text: string;
@@ -32,10 +33,12 @@ export function PitchLoop({
   doneLabel: string;
   onDone: (spoke: boolean) => void;
   firstNote: string;
+  /** 이미 쌓인 녹음 수. 범례의 회차는 화면 상태가 아니라 DB 의 사실이다 (docs/FLOW.md 1′장) */
+  startAttempt: number;
 }) {
   const [native, setNative] = useState<Point[] | null>(() => (preview ? demoCurve(0) : null));
   const [mine, setMine] = useState<Point[] | null>(() => (preview ? demoCurve(1) : null));
-  const [attempt, setAttempt] = useState(preview ? 3 : 0);
+  const [attempt, setAttempt] = useState(preview ? 3 : startAttempt);
   const [state, setState] = useState<"idle" | "playing" | "recording" | "saving" | "denied">("idle");
   const [note, setNote] = useState<string>(firstNote);
   const ctxRef = useRef<AudioContext | null>(null);
