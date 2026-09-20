@@ -342,3 +342,34 @@
   background: var(--color-tint);
   color: var(--color-accent-dark);
 }
+
+/* 행이 링크·버튼일 때: 모양은 같은 행, 색·정렬만 물려받는다 */
+a.row,
+.rowButton {
+  width: 100%;
+  text-decoration: none;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* 상단 오른쪽 작은 텍스트 링크 ("나중에 할게"). 상단 바와 같은 14px 회색 */
+.topLink {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text2);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.topLink:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

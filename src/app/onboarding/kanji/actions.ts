@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { finishOnboarding, getOnboardingState, markStepFinished, recordSeedJudgement } from "@/lib/db/onboarding";
+import { getOnboardingState, recordSeedJudgement, setStepState } from "@/lib/db/onboarding";
 import { nextPath } from "@/lib/onboarding-flow";
 
 export async function judgeKanji(nodeId: string, recalled: boolean) {
@@ -11,11 +11,10 @@ export async function judgeKanji(nodeId: string, recalled: boolean) {
   await recordSeedJudgement(user.id, nodeId, recalled);
 }
 
+/** 40장을 다 봤거나 "여기까지"를 눌렀을 때. done 으로 두고(다시 묻지 않음) 다음으로. */
 export async function finishKanji() {
   const user = await requireUser();
-  await markStepFinished(user.id, "kanji");
+  await setStepState(user.id, "kanji", "done");
   const state = await getOnboardingState(user.id);
-  const next = nextPath(state.settings, "kanji");
-  if (next === "/today") await finishOnboarding(user.id);
-  redirect(next);
+  redirect(nextPath(state.settings, "ja", "kanji"));
 }

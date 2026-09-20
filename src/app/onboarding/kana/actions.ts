@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { finishOnboarding, getOnboardingState, saveKanaResult } from "@/lib/db/onboarding";
+import { getOnboardingState, saveKanaResult } from "@/lib/db/onboarding";
 import { KANA_PASS } from "@/lib/onboarding-options";
 import { nextPath } from "@/lib/onboarding-flow";
 
@@ -17,9 +17,6 @@ export async function submitKana(input: { recognized: number; total: number; sup
     // 못 읽겠다고 했거나, 인식이 됐는데 기준 미달이면 가나 모듈(v2) 대상
     !passed,
   );
-
   const state = await getOnboardingState(user.id);
-  const next = nextPath(state.settings, "kana");
-  if (next === "/today") await finishOnboarding(user.id);
-  redirect(next);
+  redirect(nextPath(state.settings, "ja", "kana"));
 }

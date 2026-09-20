@@ -84,15 +84,55 @@ export function Label({ children }: { children: ReactNode }) {
   return <div className={s.label}>{children}</div>;
 }
 
-export function Row({ title, sub, right }: { title: ReactNode; sub?: ReactNode; right?: ReactNode }) {
-  return (
-    <div className={s.row}>
+/** 목록 행. href 가 있으면 행 전체가 링크, onClick 이 있으면 버튼(토글용). */
+export function Row({
+  title,
+  sub,
+  right,
+  href,
+  onClick,
+  pressed,
+}: {
+  title: ReactNode;
+  sub?: ReactNode;
+  right?: ReactNode;
+  href?: string;
+  onClick?: () => void;
+  /** onClick 행의 토글 상태 (aria-pressed) */
+  pressed?: boolean;
+}) {
+  const inner = (
+    <>
       <div className={s.rowText}>
         <span className={s.rowTitle}>{title}</span>
         {sub && <span className={s.rowSub}>{sub}</span>}
       </div>
       {right}
-    </div>
+    </>
+  );
+  if (href) {
+    return (
+      <Link href={href} className={s.row}>
+        {inner}
+      </Link>
+    );
+  }
+  if (onClick) {
+    return (
+      <button type="button" className={cx(s.row, s.rowButton)} onClick={onClick} aria-pressed={pressed}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className={s.row}>{inner}</div>;
+}
+
+/** 상단 오른쪽 작은 텍스트 링크 (단계 건너뛰기 등). 하단 회색 링크와 별개로 화면당 1개. */
+export function TopLink({ children, onClick, disabled }: { children: ReactNode; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" className={s.topLink} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
   );
 }
 

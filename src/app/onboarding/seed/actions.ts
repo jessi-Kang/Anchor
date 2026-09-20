@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { finishOnboarding, getOnboardingState, markStepFinished, recordSeedJudgement } from "@/lib/db/onboarding";
-import { nextPath } from "@/lib/onboarding-flow";
+import { getOnboardingState, recordSeedJudgement, setStepState } from "@/lib/db/onboarding";
+import { isLang, nextPath } from "@/lib/onboarding-flow";
 
 export async function judgeSeed(nodeId: string, recalled: boolean) {
   const user = await requireUser();
@@ -11,12 +11,11 @@ export async function judgeSeed(nodeId: string, recalled: boolean) {
   await recordSeedJudgement(user.id, nodeId, recalled);
 }
 
-/** 40장을 다 봤거나 "여기까지"를 눌렀을 때. 이 단계는 끝난 것으로 표시하고 남은 단계로 (없으면 홈). */
-export async function finishSeed() {
+/** 40장을 다 봤거나 "여기까지"를 눌렀을 때. done 으로 두고(다시 묻지 않음) 이 언어의 다음으로. */
+export async function finishSeed(lang: string) {
+  if (!isLang(lang)) throw new Error("bad lang");
   const user = await requireUser();
-  await markStepFinished(user.id, "seed");
+  await setStepState(user.id, "seed", "done");
   const state = await getOnboardingState(user.id);
-  const next = nextPath(state.settings, "seed");
-  if (next === "/today") await finishOnboarding(user.id);
-  redirect(next);
+  redirect(nextPath(state.settings, lang, "seed"));
 }
