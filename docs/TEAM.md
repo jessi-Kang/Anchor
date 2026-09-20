@@ -123,4 +123,5 @@ Jessi 가 결정할 것은 돈이 들거나(유료 플랜·외부 계정), 제�
 | API 키 | `ANTHROPIC_API_KEY` · `ELEVENLABS_API_KEY` 는 Jessi 가 Vercel 에 직접 넣는다. 키 값은 채팅·커밋·문서 어디에도 쓰지 않는다 |
 | 가나를 못 읽을 때 | 한자 카드를 잠그지 않는다. 예고 1장을 보이고 그대로 카드로 보낸다. 읽기는 F10 에서 소리로 들려준다 |
 | PITR 기간이 적힌 곳 | `docs/BACKUP.md` 한 곳. 다른 문서는 숫자를 쓰지 않고 이 문서를 가리킨다 |
+| 스키마 변경 | `db/migrations/` 의 SQL 파일로만 한다. MCP 로 프로덕션 DB 에 직접 DDL 을 치지 않는다. 복구(`docs/BACKUP.md` 절차 C)가 `pnpm db:migrate` 로 스키마를 다시 만드는 전제 위에 서 있어, 파일에 없는 테이블은 복구하면 행째로 사라진다. 조회(SELECT)는 MCP 로 해도 된다 |
 | 만드는 순서 | `docs/TEAM.md` 4장이 정한다. `docs/SPEC.md` 9장은 무엇을 검증하는가를 정하고 순서를 정하지 않는다 |
