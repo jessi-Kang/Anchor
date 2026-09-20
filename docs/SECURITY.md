@@ -4,7 +4,7 @@
 
 기능이 예쁜지, 코드가 깔끔한지는 여기서 보지 않는다. 보는 것은 셋이다. 데이터를 잃지 않는가, 남에게 새지 않는가, 지운다고 한 것이 실제로 지워지는가.
 
-점검 시각: 2026-09-20. 대상: `main` (`b3514f4`) 과 프로덕션 배포(마이그레이션 `0006`).
+점검 시각: 2026-09-20. 대상: `main` (`29a7737`) 과 프로덕션 배포(마이그레이션 `0006`).
 
 
 ## 1. 점검 항목
@@ -89,19 +89,21 @@ C6~C13 은 음성 원본에 대한 것이다. `/api/recordings` 가 들어오면
 
 ## 2. 지금 상태
 
-판정은 셋이다. **돌림** = 실제로 실행해 결과를 봤다. **읽음** = 코드·설정을 읽었다. **못 지킴**·**확인 못 함**·**해당 없음** 은 그대로다.
+판정은 넷이다. **돌림** = 실제로 실행해 결과를 봤다. **절반** = 한쪽은 돌려 봤고 나머지 한쪽은 이 환경에서 못 돌린다. **읽음** = 코드·설정을 읽었다. 그 밖에 **못 지킴**·**확인 못 함**·**해당 없음**.
+
+돌림에는 **어디서 돌렸는지**를 같이 적는다. 로컬에서 닫은 것은 "로컬에서 확인함"이지 "프로덕션에서 확인함"이 아니다. 로컬은 PG16, 프로덕션은 PG18 이다.
 
 읽음과 돌림을 나누는 이유가 있다. 읽어서 내린 판정은 "그렇게 쓰여 있다"이지 "그렇게 동작한다"가 아니다. 권한·정책·트랜잭션 경계·삭제가 실제로 일어나는지는 **런타임에만 드러나고 읽어서는 잡히지 않는다.** 계정 삭제가 그 자리에서 났다 — 코드는 맞게 보였고 권한이 모자라 한 번도 성공한 적이 없었다.
 
 | # | 판정 | 근거 |
 | --- | --- | --- |
-| A1 | 돌림 | 여덟 표 전부 `REFERENCES users(id) ON DELETE CASCADE`. 로컬 DB 에 마이그레이션을 적용하고 한 계정을 지워 여덟 표가 모두 0행이 되는 것을 봤다 |
-| A2 | 돌림 | 프로덕션 `/api/health` 200, `rls_all_enabled: true`, `node_cards` 를 포함한 표 11개 모두 `rowsecurity: true` |
-| A3 | 돌림 | 같은 응답의 `db_role: anchor_app`, `role_bypasses_rls: false`. 역할은 `0001` 이 `NOBYPASSRLS` 로 만든다. 소유자 역할은 `BYPASSRLS` 를 가지고 `anchor_app` 에 ADMIN 도 가지므로 언제든 앱 역할이 될 수 있다. 격리는 소유자를 막는 것이 아니라 앱이 소유자 연결을 쓰지 않는 것(A7)으로 선다 |
-| A4 | 돌림 | 부록 스크립트를 임시 브랜치에서 두 계정으로 돌렸다(2026-09-20, `0005` 기준). 14단계 전부 기대값과 같다. 컨텍스트 없이 0행, A 는 A 만, B 의 행은 id 를 알아도 0행, B 를 고치거나 지우면 0행, B 소유로 INSERT 는 `42501`, 삭제 원장 읽기는 `permission denied`, 공용 노드는 읽히고 만들 수는 없다 |
+| A1 | 돌림 (로컬) | 여덟 표 전부 `REFERENCES users(id) ON DELETE CASCADE`. 로컬 DB 에 마이그레이션을 적용하고 한 계정을 지워 여덟 표가 모두 0행이 되는 것을 봤다 |
+| A2 | 돌림 (프로덕션) | `/api/health` 200, `rls_all_enabled: true`, `node_cards` 를 포함한 표 11개 모두 `rowsecurity: true` |
+| A3 | 돌림 (프로덕션) | `/api/health` 응답의 `db_role: anchor_app`, `role_bypasses_rls: false`. 역할은 `0001` 이 `NOBYPASSRLS` 로 만든다. 소유자 역할은 `BYPASSRLS` 를 가지고 `anchor_app` 에 ADMIN 도 가지므로 언제든 앱 역할이 될 수 있다. 격리는 소유자를 막는 것이 아니라 앱이 소유자 연결을 쓰지 않는 것(A7)으로 선다 |
+| A4 | 돌림 (임시 브랜치) | 부록 스크립트를 임시 브랜치에서 두 계정으로 돌렸다(2026-09-20, `0005` 기준). 14단계 전부 기대값과 같다. 컨텍스트 없이 0행, A 는 A 만, B 의 행은 id 를 알아도 0행, B 를 고치거나 지우면 0행, B 소유로 INSERT 는 `42501`, 삭제 원장 읽기는 `permission denied`, 공용 노드는 읽히고 만들 수는 없다 |
 | A5 | 읽음 | `withoutUser()` 를 쓰는 곳은 `/api/health` 하나다. 나머지 사용자 데이터 경로는 전부 `withUser()` |
-| A6 | 돌림 | `node_cards` 만 `USING (true)` 를 쓰고 SELECT 전용이다. 로컬 DB 에서 `anchor_app` 으로 돌렸다 — 공용 노드에 쓰기는 되고, **내 개인 노드에 쓰면 `42501` 로 막히고**, 읽기와 공용 행 UPDATE 는 되고, DELETE 는 권한이 없다 |
-| A7 | 돌림 | 프로덕션 `/api/health` 가 `db_role: anchor_app` 을 돌려준다 — 앱이 실제로 앱 역할로 붙어 있다. `src/lib/env.ts` 는 `ANCHOR_DATABASE_URL` 만 읽고, `DATABASE_URL` 을 읽는 런타임 코드는 크론 둘뿐이다 |
+| A6 | 돌림 (로컬) | `node_cards` 만 `USING (true)` 를 쓰고 SELECT 전용이다. 로컬 DB 에서 `anchor_app` 으로 돌렸다 — 공용 노드에 쓰기는 되고, **내 개인 노드에 쓰면 `42501` 로 막히고**, 읽기와 공용 행 UPDATE 는 되고, DELETE 는 권한이 없다 |
+| A7 | 돌림 (프로덕션) | `/api/health` 가 `db_role: anchor_app` 을 돌려준다 — 앱이 실제로 앱 역할로 붙어 있다. `src/lib/env.ts` 는 `ANCHOR_DATABASE_URL` 만 읽고, `DATABASE_URL` 을 읽는 런타임 코드는 크론 둘뿐이다 |
 | B1 | 읽음 | `.gitignore` 의 `.env*` + `!.env.example`. 추적되는 env 파일은 `.env.example` 하나 |
 | B2 | 읽음 | 값이 있는 줄은 자리표시자와 공개된 voice_id 뿐. 이 파일의 모든 과거 버전도 같다 |
 | B3 | 읽음 | 전 커밋 검색에서 연결 문자열·API 키 형태 0건. `.env` 가 커밋된 적 없다 |
@@ -109,35 +111,35 @@ C6~C13 은 음성 원본에 대한 것이다. `/api/recordings` 가 들어오면
 | B5 | **못 지킴** | `/api/health` 의 예외 경로가 인증 없이 드라이버 오류 문구를 돌려준다 (3장 N2) |
 | B6 | 읽음 | 커밋 메시지 전문 검색에서 0건 |
 | C1 | 읽음 | `requireUser()` 로 401, `confirm: "삭제"` 아니면 400. 미들웨어가 `/api/account/*` 도 막고, 세션 없이 부르면 307 이다(프로덕션). HTTP 계층 전체를 돌려 보지는 못했다 — **이 항목이 한 번 거짓이었다.** 원장 INSERT 가 권한에 막혀 삭제가 500 으로 끝나던 것을 읽어서는 못 잡았다 |
-| C2 | 돌림 | 한 계정을 지워 `inputs`·`cards`·`chunks`·`recordings`·`user_node_state`·`encounters`·개인 `nodes` 가 전부 0행이 되는 것을 봤다(로컬). 임시 브랜치에서는 같은 순간 다른 계정의 행이 그대로인 것도 확인했다 — CASCADE 가 계정 경계를 넘지 않는다 |
-| C3 | 돌림 | 로컬 DB 에서 계정을 지운 뒤 **소유자 연결로 원장을 보니 그 행이 남아 있다**. `account_deletions` 는 `users` 를 참조하지 않아 CASCADE 에 딸려 가지 않는다. 앱 역할로는 원장을 읽지 못한다(`permission denied`, 같이 확인) |
+| C2 | 돌림 (로컬·임시 브랜치) | 한 계정을 지워 `inputs`·`cards`·`chunks`·`recordings`·`user_node_state`·`encounters`·개인 `nodes` 가 전부 0행이 되는 것을 봤다(로컬). 임시 브랜치에서는 같은 순간 다른 계정의 행이 그대로인 것도 확인했다 — CASCADE 가 계정 경계를 넘지 않는다 |
+| C3 | 돌림 (로컬) | 로컬 DB 에서 계정을 지운 뒤 **소유자 연결로 원장을 보니 그 행이 남아 있다**. `account_deletions` 는 `users` 를 참조하지 않아 CASCADE 에 딸려 가지 않는다. 앱 역할로는 원장을 읽지 못한다(`permission denied`, 같이 확인) |
 | C4 | **확인 못 함** | 코드 경로는 있다. 첫 백업이 2026-09-20 이라 35일 만료 삭제는 아직 한 번도 돌지 않았다. 2026-10-25 이후에 실제 파일 목록으로 확인한다 |
 | C5 | 읽음 | 삭제 요청 뒤의 백업에는 그 계정이 없다. 마지막 사본은 요청 직전 백업이고 `requested_at` 보다 이르다. 원장 표시 시각(`requested_at` + 보존 기간)이 그보다 늦다 |
-| C6 | 읽음 | `/api/recordings` 가 `access: "private"` 로 올리고, 키가 `voice/<user_id>/…` 라 계정별로 갈린다. DB 에는 URL 이 아니라 pathname 만 남는다 |
+| C6 | 절반 | (읽음) `/api/recordings` 가 `access: "private"` 로 올리고, 키가 `voice/<user_id>/…` 라 계정별로 갈린다. DB 에는 URL 이 아니라 pathname 만 남는다. **못 돌린 쪽**: 올라간 오브젝트 URL 을 로그아웃 상태로 열어 막히는지. Blob 이 걸려 로컬로는 안 된다 |
 | C7 | 해당 없음 | 원본을 다시 들려주는 경로가 아직 없다. 생기는 순간 확인한다 |
 | C8 | 읽음 | 업로드가 그 사용자의 `voice_retention_days` 를 읽어 `audio_expires_at` 을 정한다. 30 은 행이 없을 때의 대비값일 뿐이다 |
 | C9 | 읽음 | `/api/cron/voice` 가 매일 돈다. 오브젝트를 지운 뒤에만 `audio_object_key` 를 NULL 로 만들고, 실패한 건은 행을 남겨 다음 번에 다시 집는다. `CRON_SECRET` 없이 부르면 403(프로덕션에서 확인) |
 | C10 | 읽음 | `pitch` 는 `recordings` 행에 있고 오브젝트와 따로 산다 |
 | C11 | 해당 없음 | 설정에 보관 기간을 바꾸는 행이 아직 없다 |
-| C12 | 읽음 | 삭제 라우트가 스토리지를 **DB 보다 먼저** 지운다. 실패하면 DB 를 건드리지 않고 502. Blob 토큰이 없는 환경에서는 남은 원본을 세어 있으면 503 으로 멈춘다 |
+| C12 | 절반 | (로컬에서 돌림) DB 쪽은 확인했다 — 계정을 지우면 `recordings` 행이 CASCADE 로 사라진다. (읽음) 삭제 라우트가 스토리지를 **DB 보다 먼저** 지우고, 실패하면 DB 를 건드리지 않고 502, 토큰이 없으면 남은 원본을 세어 503 으로 멈춘다. **못 돌린 쪽**: 오브젝트가 실제로 사라지는지. Blob 이 걸려 로컬로는 안 된다 |
 | C13 | 읽음 | `SELECT id FROM cards WHERE id = $1 AND user_id = $2` 로 주인을 확인하고, 스토리지 키에는 입력값이 아니라 DB 가 돌려준 id 를 쓴다 |
 | D1 | **확인 못 함** | Claude API 호출이 `main` 에 들어왔다(`src/lib/kanji/card-content.ts`). 호출에 학습 미사용을 켜는 인자는 없다. Anthropic API 에는 요청 단위 설정이 없고 상용 API 약관이 기본으로 학습에서 제외하므로, 이 원칙은 코드가 아니라 **계정 약관으로 지켜진다**. 계정 쪽을 확인해야 판정이 끝난다 (3장 N6) |
 | D2 | **확인 못 함** | ElevenLabs 호출이 `main` 에 들어왔다(`src/app/api/tts/route.ts`). 같은 모양이다. ElevenLabs 는 계정 단위 보관·학습 설정이 따로 있어 콘솔에서 확인해야 한다 (3장 N6) |
 | D3 | 읽음 | 카드 생성은 사전 데이터(음독·한국 한자음·영어 뜻·부품)만 보낸다. 추측 판정은 추측 한 줄과 정답만 보낸다. TTS 는 200자로 자른다. 사용자 자료를 통째로 보내는 경로가 없다 |
 | D4 | 읽음 | 외부 호출 결과를 담는 캐시는 `node_cards` 하나고, 쓰기가 공용 노드로 제한된다(A6). 담기는 것은 사전 데이터에서 만든 카드 문안이다. 추측 판정 결과는 캐시하지 않는다 |
-| E1 | 읽음 | `/api/cron/backup` 이 `access: "private"` 로 올린다. 스토어 자체의 설정은 Vercel 콘솔에서만 보이고 이 세션은 보지 않는다 |
-| E2 | 돌림 | 프로덕션에서 헤더 없이 호출하면 403 |
+| E1 | 절반 | (읽음) `/api/cron/backup` 이 `access: "private"` 로 올린다. **못 돌린 쪽**: 백업 파일 URL 을 인증 없이 열어 막히는지, 스토어 설정이 실제로 비공개인지. 둘 다 Vercel 콘솔과 Blob 이 걸려 이 세션에서는 안 된다 |
+| E2 | 돌림 (프로덕션) | 헤더 없이 호출하면 403 |
 | E3 | 읽음 | 두 층 모두 토큰을 뺀다. 매일 JSON 백업은 매핑 컬럼만 뜨고, `pg_dump` 는 `--exclude-table-data='neon_auth.account'` 로 그 표의 행을 뺀다 |
 | E4 | 읽음 | `db/recovery/reapply-roles-and-rls.sql` 이 역할·권한·`0002`·`0003` 을 다시 적용한다 |
-| E5 | 돌림 | `main` 과 프로덕션이 둘 다 `0006` 이다. `main` 을 체크아웃한 복구가 프로덕션 스키마를 그대로 다시 만든다 |
+| E5 | 돌림 (프로덕션) | `main` 과 프로덕션이 둘 다 `0006` 이다. `main` 을 체크아웃한 복구가 프로덕션 스키마를 그대로 다시 만든다 |
 | E6 | **못 지킴** | 백업은 `neon_auth.user`·`account` 를 담지만 복원 스크립트는 `public.*` 만 넣는다 (3장 L2) |
 | E7 | **확인 못 함** | `docs/BACKUP.md` 의 리허설 표가 비어 있다. 백업에서 실제로 복구된 적이 없다 (3장 L3) |
 | F1 | **확인 못 함** | 로그인 시작이 내려주는 쿠키는 `__Secure-` 접두사에 `HttpOnly; Secure; SameSite=Lax; Path=/` 를 모두 갖는다. 로그인을 마친 뒤의 세션 쿠키는 실제 Google 로그인이 있어야 본다 |
 | F2 | 읽음 | `src/lib/env.ts` 가 32자 미만이면 시작 시점에 던진다 |
-| F3 | 돌림 | 세션 없이 `/today`·`/settings`·`/onboarding/languages`·`/api/export`·`/api/account/delete` 가 모두 307 로 `/` 로 간다 |
+| F3 | 돌림 (프로덕션) | 세션 없이 `/today`·`/settings`·`/onboarding/languages`·`/api/export`·`/api/account/delete` 가 모두 307 로 `/` 로 간다 |
 | F4 | 읽음 | `src/app/api/**` 와 `**/actions.ts` 를 훑어 `requireUser()`·`currentUser()` 가 없는 것을 찾으면 셋뿐이고 각각 이유가 있다 — 인증 프록시, `CRON_SECRET` 으로 막힌 크론 둘, 사용자 데이터가 없는 헬스체크. 나머지는 전부 먼저 부른다 |
 | F5 | 읽음 | matcher 에서 뺀 셋은 `/api/auth`(인증 자체), `/api/health`(사용자 데이터 없음), `/api/cron`(`CRON_SECRET` 으로 막힘) |
-| F6 | 돌림 | 시험 로그인은 세 겹으로 닫힌다. `next.config.ts` 가 `dev.ts` 를 `pageExtensions` 에 넣을 때만 라우트가 되고(`next build` 는 `NODE_ENV=production` 을 스스로 켠다), 부르는 쪽은 빌드 시점에 접히는 조건 안에서만 동적 import 하며, `testLoginEnabled()` 가 런타임에 다시 본다. 빌드 라우트 목록에 없고 `.next` 문자열 0건이며, 프로덕션에서 `/api/test-login` 은 없는 주소와 똑같이 307 이다 |
+| F6 | 돌림 (프로덕션) | 시험 로그인은 세 겹으로 닫힌다. `next.config.ts` 가 `dev.ts` 를 `pageExtensions` 에 넣을 때만 라우트가 되고(`next build` 는 `NODE_ENV=production` 을 스스로 켠다), 부르는 쪽은 빌드 시점에 접히는 조건 안에서만 동적 import 하며, `testLoginEnabled()` 가 런타임에 다시 본다. 빌드 라우트 목록에 없고 `.next` 문자열 0건이며, 프로덕션에서 `/api/test-login` 은 없는 주소와 똑같이 307 이다 |
 
 ## 3. 못 지키는 것과 그 이유
 
