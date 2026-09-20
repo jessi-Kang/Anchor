@@ -323,3 +323,22 @@
   width: 72px;
   height: 72px;
 }
+
+/* 씨앗 카드 앞면이 한자일 때 (44~132px 범위, 여기선 84px) */
+.flipKanji {
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-size: 84px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--color-text1);
+}
+/* 한국어 앵커 한 줄: 설명이 아니라 아는 소리를 부르는 용도라 배경 틴트로 표시 */
+.flipAnchor {
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-tint);
+  color: var(--color-accent-dark);
+}
