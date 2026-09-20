@@ -56,11 +56,20 @@ export async function POST(req: Request) {
   }
 
   await withUser(user.id, async (tx) => {
-    await tx.query(
-      `INSERT INTO account_deletions (user_id) VALUES ($1)
-       ON CONFLICT (user_id) DO UPDATE SET requested_at = now()`,
-      [user.id],
-    );
+    // 원장은 앱에게 INSERT 전용이다(0001). ON CONFLICT 는 DO UPDATE 든 DO NOTHING 이든 충돌 행을 보려고
+    // SELECT 권한을 요구해서 여기서 42501 로 막혔다. 원장을 읽을 수 있게 여는 대신 그냥 넣는다.
+    // 같은 id 로 다시 요청해 이미 행이 있으면(23505) 처음 요청 시각을 그대로 둔다 — 백업 사본이
+    // 사라지는 시점의 기준 시각은 데이터가 처음 사라진 때다.
+    // SAVEPOINT 로 감싸는 이유: 한 트랜잭션 안에서 오류가 나면 뒤 문장이 전부 막힌다. 원장 INSERT 와
+    // users DELETE 가 같은 트랜잭션이어야 한다는 전제(docs/SECURITY.md C3)는 그대로 지킨다.
+    await tx.query("SAVEPOINT ledger");
+    try {
+      await tx.query("INSERT INTO account_deletions (user_id) VALUES ($1)", [user.id]);
+      await tx.query("RELEASE SAVEPOINT ledger");
+    } catch (e) {
+      await tx.query("ROLLBACK TO SAVEPOINT ledger");
+      if ((e as { code?: string })?.code !== "23505") throw e;
+    }
     await tx.query("DELETE FROM users WHERE id = $1", [user.id]);
   });
 
