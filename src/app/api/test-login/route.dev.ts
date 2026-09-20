@@ -12,6 +12,7 @@
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { TEST_COOKIE, COOKIE_OPTIONS, issueCookieValue, testLoginEnabled } from "@/lib/auth/test-login";
+import { safeNext } from "@/lib/safe-next";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +27,8 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
-  // 같은 사이트 경로만 (열린 리다이렉트 방지). `/` 화면과 같은 규칙.
-  const next = url.searchParams.get("next");
-  const to = next && next.startsWith("/") && !next.startsWith("//") ? next : "/today";
+  // 같은 사이트 경로만 (열린 리다이렉트 방지). 다른 세 곳과 같은 가드를 쓴다 — 복사본을 두지 않는다.
+  const to = safeNext(url.searchParams.get("next"));
 
   const res = NextResponse.redirect(new URL(to, req.url));
   res.cookies.set(TEST_COOKIE, await issueCookieValue(), COOKIE_OPTIONS);
