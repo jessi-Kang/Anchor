@@ -298,3 +298,23 @@ a.row,
   opacity: 0.6;
   cursor: default;
 }
+
+/* F02 붙여넣기 상자. 참고 HTML 의 "붙여넣은 글" 본문(일본어 16px, 줄간 1.8)과 같은 글자로 */
+.paste {
+  width: 100%;
+  min-height: 176px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  resize: vertical;
+  font-family: var(--font-jp), var(--font-kr), "Noto Sans JP", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.8;
+  color: var(--color-text1);
+  outline: none;
+}
+.paste::placeholder {
+  color: var(--color-text3);
+  font-weight: 400;
+}
