@@ -100,7 +100,10 @@ export function PitchLoop({
           window.speechSynthesis.cancel();
           window.speechSynthesis.speak(u);
         });
-        setNote(noNative ? NO_NATIVE_NOTE : "브라우저 음성이야. 목소리 키를 넣으면 원어민 곡선도 보여.");
+        // 여기로 왔다는 건 원어민 음성이 안 왔다는 뜻이다 — `noNative` 로 들어왔든 이번에 못 받았든
+        // 화면에 벌어진 일은 같다. 그러니 FLOW 가 정한 그 한 줄을 쓴다. 전에는 "목소리 키를 넣으면"
+        // 이라고 했는데, 그건 Jessi 가 배포에 넣는 환경변수라 읽은 사람이 설정에서 찾을 수 없다.
+        setNote(NO_NATIVE_NOTE);
       }
     } catch (e) {
       console.error(e);
@@ -154,7 +157,11 @@ export function PitchLoop({
       form.set("duration_ms", String(durationMs));
       form.set("audio", blob, "voice.webm");
       const res = await fetch("/api/recordings", { method: "POST", body: form });
-      setNote(res.ok ? "곡선을 봐. 설명 대신 한 번 더." : "저장이 안 됐어. 곡선은 남아 있으니 한 번 더.");
+      // 실패해도 화면은 앞으로 간다 (docs/FLOW.md 4장). "저장이 안 됐어" 를 내지 않는다 — 곡선은
+      // 이미 화면에 있고 사용자가 할 일이 없다. 알릴 수 없는 일을 알리면 상태 어휘만 늘어난다.
+      // (못 보낸 것을 기기에 남겼다 다시 올리는 일은 재전송이 설 때 여기에 붙는다.)
+      if (!res.ok) console.error("[recordings] 저장 실패", res.status);
+      setNote("곡선을 봐. 설명 대신 한 번 더.");
     } catch (e) {
       console.error(e);
       setNote("녹음을 읽지 못했어. 한 번 더.");
@@ -207,8 +214,11 @@ export function PitchLoop({
         <Button outline disabled={state !== "idle"} onClick={listen}>
           {state === "playing" ? "듣는 중" : "듣기"}
         </Button>
+        {/* 보내는 동안은 글자를 바꾸지 않고 꺼짐으로만 둔다 — "저장 중" 은 쓰지 않는 말이고
+            (docs/FLOW.md 4장), 사용자가 기다려서 할 일도 없다. 녹음 중은 다르다: 3초 동안
+            소리를 내야 하는 것은 사용자 쪽 할 일이라 화면이 말해야 한다. */}
         <Button disabled={state !== "idle"} onClick={speak}>
-          {state === "recording" ? "말하는 중" : state === "saving" ? "저장 중" : "말하기"}
+          {state === "recording" ? "말하는 중" : "말하기"}
         </Button>
       </ButtonRow>
       <Space h={4} />
