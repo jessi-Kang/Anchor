@@ -230,7 +230,7 @@ export function Ghost({ children, href, plain, onClick }: { children: ReactNode;
 /** 일본어 글자 (한자·가나). 항상 Noto Sans JP 로. 크기는 sm(18, 행 제목) / md(44) / lg(132). */
 export function Ja({ children, size = "sm", mark }: { children: ReactNode; size?: "sm" | "md" | "lg" | "xl"; mark?: boolean }) {
   return (
-    <span lang="ja" className={cx(s.ja, size === "md" && s.jaMd, size === "lg" && s.jaLg, size === "xl" && s.jaXl, mark && s.mark)}>
+    <span lang="ja" className={cx(s.ja, size === "sm" && s.jaSm, size === "md" && s.jaMd, size === "lg" && s.jaLg, size === "xl" && s.jaXl, mark && s.mark)}>
       {children}
     </span>
   );

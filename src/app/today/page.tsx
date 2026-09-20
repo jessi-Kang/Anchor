@@ -114,10 +114,13 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     }),
   );
   const nextRow = rows.find((r) => r.next);
-  // 카드 큐가 비면 홈 대신 하루 끝(F15) (docs/FLOW.md 1′장 56행). 자료는 있는데 볼 카드가 하나도
-  // 없는 상태다 — 그때 홈은 "다음 카드 이유" 를 댈 것이 없어 할 말이 없는 화면이 된다.
+  // **여기서 하루 끝(F15)으로 보내지 않는다.** 보내면 다 본 다음 날부터 홈이 영영 하루 끝이 되고,
+  // 그 화면의 나가는 길은 홈 하나뿐이라 홈 ↔ 하루 끝 고리에 갇힌다 — 자료 넣기·못 한 말·설정에
+  // 들어갈 길이 통째로 사라진다. 하루 끝은 상태가 아니라 순간이고, 마지막 카드를 착지한 그 자리에서만
+  // 뜬다 (docs/FLOW.md 4장). 끝난 것은 홈이 한 줄로 말한다.
+  // 뽑지 않은 자료는 "다 본" 것이 아니다 — 한자가 0개면 남은 카드도 0이라 같은 수가 되므로 갈라 본다.
   const japanese = rows.filter((r) => r.input.lang === "ja");
-  if (japanese.length > 0 && japanese.every((r) => r.remaining === 0)) redirect("/today/done");
+  const allDone = japanese.length > 0 && japanese.every((r) => r.kanji > 0 && r.remaining === 0);
   // 아는 것 → 다음 것, 한 문장. 아는 것을 앞에 둔다 (docs/FLOW.md 4장). 두 줄로 늘리지 않는다.
   // 주어 자리에는 **판정된** 것만 온다(`via`). 부를 발판이 없으면 억지로 붙이지 말고 자료를 댄다.
   // 앵커 단어는 붙이지 않는다 — 판정하는 자리에서만 붙인다 (docs/FLOW.md 4장).
@@ -126,7 +129,9 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     ? nx.via
       ? `${withParticle({ text: nx.via.kanji, sound: nx.via.koSound }, "을를")} ${KNEW_VERB[nx.via.how]} ${withParticle({ text: nx.kanji, sound: nx.koSound }, "이가")} 가장 가까워.`
       : `다음은 ${nx.kanji}. ${inputFrom(nextRow.input)}.`
-    : null;
+    : allDone
+      ? "이 자료는 다 봤어. 내일 또 나오면 그때 만나."
+      : null;
 
   return (
     <Screen where="홈" aside={now}>
@@ -150,6 +155,10 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
                     ? `한자 ${kanji}개 · 남은 카드 ${remaining}`
                     : `한자 ${kanji}개 · 다 봤어`,
             next: remaining > 0 ? (next?.kanji ?? null) : null,
+            // 자료 행 하나가 세 상태를 가른다 (docs/FLOW.md 4장): 안 뽑음 → 뽑기(F03),
+            // 남은 카드 → 카드(F04, next 가 맡는다), 다 봄 → 재만남(F12).
+            // 다 본 자료를 뽑기로 보내면 할 일이 없는 화면이 뜨고, 재만남에 들어갈 길이 어디에도 없다.
+            href: input.lang === "ja" && kanji > 0 && remaining === 0 ? `/inputs/${input.id}/read` : undefined,
           })), ...notStartedRows, ...talkRows]}
         />
       </Card>

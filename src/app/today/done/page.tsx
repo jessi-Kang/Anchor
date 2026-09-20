@@ -12,6 +12,8 @@ export const dynamic = "force-dynamic";
 /** 한 줄에 들어가는 한자 수. 넘으면 글자 대신 개수로 말한다. */
 const FITS = 6;
 
+// 참고 화면과 같은 상태로 둔다 (design/screens/F15.html). 실제 화면에서는 이 줄에 카드에서 낸
+// 소리(協力)와 대화 덩어리가 같이 서지만, 미리보기는 참고 HTML 과 견주는 자리라 그대로 맞춘다.
 const PREVIEW = { lit: ["協", "開", "基"], spoken: ["push this to"], waiting: ["妥"] };
 
 /**
@@ -50,7 +52,7 @@ export default async function DonePage({ searchParams }: { searchParams: Promise
         <Label>그래프</Label>
         {lit.length > 0 && <Row title={lit.join(" ")} sub={`한자 ${lit.length}`} right={<Pill on>켜짐</Pill>} plain />}
         {spoken.length > 0 && (
-          <Row title={spoken.join(" · ")} sub={`말해본 덩어리 ${spoken.length}`} right={<Pill on>켜짐</Pill>} plain />
+          <Row title={spoken.join(" · ")} sub={`말해본 것 ${spoken.length}`} right={<Pill on>켜짐</Pill>} plain />
         )}
         {waiting.length > 0 && (
           /*

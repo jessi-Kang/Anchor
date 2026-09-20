@@ -81,12 +81,20 @@ export default async function ReadPage({
   // 읽기·한국어 낱말·아래 한 줄이 모두 이 한 계산에서 나온다.
   const runs = runStates(body, met);
   const mixed = runs.find((r) => r.met.length > 0 && r.fresh.length > 0) ?? null;
-  // 한국어 낱말은 **위 한 줄이 짚은 그 낱말**의 것이다. 딴 낱말을 끌어와 붙이지 않는다.
-  // 글자마다의 한국 한자음을 이어 만들고(妥協 → 타 + 협), 소리를 하나라도 모르면 만들지 않는다.
-  // 짚은 낱말은 만난 글자와 아직인 글자가 섞인 것이라 `allMet` 이 거짓이다 — 그래서 지금은 늘
-  // 가려진다. 규칙을 여기 한 줄로 두는 이유는, 나중에 조건이 바뀌어도 읽기와 같은 값을 보게 하려는 것이다.
+  /*
+    한국어 낱말이 붙는 낱말. 섞인 낱말이 있으면 그것 — 위 한 줄이 짚은 낱말이라 딴 낱말의 한국어를
+    붙이면 화면이 두 낱말을 말하게 된다. 섞인 낱말은 `allMet` 이 거짓이라 아래에서 걸러진다.
+
+    섞인 낱말이 없으면(=이 자료를 다 만났으면) **마지막으로 다 만난 낱말**을 짚는다. 이 자리가
+    없으면 한국어 낱말은 보이는 조건이 아예 없는 값이 된다 — "전부 만났을 때만 보인다" 를 늘 가리는
+    것으로 지키는 건 규칙을 지킨 게 아니라 피한 것이다 (docs/FLOW.md 1′장 F12 행). 마지막을 고르는
+    이유는 그게 방금까지 섞인 낱말이던 그 낱말이기 때문이다 (妥 를 풀면 妥協 가 다 만난 낱말이 된다).
+  */
+  const wordRun = mixed ?? [...runs].reverse().find((r) => r.chars.length > 1 && r.allMet) ?? null;
+  // 글자마다의 한국 한자음을 이어 만든다(妥協 → 타 + 협). 소리를 하나라도 모르면 만들지 않는다 —
+  // 낱말의 한국어 낱말(協.ko_word 는 "협력")을 끌어다 쓰면 그 낱말의 말이 아니게 된다.
   const korean =
-    mixed && mixed.allMet && mixed.chars.every((c) => sounds.get(c)) ? mixed.chars.map((c) => sounds.get(c)).join("") : null;
+    wordRun && wordRun.allMet && wordRun.chars.every((c) => sounds.get(c)) ? wordRun.chars.map((c) => sounds.get(c)).join("") : null;
 
   return (
     <Screen where={name} up={`/inputs/${id}`} aside={preview ? "점심 12:37" : nowKST()} fixed={fixed === "1"}>
@@ -112,9 +120,10 @@ export default async function ReadPage({
         )}
         <span className={s.metFootLine}>
           {/*
-            **한국어 낱말은 그 낱말의 한자를 전부 만났을 때만 보인다.** 읽기를 가리는 것과 같은 판단이고
-            (`allMet`), 같은 값에서 나온다. 妥 카드의 후킹이 "타협의 타" 라서, 미리 보여 주면 읽기는
-            가려 놓고 다음 카드의 앵커를 주는 꼴이 된다.
+            **한국어 낱말은 그 낱말의 한자를 전부 만났을 때만 보이고, 전부 만났으면 보인다.**
+            읽기를 가리는 것과 같은 판단이고(`allMet`), 같은 값에서 나온다. 妥 카드의 후킹이
+            "타협의 타" 라서 미리 보여 주면 읽기는 가려 놓고 다음 카드의 앵커를 주는 꼴이 되고,
+            다 만난 뒤에도 가리면 이제 줄 것이 없는 말을 안 하는 것이다.
             개수는 셋으로 갈린다 — 0개 / 1개 / 여럿. 0개일 때도 블록을 숨기지 않는다.
           */}
           {korean && `${korean}. `}

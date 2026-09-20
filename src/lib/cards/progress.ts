@@ -1,5 +1,5 @@
 import { withUser } from "@/lib/db";
-import { getInput, type InputRow } from "@/lib/db/inputs";
+import { getInput, listInputs, type InputRow } from "@/lib/db/inputs";
 import { getKanjiNodes, getKanjiStates, isJudged, type KanjiNode } from "@/lib/db/kanji";
 import type { CardRow } from "@/lib/db/cards";
 
@@ -56,6 +56,20 @@ export async function inputProgress(userId: string, input: InputRow): Promise<In
  */
 export function freshKanji(prog: InputProgress): string[] {
   return prog.nodes.filter((n) => !prog.anchors.has(n.key)).map((n) => n.key);
+}
+
+/**
+ * 오늘 볼 카드가 더 남았는가 — **자료 하나가 아니라 계정 전체**를 본다.
+ *
+ * 하루 끝(F15)은 상태가 아니라 순간이다 (docs/FLOW.md 4장). 마지막 카드를 착지한 그 자리에서만
+ * 띄우고 홈은 홈으로 둔다. 그래서 "띄울 때인가" 를 착지 직후 화면이 물어야 하는데, 그 화면은 자기
+ * 자료밖에 모른다 — 이 자료를 다 봤어도 다른 기사에 카드가 남아 있으면 하루가 끝난 게 아니다.
+ * 자료 하나만 보고 띄우면 남은 것을 끝났다고 말하게 된다.
+ */
+export async function cardsLeft(userId: string): Promise<number> {
+  const inputs = await listInputs(userId, 10);
+  const progs = await Promise.all(inputs.filter((i) => i.lang === "ja").map((i) => inputProgress(userId, i)));
+  return progs.reduce((n, p) => n + p.remaining, 0);
 }
 
 export type CardContext = InputProgress & { where: string; n: number };
