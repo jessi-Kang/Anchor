@@ -106,8 +106,13 @@
   padding: 16px 0;
   border-bottom: 1px solid var(--color-line);
 }
-.row:last-child {
+.row:last-child,
+.card > :last-child > .row:last-child {
   border-bottom: 0;
+}
+/* 행을 form 으로 감쌀 때(서버 액션 제출) 행 목록 모양을 유지한다 */
+.card > form {
+  display: contents;
 }
 .rowText {
   display: flex;

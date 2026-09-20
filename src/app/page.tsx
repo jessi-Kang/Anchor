@@ -7,10 +7,12 @@ import s from "./page.module.css";
 export const dynamic = "force-dynamic";
 
 /** `/` — O01 로그인. design/screens/O01.html 을 그대로 옮김. `?fixed=1` 은 픽셀 비교용. */
-export default async function Home({ searchParams }: { searchParams: Promise<{ fixed?: string }> }) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ fixed?: string; next?: string }> }) {
+  const { fixed, next } = await searchParams;
+  // 로그인 뒤 목적지. 같은 사이트 경로만 (열린 리다이렉트 방지)
+  const to = next && next.startsWith("/") && !next.startsWith("//") ? next : "/today";
   const user = await currentUser();
-  if (user) redirect("/today");
-  const { fixed } = await searchParams;
+  if (user) redirect(to);
 
   return (
     <Screen where="시작" fixed={fixed === "1"}>
@@ -38,7 +40,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
         </div>
       </Card>
       <Space h={12} />
-      <GoogleSignIn />
+      <GoogleSignIn callbackURL={to} />
     </Screen>
   );
 }

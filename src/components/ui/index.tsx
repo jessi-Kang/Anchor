@@ -97,20 +97,28 @@ export function Label({ children }: { children: ReactNode }) {
   return <div className={s.label}>{children}</div>;
 }
 
-/** 목록 행. href 가 있으면 행 전체가 링크, onClick 이 있으면 버튼(토글용). */
+/**
+ * 목록 행. href 가 있으면 행 전체가 링크(plain 이면 프리페치 없는 <a>: 파일 다운로드 등),
+ * onClick 이 있으면 버튼(토글용), submit 이면 감싼 form 을 제출하는 버튼.
+ */
 export function Row({
   title,
   sub,
   right,
   href,
+  plain,
   onClick,
+  submit,
   pressed,
 }: {
   title: ReactNode;
   sub?: ReactNode;
   right?: ReactNode;
   href?: string;
+  /** Next Link 대신 <a>. API 라우트(다운로드)처럼 프리페치가 걸리면 안 되는 곳 */
+  plain?: boolean;
   onClick?: () => void;
+  submit?: boolean;
   /** onClick 행의 토글 상태 (aria-pressed) */
   pressed?: boolean;
 }) {
@@ -123,6 +131,13 @@ export function Row({
       {right}
     </>
   );
+  if (href && plain) {
+    return (
+      <a href={href} className={s.row}>
+        {inner}
+      </a>
+    );
+  }
   if (href) {
     return (
       <Link href={href} className={s.row}>
@@ -130,9 +145,9 @@ export function Row({
       </Link>
     );
   }
-  if (onClick) {
+  if (onClick || submit) {
     return (
-      <button type="button" className={cx(s.row, s.rowButton)} onClick={onClick} aria-pressed={pressed}>
+      <button type={submit ? "submit" : "button"} className={cx(s.row, s.rowButton)} onClick={onClick} aria-pressed={pressed}>
         {inner}
       </button>
     );
@@ -184,8 +199,15 @@ export function Button({ children, href, onClick, disabled, outline, type = "but
   );
 }
 
-/** 회색 텍스트 보조 링크. 화면당 최대 1개. */
-export function Ghost({ children, href, onClick }: { children: ReactNode; href?: string; onClick?: () => void }) {
+/** 회색 텍스트 보조 링크. 화면당 최대 1개. plain 이면 프리페치 없는 <a>. */
+export function Ghost({ children, href, plain, onClick }: { children: ReactNode; href?: string; plain?: boolean; onClick?: () => void }) {
+  if (href && plain) {
+    return (
+      <a href={href} className={s.ghost}>
+        {children}
+      </a>
+    );
+  }
   if (href) {
     return (
       <Link href={href} className={s.ghost}>
