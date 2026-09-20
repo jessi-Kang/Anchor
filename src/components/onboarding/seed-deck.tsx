@@ -130,17 +130,17 @@ export function SeedDeck({
               <div className={s.flipDef} lang={current.lang}>
                 {current.main}
               </div>
+              {current.sub && (
+                <div className={s.flipExample} lang={current.lang}>
+                  {current.sub}
+                </div>
+              )}
               {current.ruby && (
                 <div className={s.flipExample} lang="ja">
                   <ruby>
                     {current.ruby.base}
                     <rt>{current.ruby.rt}</rt>
                   </ruby>
-                </div>
-              )}
-              {current.sub && (
-                <div className={s.flipExample} lang={current.lang}>
-                  {current.sub}
                 </div>
               )}
               {current.anchor && <div className={s.flipAnchor}>{current.anchor}</div>}

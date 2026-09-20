@@ -8,7 +8,7 @@ import { nextPath } from "@/lib/onboarding-flow";
 export async function judgeKanji(nodeId: string, recalled: boolean) {
   const user = await requireUser();
   if (!/^[0-9a-f-]{36}$/i.test(nodeId)) throw new Error("bad node id");
-  await recordSeedJudgement(user.id, nodeId, recalled, "ja");
+  await recordSeedJudgement(user.id, nodeId, recalled);
 }
 
 export async function finishKanji() {

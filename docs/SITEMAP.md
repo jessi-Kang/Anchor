@@ -24,7 +24,7 @@ flowchart TD
 | `/` | O01 | Google 로그인. 데이터 원칙 2줄 |
 | `/onboarding/purpose` | O02 | 상황 고르기 (수준 질문 없음). 상황을 고른 언어만 켜진다. /settings 에서 다시 들어와 언어를 추가한다 |
 | `/onboarding/kana` | O03 | 가나 6개 실제 읽기 (마이크). 일본어를 켰을 때만. 실패 시 가나 모듈로 분기(v2) |
-| `/onboarding/kanji` | O05 | 한자 40장 소리 떠올리기 3분 → user_node_state(knows_sound). 일본어를 켰을 때만, 가나 뒤 |
+| `/onboarding/kanji` | O05 | 한자 40장 일본어 읽기 떠올리기 3분 → user_node_state(knows_meaning). 일본어를 켰을 때만, 가나 뒤 |
 | `/onboarding/seed` | O04 | 영어 뜻 떠올리기 3분 → user_node_state 씨앗. 영어·스페인어를 켰을 때만. 스페인어를 켰으면 스페인어 대응 표시 |
 | `/today` | F01 | 오늘 만난 것 큐 |
 | `/today/done` | F15 | 하루 끝 요약 |

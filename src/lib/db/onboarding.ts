@@ -79,13 +79,13 @@ export type SeedNode = {
   id: string;
   display: string;
   lang: "en" | "ja";
-  /** 뒤집었을 때 첫 줄: 영어는 쉬운 정의, 일본어는 음독 */
+  /** 뒤집었을 때 첫 줄 = 떠올렸어야 하는 것. 영어는 쉬운 정의, 한자는 일본어 읽기(음독) */
   main: string;
-  /** 둘째 줄: 영어는 예문, 스페인어를 켰으면 스페인어 대응이 여기 붙는다 */
+  /** 둘째 줄: 영어는 예문 */
   sub?: string;
   /** 일본어 예시 단어 (よみがな 필수) */
   ruby?: { base: string; rt: string };
-  /** 한국어 앵커 한 줄 ("협력의 협"). 설명이 아니라 이미 아는 소리를 부르는 용도 */
+  /** 보조 한 줄 (스페인어를 켰을 때 스페인어 대응). 배경 틴트 알약으로 표시 */
   anchor?: string;
 };
 
@@ -96,7 +96,9 @@ type SeedRow = { id: string; display: string; reading: string | null; meta: Reco
 /**
  * 씨앗 40장 (공용 노드) + 이 사용자가 이미 판정한 것.
  *  - en-onboarding: 어근·덩어리. showEs 면 뒤집었을 때 스페인어 대응을 함께 보인다.
- *  - ja-onboarding: 한자. 뒤집으면 음독 + 예시 단어(よみがな) + 한국어 한자어 앵커.
+ *  - ja-onboarding: 한자. 판정 대상은 "일본어로 읽을 수 있는가". 뒤집으면 읽기(きょう)와 예시 단어(協力 きょうりょく)만.
+ *    한국어는 화면에 나오지 않는다. 한국어 한자어 소리는 이미 아는 것이라 묻지 않고, 발견 카드의 후킹에서만 쓴다.
+ *    (meta 의 ko_sound/ko_word/pattern 은 그래프 엣지용으로만 남는다.)
  */
 export async function getSeedDeck(
   userId: string,
@@ -118,7 +120,6 @@ export async function getSeedDeck(
             lang: "ja",
             main: r.reading ?? "",
             ruby: r.meta.example && r.meta.example_reading ? { base: r.meta.example, rt: r.meta.example_reading } : undefined,
-            anchor: r.meta.ko_word && r.meta.ko_sound ? `${r.meta.ko_word}의 ${r.meta.ko_sound}` : undefined,
           }
         : {
             id: r.id,
@@ -144,17 +145,18 @@ export async function getSeedDeck(
 /**
  * "떠올랐어 / 안 떠올랐어" 기록. 정답을 본 뒤 판정하므로 자기 보고가 아니다.
  * 떠올랐으면 knows_meaning=true, confidence 0.8. 아니면 false, 0.2.
- * knows_sound: 영어 부품은 읽을 수 있으니 true. 한자는 한국어 한자어 소리를 아는 것이므로 떠올랐을 때만 true
- * ("협력은 아는데 協은 모른다"가 knows_sound=true, knows_meaning=false 로 남아야 한다). can_say 는 사운드 루프가 정한다.
+ * knows_sound 는 true 로 둔다: 영어 부품은 읽을 수 있고, 한자는 한국어 화자면 한자어 소리를 이미 안다(SPEC 6.5).
+ * 한자 씨앗에서 "일본어 읽기가 떠올랐다" = 그 글자를 일본어 단어로 안다 → knows_meaning.
+ * "협력은 아는데 協은 모른다"는 knows_sound=true, knows_meaning=false 로 남는다. can_say 는 사운드 루프가 정한다.
  */
-export function recordSeedJudgement(userId: string, nodeId: string, recalled: boolean, lang: "en" | "ja" = "en") {
+export function recordSeedJudgement(userId: string, nodeId: string, recalled: boolean) {
   return withUser(userId, async (tx) => {
     await tx.query(
       `INSERT INTO user_node_state (user_id, node_id, knows_sound, knows_meaning, can_say, confidence, source)
-       VALUES ($1, $2, $5, $3, false, $4, 'onboarding')
+       VALUES ($1, $2, true, $3, false, $4, 'onboarding')
        ON CONFLICT (user_id, node_id) DO UPDATE
-         SET knows_sound = EXCLUDED.knows_sound, knows_meaning = EXCLUDED.knows_meaning, confidence = EXCLUDED.confidence, source = 'onboarding'`,
-      [userId, nodeId, recalled, recalled ? 0.8 : 0.2, lang === "en" ? true : recalled],
+         SET knows_meaning = EXCLUDED.knows_meaning, confidence = EXCLUDED.confidence, source = 'onboarding'`,
+      [userId, nodeId, recalled, recalled ? 0.8 : 0.2],
     );
   });
 }
