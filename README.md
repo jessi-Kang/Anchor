@@ -147,6 +147,14 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 5. 영어 대화 루프 (F13–F14): 못 한 말 → 덩어리 → 듣기/말하기/곡선.
 6. 인풋 레이어 (F02–F03) + 재만남 (F12).
 
+## 배포
+
+- 프로덕션: https://anchor-jessikang.vercel.app (Vercel 팀 `jessikang` → 프로젝트 `anchor`, 리전 icn1)
+- DB·Auth: Neon 프로젝트 `anchor` (Vercel 마켓플레이스 통합, 싱가포르). Neon 조직이 Vercel 관리형이라 프로젝트는 Vercel Storage 에서 만든다.
+- 통합이 `DATABASE_URL`(소유자)·`NEON_AUTH_BASE_URL` 을 주입하고, 앱은 별도로 넣은 `ANCHOR_DATABASE_URL`(anchor_app) 만 쓴다.
+- 이 저장소 브랜치에 푸시하면 자동 배포된다. 마이그레이션은 자동으로 돌지 않는다: 새 SQL 파일을 만들면 `pnpm db:migrate` 를 손으로(또는 Neon MCP 로) 적용한 뒤 푸시한다.
+- Google 로그인은 Neon Auth 의 공용 개발 자격증명으로 동작한다. 공개 전에 Google 클라이언트를 직접 등록한다 (docs: https://neon.com/docs/auth/guides/setup-oauth).
+
 ## 개발
 
 ```bash
@@ -185,7 +193,7 @@ curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_fo
 
 | 단계 | 상태 |
 | --- | --- |
-| 1. 골격: Next.js + Neon Auth(Google) + 스키마·RLS 마이그레이션 + 내보내기·삭제 엔드포인트 + 백업(스냅샷·pg_dump) | 완료 (Neon 프로젝트 연결 전) |
+| 1. 골격: Next.js + Neon Auth(Google) + 스키마·RLS 마이그레이션 + 내보내기·삭제 엔드포인트 + 백업(스냅샷·pg_dump) | 완료, 배포됨 |
 | 2. 디자인 토큰 → CSS 변수(`pnpm design:tokens`), 공통 레이아웃 컴포넌트, O01 픽셀 재현(`pnpm design:check`) | 완료 |
 | 3. 온보딩 O02–O04: 상황 고르기, 가나 6개 마이크 인식(Web Speech API), 영어 씨앗 40장 → `user_node_state` | 완료 |
 | 4. 일본어 발견 카드 F04 → Scene1–5 → F11 | 다음 |
