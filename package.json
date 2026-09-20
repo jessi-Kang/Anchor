@@ -1,0 +1,35 @@
+{
+  "name": "anchor",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:migrate:status": "tsx scripts/migrate.ts --status",
+    "backup:snapshot": "tsx scripts/backup/neon-snapshot.ts",
+    "vercel-build": "tsx scripts/backup/neon-snapshot.ts --pre-deploy && next build"
+  },
+  "dependencies": {
+    "@neondatabase/auth": "0.5.0-beta",
+    "@neondatabase/serverless": "^1.1.0",
+    "next": "16.3.5",
+    "pg": "^8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/pg": "^8",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "tsx": "^4",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
