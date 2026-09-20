@@ -45,7 +45,10 @@ jobs:
           STAMP=$(date -u +%Y%m%dT%H%M%SZ)
           echo "stamp=$STAMP" >> "$GITHUB_ENV"
           # custom format(-Fc): pg_restore 로 테이블 단위 복구 가능. neon_auth 스키마 포함(전체).
-          pg_dump "$DATABASE_URL_ADMIN" -Fc --no-owner --no-privileges -f "anchor-$STAMP.dump"
+          # neon_auth.account 는 행을 뜨지 않는다: Google OAuth 토큰(accessToken·refreshToken·idToken)이
+          # 외부 스토리지에 보존 기간 내내 남기 때문이다. 매일 JSON 백업도 같은 표에서 토큰을 빼고 매핑만 뜬다.
+          pg_dump "$DATABASE_URL_ADMIN" -Fc --no-owner --no-privileges \
+            --exclude-table-data='neon_auth.account' -f "anchor-$STAMP.dump"
           sha256sum "anchor-$STAMP.dump" > "anchor-$STAMP.dump.sha256"
           ls -la anchor-*
 
