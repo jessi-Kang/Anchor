@@ -32,8 +32,9 @@ export function GuessForm({ cardId, initial }: { cardId: string; initial: string
         }}
       />
       <Grow />
+      {/* 누르는 동안 글자를 바꾸지 않는다 — 주 버튼은 누른 뒤에도 같은 말이어야 한다. 꺼짐으로 충분하다. */}
       <Button disabled={pending} onClick={send}>
-        {pending ? "보는 중" : "확인"}
+        확인
       </Button>
     </>
   );
