@@ -1,58 +1,35 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { ensureUser } from "@/lib/db/users";
+import { Screen, Space, Title, Lead, Card, Label, Row, Pill, Grow, Button, Ghost } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 /**
- * `/today` — F01 홈. 1단계에서는 로그인 → users 행 생성 → 세션 확인까지만.
- * 온보딩(O02~O04)이 3단계에서 붙으면 onboarded_at 이 없을 때 /onboarding/purpose 로 보낸다.
+ * `/today` — F01 홈. 문구·뼈대는 design/screens/F01.html. 큐 데이터는 5·6단계(인풋 레이어)에서 붙는다.
+ * 지금은 로그인 → users 행 생성 → 세션 확인까지.
  */
 export default async function TodayPage() {
   const user = await currentUser();
   if (!user) redirect("/");
+  await ensureUser(user);
 
-  const row = await ensureUser(user);
+  const now = new Date().toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
 
   return (
-    <main style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", padding: "56px 20px 24px" }}>
-      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text3)" }}>홈</div>
-      <div style={{ height: 18 }} />
-      <section
-        style={{
-          background: "var(--card)",
-          border: "1px solid var(--line)",
-          borderRadius: 18,
-          padding: "18px 20px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
-      >
-        <div style={{ fontSize: 13, color: "var(--text3)" }}>로그인됨</div>
-        <div style={{ fontSize: 18 }}>{user.email}</div>
-        <div style={{ fontSize: 13, color: "var(--text2)" }}>
-          계정 생성 {new Date(row.created_at).toLocaleDateString("ko-KR")}
-        </div>
-      </section>
-      <div style={{ height: 10 }} />
-      <section
-        style={{
-          background: "var(--card)",
-          border: "1px solid var(--line)",
-          borderRadius: 18,
-          padding: "18px 20px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          fontSize: 15,
-        }}
-      >
-        <div style={{ fontSize: 13, color: "var(--text3)" }}>데이터</div>
-        <a href="/api/export" style={{ color: "var(--accent-dark)" }}>
-          전체 내보내기 (JSON)
-        </a>
-      </section>
-    </main>
+    <Screen where="홈" aside={now}>
+      <Space h={28} />
+      <Title lg>오늘 만난 것</Title>
+      <Space h={6} />
+      <Lead>내가 읽고 들은 것에서만 뽑아. 커리큘럼은 없어.</Lead>
+      <Space h={22} />
+      <Card>
+        <Label>인풋</Label>
+        <Row title="아직 없어" sub={user.email} right={<Pill>0분</Pill>} />
+      </Card>
+      <Grow />
+      <Button href="/inputs/new">자료 넣기</Button>
+      <Ghost href="/api/export">전체 내보내기</Ghost>
+    </Screen>
   );
 }

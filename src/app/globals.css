@@ -1,18 +1,4 @@
-/* 1단계 최소 스타일. 2단계에서 design/tokens.json 을 CSS 변수로 옮기고 공통 레이아웃을 만든다. */
-:root {
-  --bg: #f6f6f7;
-  --card: #ffffff;
-  --line: #e6e7ea;
-  --text1: #2a2d33;
-  --text2: #6b7078;
-  --text3: #9aa0a8;
-  --tint: #e9eef6;
-  --tint2: #f1f4f9;
-  --accent: #5c7cb0;
-  --accent-dark: #3f5e90;
-  --button: #2a2d33;
-  --button-text: #ffffff;
-}
+@import "./tokens.css";
 
 * {
   box-sizing: border-box;
@@ -22,14 +8,24 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text1);
-  font-family: var(--font-kr), var(--font-jp), "Noto Sans KR", "Noto Sans JP", sans-serif;
-  font-size: 15px;
+  background: var(--color-bg);
+  color: var(--color-text1);
+  /* next/font 가 --font-kr/--font-jp 를 채운다. 디자인 시스템: Noto Sans KR / JP 만. */
+  font-family: var(--font-kr), var(--font-jp), var(--font-family);
+  font-size: var(--font-size-body);
   -webkit-font-smoothing: antialiased;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+a:hover {
+  opacity: 0.85;
+}
+
+/* 일본어 텍스트에는 항상 よみがな */
+ruby rt {
+  font-size: 0.5em;
+  color: var(--color-text2);
 }

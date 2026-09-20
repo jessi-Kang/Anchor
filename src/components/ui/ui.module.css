@@ -1,0 +1,178 @@
+/* 공통 뼈대 (design/SCREENS.md "공통 뼈대", CLAUDE.md 디자인 시스템)
+   상단: 작은 회색 "지금 어디" + 오른쪽 보조 텍스트 / 카드 모드는 진행 막대 6칸
+   본문: 흰 카드, 카드 안 13px 라벨
+   하단: 검은 주 버튼 1개 (+ 회색 텍스트 보조 링크 최대 1개) */
+
+.screen {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 390px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: var(--space-screen-pad-top) var(--space-screen-pad-x) 24px;
+  background: var(--color-bg);
+  color: var(--color-text1);
+}
+
+/* 참고 HTML 은 390×844 고정. 픽셀 비교 모드에서 같은 크기로 맞춘다. */
+.screenFixed {
+  min-height: 844px;
+  height: 844px;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text3);
+}
+
+.progress {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.progressCell {
+  width: 30px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-line);
+}
+.progressCellDone {
+  background: var(--color-text1);
+}
+
+.grow {
+  flex-grow: 1;
+}
+
+.title {
+  font-size: var(--font-size-title);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text1);
+}
+.titleLg {
+  font-size: var(--font-size-title-lg);
+}
+.lead {
+  font-size: var(--font-size-body);
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--color-text2);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap);
+  padding: var(--space-card-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+}
+.cardTint {
+  background: var(--color-tint2);
+}
+.cardList {
+  padding: 4px 20px;
+}
+
+.label {
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  color: var(--color-text3);
+  letter-spacing: 0.02em;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.rowTitle {
+  font-size: var(--font-size-row);
+  font-weight: 700;
+  color: var(--color-text1);
+}
+.rowSub {
+  font-size: var(--font-size-label);
+  color: var(--color-text2);
+}
+
+.pill {
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--color-text3);
+  background: transparent;
+}
+.pillOn {
+  color: var(--color-accent-dark);
+  background: var(--color-tint);
+}
+
+.mark {
+  background: var(--color-tint);
+  border-radius: 6px;
+  padding: 0 5px;
+  color: var(--color-accent-dark);
+}
+
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: var(--button-height);
+  border: 0;
+  border-radius: var(--radius-button);
+  background: var(--color-button);
+  color: var(--color-button-text);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.buttonOutline {
+  background: var(--color-card);
+  color: var(--color-text1);
+  border: 1px solid var(--color-line);
+}
+
+.ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--button-ghost-height);
+  font-size: var(--font-size-body);
+  font-weight: 500;
+  color: var(--color-text2);
+  background: none;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}

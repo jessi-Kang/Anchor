@@ -1,0 +1,48 @@
+/* 자동 생성: pnpm design:tokens (원본 design/tokens.json). 손으로 고치지 말 것. */
+:root {
+  --color-bg: #F6F6F7;
+  --color-card: #FFFFFF;
+  --color-line: #E6E7EA;
+  --color-text1: #2A2D33;
+  --color-text2: #6B7078;
+  --color-text3: #9AA0A8;
+  --color-tint: #E9EEF6;
+  --color-tint2: #F1F4F9;
+  --color-accent: #5C7CB0;
+  --color-accent-dark: #3F5E90;
+  --color-button: #2A2D33;
+  --color-button-text: #FFFFFF;
+
+  --font-family: 'Noto Sans KR', 'Noto Sans JP', sans-serif;
+  --font-size-label: 13px;
+  --font-size-body: 15px;
+  --font-size-row: 18px;
+  --font-size-title: 26px;
+  --font-size-title-lg: 28px;
+  --font-size-kanji-sm: 44px;
+  --font-size-kanji-lg: 132px;
+
+  --radius-card: 18px;
+  --radius-button: 14px;
+  --radius-tile: 24px;
+  --radius-pill: 999px;
+
+  --space-screen-pad-x: 20px;
+  --space-screen-pad-top: 56px;
+  --space-card-pad: 18px 20px;
+  --space-gap: 10px;
+
+  --button-height: 56px;
+  --button-ghost-height: 44px;
+
+  --curve-native: #2A2D33;
+  --curve-me: #5C7CB0;
+  --curve-stroke-width: 4px;
+  --curve-me-dash: 8 7;
+
+  --graph-known: #E9EEF6;
+  --graph-today: #5C7CB0;
+  --graph-next: #E6E7EA;
+  --graph-edge-known: #5C7CB0;
+  --graph-edge-next: #E6E7EA;
+}
