@@ -3,12 +3,13 @@ import { currentUser } from "@/lib/auth/server";
 import { ensureUser } from "@/lib/db/users";
 import { getSettings } from "@/lib/db/settings";
 import { listInputs } from "@/lib/db/inputs";
+import { countChunks } from "@/lib/db/chunks";
 import { inputProgress, nextCandidates } from "@/lib/cards/progress";
 import { enabledLanguages, homeRedirect, inputPath, LANG_LABEL } from "@/lib/languages";
 import { eulReul } from "@/lib/ko";
 import { isDesignPreview } from "@/lib/design-preview";
-import { Screen, Space, Title, Lead, Card, Label, Status, Grow, Button, Ghost } from "@/components/ui";
-import { HomeRows } from "./home-rows";
+import { Screen, Space, Title, Lead, Card, Label, Grow, Button, Ghost } from "@/components/ui";
+import { HomeRows, type HomeRow } from "./home-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -34,11 +35,13 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           <HomeRows
             rows={[
               { id: "a", title: "日経 기사", sub: "한자 4개 · 남은 카드 3", next: "協" },
-              { id: "b", title: "수업 슬라이드", sub: "어근 2개", next: null },
-              { id: "c", title: "어제 못 한 말", sub: "1개", next: null },
+              { id: "b", title: "수업 슬라이드", sub: "어근 2개 · 남은 카드 2", next: null },
+              { id: "c", title: "어제 못 한 말", sub: "못 한 말 1개 · 남은 카드 1", next: null, href: "/talk" },
             ]}
           />
         </Card>
+        <Space h={14} />
+        <Lead>力을 아니까 助가 가장 가까워.</Lead>
         <Grow />
         <Button href="/inputs/new">자료 넣기</Button>
         <Ghost href="/settings">설정</Ghost>
@@ -54,7 +57,6 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   if (home) redirect(home);
   const langs = enabledLanguages(settings);
   const inputs = await listInputs(user.id, 10);
-
   if (inputs.length === 0) {
     return (
       <Screen where="홈" aside={now}>
@@ -69,6 +71,13 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       </Screen>
     );
   }
+
+  // 홈의 두 번째 입구 (docs/FLOW.md 2장): 영어를 켰으면 "못 한 말" 행이 F13 으로 간다.
+  // 빈 상태에는 넣지 않는다 — FLOW 1′장이 "자료 행 없이 버튼 하나" 로 못 박는다.
+  const talkCount = langs.includes("en") ? await countChunks(user.id, "en") : 0;
+  const talkRows: HomeRow[] = langs.includes("en")
+    ? [{ id: "talk", title: "못 한 말", sub: talkCount > 0 ? `못 한 말 ${talkCount}개` : "한 줄이면 돼", next: null, href: "/talk" }]
+    : [];
 
   const rows = await Promise.all(
     inputs.map(async (input) => {
@@ -95,7 +104,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       <Card>
         <Label>오늘</Label>
         <HomeRows
-          rows={rows.map(({ input, kanji, remaining, next }) => ({
+          rows={[...rows.map(({ input, kanji, remaining, next }) => ({
             id: input.id,
             title: input.title ?? input.body.slice(0, 20),
             sub:
@@ -107,13 +116,13 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
                     ? `한자 ${kanji}개 · 남은 카드 ${remaining}`
                     : `한자 ${kanji}개 · 다 봤어`,
             next: remaining > 0 ? (next?.kanji ?? null) : null,
-          }))}
+          })), ...talkRows]}
         />
       </Card>
       {reason && (
         <>
-          <Space h={10} />
-          <Status dot="on">{reason}</Status>
+          <Space h={14} />
+          <Lead>{reason}</Lead>
         </>
       )}
       <Grow />

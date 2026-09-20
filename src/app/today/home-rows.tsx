@@ -10,6 +10,8 @@ export type HomeRow = {
   sub: string;
   /** 남은 카드가 있으면 다음 한자. 탭하면 그 카드(F04)로 (docs/FLOW.md 1′장) */
   next: string | null;
+  /** 자료가 아닌 행(못 한 말 → F13)은 갈 곳을 직접 준다 */
+  href?: string;
 };
 
 /** 홈 자료 행. 남은 카드가 있으면 "이어서" 알약, 탭 → F04. 없으면 탭 → 뽑기(F03). */
@@ -32,7 +34,7 @@ export function HomeRows({ rows }: { rows: HomeRow[] }) {
             }}
           />
         ) : (
-          <Row key={r.id} href={`/inputs/${r.id}`} title={r.title} sub={r.sub} />
+          <Row key={r.id} href={r.href ?? `/inputs/${r.id}`} title={r.title} sub={r.sub} />
         ),
       )}
     </>
