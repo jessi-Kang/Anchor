@@ -86,7 +86,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
           <Legend />
         </Card>
         <Grow />
-        <Button href="/today">{`${inputTo({ title: null, meta: { example: true } })} 돌아가기`}</Button>
+        <Button href="/today">{`${inputTo({ title: null, meta: { example: true }, lang: "ja" })} 돌아가기`}</Button>
         <Ghost href="/today">다음 카드 助</Ghost>
       </Screen>
     );
