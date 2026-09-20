@@ -152,15 +152,15 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 ```bash
 pnpm install
 cp .env.example .env.local        # 값 채우기 (아래 표)
-pnpm db:migrate                    # DATABASE_URL_ADMIN 로 스키마 + RLS 적용
+pnpm db:migrate                    # DATABASE_URL_ADMIN(또는 DATABASE_URL) 로 스키마 + RLS 적용
 pnpm db:seed                       # 공용 참조 노드 적재 (지금은 O04 영어 씨앗 40장)
 pnpm dev                           # http://localhost:3000
 ```
 
 | 변수 | 무엇 |
 | --- | --- |
-| `DATABASE_URL` | 앱 런타임 연결. 마이그레이션이 만드는 `anchor_app` 역할 (RLS 우회 불가) |
-| `DATABASE_URL_ADMIN` | 마이그레이션·백업 전용. 테이블 소유자 |
+| `ANCHOR_DATABASE_URL` | 앱 런타임 연결. 마이그레이션이 만드는 `anchor_app` 역할 (RLS 우회 불가) |
+| `DATABASE_URL_ADMIN` | 마이그레이션·백업 전용. 테이블 소유자. 없으면 Vercel Neon 통합이 주입한 `DATABASE_URL` 을 쓴다 |
 | `ANCHOR_APP_PASSWORD` | 0001 마이그레이션이 `anchor_app` 을 만들 때 쓰는 비밀번호 |
 | `NEON_AUTH_BASE_URL` | Neon 콘솔 → Auth → Configuration 의 Auth URL. Google 제공자를 켜 둔다 |
 | `NEON_AUTH_COOKIE_SECRET` | `openssl rand -base64 32` |

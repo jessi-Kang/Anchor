@@ -37,7 +37,7 @@ let pool: AnyPool | undefined;
  */
 function getPool(): AnyPool {
   if (pool) return pool;
-  const url = env.DATABASE_URL;
+  const url = env.ANCHOR_DATABASE_URL;
   const host = new URL(url).hostname;
   const isNeon = host.endsWith(".neon.tech") || host.endsWith(".neon.build");
   pool = (isNeon

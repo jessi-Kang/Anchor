@@ -9,8 +9,12 @@ function required(name: string): string {
 }
 
 export const env = {
-  get DATABASE_URL() {
-    return required("DATABASE_URL");
+  /**
+   * 앱 런타임 연결 (anchor_app 역할). 이름을 DATABASE_URL 로 두지 않는 이유:
+   * Vercel 의 Neon 통합이 소유자 역할 연결을 DATABASE_URL 로 주입하는데, 그걸 앱이 쓰면 RLS 가 무력화된다.
+   */
+  get ANCHOR_DATABASE_URL() {
+    return required("ANCHOR_DATABASE_URL");
   },
   get NEON_AUTH_BASE_URL() {
     return required("NEON_AUTH_BASE_URL");

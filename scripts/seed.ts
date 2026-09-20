@@ -2,7 +2,7 @@
  * 공용 참조 노드 적재 (user_id IS NULL).
  *   pnpm db:seed
  *
- * DATABASE_URL_ADMIN 로 접속한다. 앱 역할은 공용 노드를 쓸 수 없다(RLS).
+ * DATABASE_URL_ADMIN (없으면 DATABASE_URL) 로 접속한다. 앱 역할은 공용 노드를 쓸 수 없다(RLS).
  * 지금은 O04 영어 씨앗(db/seed/en-seed.json)만. 이후 KANJIDIC2·IDS·한자음 적재도 여기에 붙인다.
  * 같은 (lang, kind, key) 는 갱신하고, 새 것만 추가한다. 사용자 상태(user_node_state)는 건드리지 않는다.
  */
@@ -29,8 +29,9 @@ type SeedItem = {
 };
 
 async function main() {
-  const url = process.env.DATABASE_URL_ADMIN;
-  if (!url) throw new Error("DATABASE_URL_ADMIN 이 필요하다");
+  // 관리 연결: DATABASE_URL_ADMIN 이 없으면 Vercel Neon 통합이 주입하는 DATABASE_URL(소유자 역할)을 쓴다.
+  const url = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL_ADMIN (또는 DATABASE_URL) 이 필요하다");
 
   const file = path.resolve(process.cwd(), "db/seed/en-seed.json");
   const { items } = JSON.parse(readFileSync(file, "utf8")) as { items: SeedItem[] };

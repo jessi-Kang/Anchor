@@ -3,7 +3,7 @@
  *   pnpm db:migrate            적용
  *   pnpm db:migrate --status   상태만
  *
- * - DATABASE_URL_ADMIN 로 접속 (테이블 소유자).
+ * - DATABASE_URL_ADMIN (없으면 DATABASE_URL) 로 접속 (테이블 소유자).
  * - db/migrations/*.sql 을 이름순으로 실행, 파일 하나 = 트랜잭션 하나.
  * - schema_migrations 에 이름·체크섬 기록. 적용된 파일이 바뀌면 중단.
  * - `__ANCHOR_APP_PASSWORD__` 플레이스홀더를 환경 변수로 치환 (0001 의 역할 생성용).
@@ -24,8 +24,9 @@ function sha256(s: string) {
 }
 
 async function main() {
-  const url = process.env.DATABASE_URL_ADMIN;
-  if (!url) throw new Error("DATABASE_URL_ADMIN 이 필요하다 (.env.example 참고)");
+  // 관리 연결: DATABASE_URL_ADMIN 이 없으면 Vercel Neon 통합이 주입하는 DATABASE_URL(소유자 역할)을 쓴다.
+  const url = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL_ADMIN (또는 DATABASE_URL) 이 필요하다 (.env.example 참고)");
 
   const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith(".sql")).sort();
 

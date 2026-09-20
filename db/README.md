@@ -5,7 +5,7 @@ Postgres 스키마는 `migrations/*.sql` 의 순서대로만 바뀐다. ORM 자�
 ## 실행
 
 ```bash
-# .env.local 에 DATABASE_URL_ADMIN, ANCHOR_APP_PASSWORD 설정 후
+# .env.local 에 DATABASE_URL_ADMIN(또는 DATABASE_URL), ANCHOR_APP_PASSWORD 설정 후
 pnpm db:migrate            # 미적용 파일을 순서대로 적용 (각 파일은 하나의 트랜잭션)
 pnpm db:migrate:status     # 적용 상태만 출력
 ```
@@ -16,8 +16,8 @@ pnpm db:migrate:status     # 적용 상태만 출력
 
 | 변수 | 역할 | 쓰는 곳 |
 | --- | --- | --- |
-| `DATABASE_URL_ADMIN` | 테이블 소유자 (Neon 기본 역할) | 마이그레이션, 공용 참조 데이터 적재, 백업 |
-| `DATABASE_URL` | `anchor_app` (BYPASSRLS 없음, 0001 이 SQL로 생성) | 앱 런타임 전부 |
+| `DATABASE_URL_ADMIN` (없으면 `DATABASE_URL`) | 테이블 소유자 (Neon 기본 역할). Vercel Neon 통합은 이걸 `DATABASE_URL` 로 주입한다 | 마이그레이션, 공용 참조 데이터 적재, 백업 |
+| `ANCHOR_DATABASE_URL` | `anchor_app` (BYPASSRLS 없음, 0001 이 SQL로 생성) | 앱 런타임 전부 |
 
 Neon 콘솔·API로 만든 역할은 `neon_superuser` 멤버라 RLS를 우회한다. 앱 역할을 콘솔에서 만들면 RLS가 무력화된다. 반드시 마이그레이션이 만든 `anchor_app` 을 쓴다.
 

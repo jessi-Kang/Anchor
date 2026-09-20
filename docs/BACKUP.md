@@ -46,7 +46,7 @@ psql "$NEW_DATABASE_URL_ADMIN" -v ON_ERROR_STOP=1 -f db/recovery/reapply-roles-a
 # 4. 삭제 원장 재적용: 덤프 이후 삭제를 요청한 계정은 복원본에서도 지운다
 psql "$NEW_DATABASE_URL_ADMIN" -c "DELETE FROM users WHERE id IN (SELECT user_id FROM account_deletions)"
 
-# 5. /api/health 가 rls_all_forced=true, role_bypasses_rls=false 를 돌려주는지 확인 후 DATABASE_URL 교체
+# 5. /api/health 가 rls_all_forced=true, role_bypasses_rls=false 를 돌려주는지 확인 후 ANCHOR_DATABASE_URL 교체
 ```
 
 `db/recovery/reapply-roles-and-rls.sql` 은 0001 의 역할 생성 블록과 GRANT, 0002 전체를 이어붙인 파일이다. 0002 가 바뀌면 함께 갱신한다.
