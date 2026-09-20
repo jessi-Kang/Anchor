@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { withoutUser } from "@/lib/db";
+import { iGa, joinWaGwa } from "@/lib/ko";
 import type { CardContent, KanjiNode } from "@/lib/db/kanji";
 
 /**
@@ -67,12 +68,13 @@ export function fallbackContent(node: KanjiNode, names: Map<string, string>): Ca
   const word = m.ko_word ?? sound;
   const uniq = [...new Set(m.parts ?? [])];
   const partWords = uniq.map((p) => names.get(p)?.split(" ")[0] ?? p);
-  const parts_meaning = partWords.length ? partWords.join("과 ") : `${node.key} 한 글자`;
+  // 이음말도 조사다. 앞말의 받침을 따른다 ("열과 힘", "나무와 힘") — src/lib/ko.ts 한 곳에서 고른다.
+  const parts_meaning = partWords.length ? joinWaGwa(partWords) : `${node.key} 한 글자`;
   const landing = m.example && m.example_reading && m.ko_word ? [{ word: m.example, reading: m.example_reading, ko: m.ko_word }] : [];
   return {
     hook: { word, mark: sound },
     parts_meaning,
-    question: partWords.length ? `${parts_meaning}이 모이면\n무슨 뜻이 될까?` : `이 모양이면\n무슨 뜻이 될까?`,
+    question: partWords.length ? `${parts_meaning}${iGa(parts_meaning)} 모이면\n무슨 뜻이 될까?` : `이 모양이면\n무슨 뜻이 될까?`,
     answer: (m.meanings ?? []).slice(0, 2).join(", ") || node.key,
     landing,
     pattern: "",

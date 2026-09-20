@@ -3,26 +3,37 @@ import { currentUser } from "@/lib/auth/server";
 import { getCard } from "@/lib/db/cards";
 import { cardContext, nextCandidates, KNEW_VERB } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
-import { withParticle } from "@/lib/ko";
+import { withParticle, type Spoken } from "@/lib/ko";
 import { Screen, Space, Title, Lead, Card, Grow, Button, Ghost, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
 import { NextCard } from "./next-card";
 
 export const dynamic = "force-dynamic";
 
-type GraphData = { center: string; known: string[]; next: string[] };
+/**
+ * 원 안 글자와, 조사를 고르기 위한 한국 한자음. 「아는 것」 원은 조사가 안 붙으니 글자만 받는다.
+ * 대체 텍스트도 화면 문장과 같은 자리(`withParticle`)를 거쳐야 한다 — 화면에 안 보인다고 예외가 아니다.
+ */
+type GraphData = { center: Spoken; known: string[]; next: Spoken[] };
+
+function graphLabel(g: GraphData): string {
+  const lit = `${withParticle(g.center, "이가")} 켜진 그래프`;
+  if (!g.next.length) return `${lit}. 다음 후보는 없어.`;
+  const next = { text: g.next.map((n) => n.text).join("·"), sound: g.next[g.next.length - 1].sound };
+  return `${withParticle(g.center, "이가")} 켜지고 ${withParticle(next, "이가")} 다음으로 뜬 그래프`;
+}
 
 /** 그래프 1장: 가운데 오늘 켜진 한자, 위에 아는 부품(최대 2), 아래 다음 후보(최대 2). 범례 항상. */
 function Graph({ g }: { g: GraphData }) {
   const top = [78, 238];
   const bottom = [78, 238];
   return (
-    <svg width="316" height="236" viewBox="0 0 316 236" role="img" aria-label={`${g.center}이 켜지고 ${g.next.join("·")}가 다음으로 뜬 그래프`} style={{ maxWidth: "100%" }}>
+    <svg width="316" height="236" viewBox="0 0 316 236" role="img" aria-label={graphLabel(g)} style={{ maxWidth: "100%" }}>
       {g.known.slice(0, 2).map((k, i) => (
         <line key={`ke${k}`} x1={158} y1={112} x2={g.known.length === 1 ? 158 : top[i]} y2={40} stroke="var(--graph-edge-known)" strokeWidth={3} />
       ))}
       {g.next.slice(0, 2).map((k, i) => (
-        <line key={`ne${k}`} x1={158} y1={112} x2={g.next.length === 1 ? 158 : bottom[i]} y2={196} stroke="var(--graph-edge-next)" strokeWidth={3} strokeDasharray="6 6" />
+        <line key={`ne${k.text}`} x1={158} y1={112} x2={g.next.length === 1 ? 158 : bottom[i]} y2={196} stroke="var(--graph-edge-next)" strokeWidth={3} strokeDasharray="6 6" />
       ))}
       {g.known.slice(0, 2).map((k, i) => {
         const x = g.known.length === 1 ? 158 : top[i];
@@ -37,15 +48,15 @@ function Graph({ g }: { g: GraphData }) {
       })}
       <circle cx={158} cy={112} r={42} fill="var(--graph-today)" />
       <text x={158} y={127} textAnchor="middle" fontFamily="var(--font-jp), Noto Sans JP" fontSize={42} fontWeight={700} fill="#FFFFFF">
-        {g.center}
+        {g.center.text}
       </text>
       {g.next.slice(0, 2).map((k, i) => {
         const x = g.next.length === 1 ? 158 : bottom[i];
         return (
-          <g key={`n${k}`}>
+          <g key={`n${k.text}`}>
             <circle cx={x} cy={196} r={30} fill="var(--color-bg)" stroke="var(--graph-next)" strokeWidth={2} />
             <text x={x} y={207} textAnchor="middle" fontFamily="var(--font-jp), Noto Sans JP" fontSize={30} fontWeight={700} fill="var(--color-text3)">
-              {k}
+              {k.text}
             </text>
           </g>
         );
@@ -70,7 +81,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
         <Lead>協을 맞혔으니 助·加가 가장 가까워. 다음 카드는 이 둘 중 하나.</Lead>
         <Space h={18} />
         <Card style={{ padding: "20px 20px" }}>
-          <Graph g={{ center: "協", known: ["開", "基"], next: ["助", "加"] }} />
+          <Graph g={{ center: { text: "協", sound: "협" }, known: ["開", "基"], next: [{ text: "助", sound: "조" }, { text: "加", sound: "가" }] }} />
           <Legend />
         </Card>
         <Grow />
@@ -115,7 +126,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
       <Lead>{lead}</Lead>
       <Space h={18} />
       <Card style={{ padding: "20px 20px" }}>
-        <Graph g={{ center: p.kanji, known: known.slice(0, 2), next: cands.map((c) => c.kanji) }} />
+        <Graph g={{ center: { text: p.kanji, sound: p.hook.mark }, known: known.slice(0, 2), next: cands.map((c) => ({ text: c.kanji, sound: c.koSound })) }} />
         <Legend />
       </Card>
       <Grow />

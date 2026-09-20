@@ -26,11 +26,20 @@ export function iGa(word: string, sound?: string | null) {
 export function eulReul(word: string, sound?: string | null) {
   return hasBatchim(sound || word) ? "을" : "를";
 }
+/** 와/과 는 방향이 반대다 — 받침이 있으면 "과", 없으면 "와". */
+export function waGwa(word: string, sound?: string | null) {
+  return hasBatchim(sound || word) ? "과" : "와";
+}
+
+/** 말 여럿을 "A와 B과 C" 로 잇는다. 이음말도 앞말의 받침을 따른다. */
+export function joinWaGwa(words: string[]): string {
+  return words.reduce((acc, w, i) => (i === 0 ? w : `${acc}${waGwa(acc)} ${w}`), "");
+}
 
 /** 한자 하나와 그 한국 한자음. 조사를 붙이려면 둘이 같이 다녀야 한다. */
 export type Spoken = { text: string; sound: string | null };
 
-const PARTICLES = { 은는: ["은", "는"], 이가: ["이", "가"], 을를: ["을", "를"] } as const;
+const PARTICLES = { 은는: ["은", "는"], 이가: ["이", "가"], 을를: ["을", "를"], 와과: ["과", "와"] } as const;
 
 /**
  * 한자(또는 한자가 섞인 말) 뒤에 조사를 붙이는 **유일한** 자리.
