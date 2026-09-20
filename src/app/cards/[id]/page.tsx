@@ -49,7 +49,7 @@ export default async function CardSourcePage({ params, searchParams }: { params:
       <div className={s.center}>
         <Label>{label}</Label>
         <h1 className={s.source} lang="ja">
-          {src ? markWord(src.sentence, src.word) : <Mark>{rubyKanji(p.kanji)}</Mark>}
+          {src ? markWord(src.sentence, src.word, src.readings) : <Mark>{rubyKanji(p.kanji)}</Mark>}
         </h1>
         <Lead>
           {p.hook.word}

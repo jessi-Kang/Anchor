@@ -12,8 +12,12 @@ export type CardPayload = CardContent & {
   /** 음독 (きょう) */
   reading: string;
   parts: CardPart[];
-  /** 출처: 자료 문장과 그 한자가 든 단어 (F04) */
-  source: { sentence: string; word: string } | null;
+  /**
+   * 출처: 자료 문장과 그 한자가 든 단어 (F04).
+   * readings 는 문장의 한자 덩어리마다 붙는 よみがな 로, `kanjiRuns(sentence)` 와 길이·순서가 같다.
+   * 없으면(키 없음·생성 실패·개수 불일치) 그 문장은 ruby 없이 나온다.
+   */
+  source: { sentence: string; word: string; readings?: string[] } | null;
   /** 문안 출처: 손으로 적음 / Claude / 사전 조합 */
   content_source: "authored" | "claude" | "fallback";
 };

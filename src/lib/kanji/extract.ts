@@ -44,3 +44,30 @@ export function findWordWith(text: string, kanji: string): { word: string; sente
   while (sb + 1 < chars.length && !stops.has(chars[sb + 1]) && chars[sb + 1] !== "、") sb++;
   return { word, sentence: chars.slice(sa, sb + 1).join("") };
 }
+
+/**
+ * 문장을 이어진 한자 덩어리로 자른다 (よみがな 를 다는 단위).
+ * 글자 하나가 아니라 덩어리다 — 世代 는 せ + だい 로 쪼갤 수 없고 せだい 하나로 읽는다.
+ * 위치는 코드포인트 기준이라 렌더링 쪽에서 [...sentence] 와 그대로 맞는다.
+ */
+export type KanjiRun = { text: string; start: number; end: number };
+
+export function kanjiRuns(text: string): KanjiRun[] {
+  const chars = Array.from(text);
+  const isKanji = (c: string) => {
+    const o = c.codePointAt(0) ?? 0;
+    return (o >= 0x4e00 && o <= 0x9fff) || (o >= 0x3400 && o <= 0x4dbf) || (o >= 0xf900 && o <= 0xfaff);
+  };
+  const out: KanjiRun[] = [];
+  let i = 0;
+  while (i < chars.length) {
+    if (!isKanji(chars[i])) {
+      i++;
+      continue;
+    }
+    const start = i;
+    while (i < chars.length && isKanji(chars[i])) i++;
+    out.push({ text: chars.slice(start, i).join(""), start, end: i });
+  }
+  return out;
+}
