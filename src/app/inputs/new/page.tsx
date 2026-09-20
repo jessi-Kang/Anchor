@@ -3,7 +3,7 @@ import { currentUser } from "@/lib/auth/server";
 import { ensureUser } from "@/lib/db/users";
 import { getSettings, type Lang3 } from "@/lib/db/settings";
 import { hasInputs } from "@/lib/db/inputs";
-import { EXAMPLE_INPUT } from "@/lib/example-input";
+import { EXAMPLE_INPUT, exampleLabel } from "@/lib/example-input";
 import { enabledLanguages, homeRedirect, isLang, LANG_LABEL } from "@/lib/languages";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Title, Lead, Status } from "@/components/ui";
@@ -50,7 +50,7 @@ export default async function NewInputPage({ searchParams }: { searchParams: Pro
           <Space h={10} />
         </>
       )}
-      <PasteForm lang={lang} example={EXAMPLE_INPUT[lang]} firstVisit={firstVisit} />
+      <PasteForm lang={lang} example={{ ...EXAMPLE_INPUT[lang], label: exampleLabel(lang) }} firstVisit={firstVisit} />
     </Screen>
   );
 }
