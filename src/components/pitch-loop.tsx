@@ -11,7 +11,7 @@ type Point = { t: number; f0: number };
  */
 const NO_NATIVE_NOTE = "아직 견줄 원어민 소리가 없어. 지금은 내 소리끼리 겹쳐 봐.";
 
-const legendAria = (noNative: boolean) => (noNative ? "내 억양 곡선 두 회차" : "원어민과 내 억양 곡선");
+const legendAria = (noNative: boolean) => (noNative ? "지난번과 이번 내 억양 곡선" : "원어민과 내 억양 곡선");
 
 /**
  * 듣기 → 따라 말하기 → 곡선. 한자 카드(F10)와 대화 덩어리(F14)가 같은 루프를 쓴다.
@@ -173,10 +173,12 @@ export function PitchLoop({
         */}
         <div className={s.legend}>
           {noNative ? (
+            // 겹치는 것은 **직전 하나**다. 곡선도 범례도 늘 둘 — 열둘이 겹치면 읽을 수 없다.
+            // 첫 회차라 지난번이 없으면 이 항목은 아예 안 낸다. 없는 것을 범례에 적지 않는다.
             prevMine && (
               <span className={s.legendItem}>
                 <span className={s.legendLine} style={{ background: "var(--curve-native)" }} />
-                나, {Math.max(1, attempt - 1)}회차
+                지난번
               </span>
             )
           ) : (
