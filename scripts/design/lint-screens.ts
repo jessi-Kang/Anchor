@@ -3,8 +3,13 @@
  *   pnpm design:lint            — 전부
  *   pnpm design:lint F03 O03    — 고른 것만
  *
- * 보는 것: 844px 를 넘치는지, 링크가 실제 파일을 가리키는지, 탭 영역이 44px 이상인지,
- * 주 버튼(검은 56px)이 화면당 1개인지. docs/FLOW.md 4장과 design/SCREENS.md 의 규칙이다.
+ * 보는 것: 844px 를 넘치는지, 링크가 실제 파일을 가리키는지, 탭 영역이 가로·세로 모두
+ * 44px 이상인지, 주 버튼(검은 56px)이 화면당 1개인지. docs/FLOW.md 4장과 CLAUDE.md 의 규칙이다.
+ *
+ * 탭 영역은 <a>·<button>·[role=button] 과 `data-tap` 을 단 것을 전부 잰다. 참고 HTML 은
+ * 정적이라 누르는 것이 <span> 으로 그려지는 자리가 있는데(F03 의 알아/몰라 칩), 그런 자리에
+ * `data-tap` 을 단다. 처음엔 <a> 의 높이만 재다가 폭 26px 짜리 라벨과 32px 짜리 칩을 통째로
+ *놓쳤다. 검사가 못 잡는 규칙은 없는 규칙이다.
  */
 import { readdirSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -47,18 +52,24 @@ async function main() {
     const found = await page.evaluate((tapMin) => {
       const frame = document.body.firstElementChild as HTMLElement;
       const links = [...document.querySelectorAll("a")].filter((a) => !a.href.includes("fonts.g"));
+      const tappable = [...document.querySelectorAll("a, button, [role=button], [data-tap]")].filter(
+        (el) => !(el instanceof HTMLAnchorElement) || !el.href.includes("fonts.g"),
+      );
       return {
         overflow: frame.scrollHeight > frame.clientHeight || document.documentElement.scrollHeight > 844,
-        small: links
-          .map((a) => ({ text: (a.textContent || "").trim().slice(0, 14), h: Math.round(a.getBoundingClientRect().height) }))
-          .filter((x) => x.h < tapMin),
+        small: tappable
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            return { text: (el.textContent || "").trim().slice(0, 14), h: Math.round(r.height), w: Math.round(r.width) };
+          })
+          .filter((x) => x.h < tapMin || x.w < tapMin),
         hrefs: links.map((a) => a.getAttribute("href") || ""),
         primary: links.filter((a) => /background: #2A2D33/.test(a.getAttribute("style") || "")).length,
       };
     }, TAP_MIN);
 
     if (found.overflow) problems.push(`${id}: 844px 를 넘친다`);
-    for (const s of found.small) problems.push(`${id}: 탭 영역 ${s.h}px — "${s.text}" (${TAP_MIN}px 이상이어야 한다)`);
+    for (const s of found.small) problems.push(`${id}: 탭 영역 ${s.w}×${s.h} — "${s.text}" (가로·세로 ${TAP_MIN}px 이상이어야 한다)`);
     for (const href of found.hrefs) {
       if (!existsSync(path.join(DIR, href))) problems.push(`${id}: 없는 화면으로 간다 — ${href}`);
     }
