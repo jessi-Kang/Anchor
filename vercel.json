@@ -10,6 +10,10 @@
     {
       "path": "/api/cron/backup",
       "schedule": "17 18 * * *"
+    },
+    {
+      "path": "/api/cron/voice",
+      "schedule": "47 18 * * *"
     }
   ]
 }

@@ -46,6 +46,8 @@ export async function startCard(inputId: string, kanji: string) {
   }
 
   const { settings } = await getSettings(user.id);
-  if (kanaGate(settings) === "ask") redirect(`/onboarding/kana?next=${encodeURIComponent(`/cards/${cardId}`)}`);
+  // from 은 O03 상단 "지금 어디" 라벨의 목적지다. 라벨은 한 단계 위로 가는 링크이고, O03 위는 이 자료(F03)다.
+  if (kanaGate(settings) === "ask")
+    redirect(`/onboarding/kana?next=${encodeURIComponent(`/cards/${cardId}`)}&from=${encodeURIComponent(`/inputs/${input.id}`)}`);
   redirect(`/cards/${cardId}`);
 }
