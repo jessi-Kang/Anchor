@@ -90,14 +90,18 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
   const p = card.payload;
   const cands = nextCandidates(ctx, p.kanji);
   const known = p.parts.map((pt) => pt.ch).filter((ch, i, a) => a.indexOf(ch) === i);
-  const shared = cands.flatMap((c) => c.shared).find(Boolean) ?? known[0] ?? null;
+  const fromCand = cands.find((c) => c.shared.length);
+  const shared = fromCand?.shared[0] ?? known[0] ?? null;
   const candText = cands.map((c) => `${c.kanji}${c.koWord ? `(${c.koWord})` : ""}`).join("·");
+  // 조사는 마지막에 읽는 말을 따른다: 한국어 단어가 붙어 있으면 그 단어, 없으면 한자음 (src/lib/ko.ts).
+  const last = cands[cands.length - 1];
+  const lastParticle = last ? iGa(last.koWord ?? last.kanji, last.koWord ? null : last.koSound) : "이";
   const lead =
     cands.length === 0
       ? "이 자료의 한자는 다 봤어. 다음 자료를 넣으면 이어져."
       : shared
-        ? `${shared}${eulReul(shared)} 아니까 ${candText}${iGa(cands[cands.length - 1].kanji)} 가장 가까워. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`
-        : `${candText}${iGa(cands[cands.length - 1].kanji)} 남았어. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`;
+        ? `${shared}${eulReul(shared, fromCand?.sharedSound)} 아니까 ${candText}${lastParticle} 가장 가까워. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`
+        : `${candText}${lastParticle} 남았어. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`;
   const backLabel = ctx.input?.meta.example ? "아침 기사로 돌아가기" : "자료로 돌아가기";
 
   return (

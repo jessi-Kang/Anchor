@@ -5,10 +5,11 @@ import { getSettings } from "@/lib/db/settings";
 import { listInputs } from "@/lib/db/inputs";
 import { countChunks } from "@/lib/db/chunks";
 import { inputProgress, nextCandidates } from "@/lib/cards/progress";
-import { enabledLanguages, homeRedirect, inputPath, LANG_LABEL } from "@/lib/languages";
-import { eulReul } from "@/lib/ko";
+import { enabledLanguages, homeRedirect, inputPath, LANG_LABEL, LANG_START } from "@/lib/languages";
+import { eulReul, iGa } from "@/lib/ko";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Title, Lead, Card, Label, Grow, Button, Ghost } from "@/components/ui";
+import { nowKST } from "@/components/card-bits";
 import { HomeRows, type HomeRow } from "./home-rows";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function TodayPage({ searchParams }: { searchParams: Promise<{ fixed?: string }> }) {
   const { fixed } = await searchParams;
-  const now = new Date().toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
+  const now = nowKST();
 
   if (isDesignPreview()) {
     return (
@@ -75,6 +76,13 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   // 홈의 두 번째 입구 (docs/FLOW.md 2장): 영어를 켰으면 "못 한 말" 행이 F13 으로 간다.
   // 빈 상태에는 넣지 않는다 — FLOW 1′장이 "자료 행 없이 버튼 하나" 로 못 박는다.
   const talkCount = langs.includes("en") ? await countChunks(user.id, "en") : 0;
+  // 둘 이상 켰으면 나머지는 홈에서 이어서 (docs/FLOW.md 1장 2). 자료가 하나도 없는 언어는
+  // 들어갈 길이 홈뿐이라, 그 언어의 자료 넣기 행을 둔다. 없으면 주소를 손으로 치는 수밖에 없다.
+  const started = new Set(inputs.map((i) => i.lang));
+  const notStartedRows: HomeRow[] = langs
+    .filter((l) => !started.has(l))
+    .map((l) => ({ id: `lang-${l}`, title: `${LANG_LABEL[l]} 자료 넣기`, sub: LANG_START[l], next: null, href: inputPath(l) }));
+
   const talkRows: HomeRow[] = langs.includes("en")
     ? [{ id: "talk", title: "못 한 말", sub: talkCount > 0 ? `못 한 말 ${talkCount}개` : "한 줄이면 돼", next: null, href: "/talk" }]
     : [];
@@ -88,10 +96,11 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     }),
   );
   const nextRow = rows.find((r) => r.next);
+  // 아는 것 → 다음 것, 한 문장. 아는 것을 앞에 둔다 (docs/FLOW.md 4장). 두 줄로 늘리지 않는다.
   const reason = nextRow?.next
     ? nextRow.next.shared.length
-      ? `다음은 ${nextRow.next.kanji}. ${nextRow.next.shared[0]}${eulReul(nextRow.next.shared[0])} 아니까 가장 가까워.`
-      : `다음은 ${nextRow.next.kanji}${nextRow.next.koWord ? ` (${nextRow.next.koWord})` : ""}. ${nextRow.input.title ?? "자료"}에서.`
+      ? `${nextRow.next.shared[0]}${eulReul(nextRow.next.shared[0], nextRow.next.sharedSound)} 아니까 ${nextRow.next.kanji}${iGa(nextRow.next.kanji, nextRow.next.koSound)} 가장 가까워.`
+      : `다음은 ${nextRow.next.kanji}${nextRow.next.koWord ? ` (${nextRow.next.koWord})` : ""}. ${nextRow.input.title?.slice(0, 12) ?? "자료"}에서.`
     : null;
 
   return (
@@ -116,7 +125,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
                     ? `한자 ${kanji}개 · 남은 카드 ${remaining}`
                     : `한자 ${kanji}개 · 다 봤어`,
             next: remaining > 0 ? (next?.kanji ?? null) : null,
-          })), ...talkRows]}
+          })), ...notStartedRows, ...talkRows]}
         />
       </Card>
       {reason && (

@@ -61,7 +61,15 @@ export async function cardContext(userId: string, card: CardRow): Promise<CardCo
   return { ...prog, total, where: `카드 ${n} / ${total}`, n };
 }
 
-export type Candidate = { kanji: string; shared: string[]; koWord: string | null };
+export type Candidate = {
+  kanji: string;
+  shared: string[];
+  koWord: string | null;
+  /** 이 한자의 한국 한자음. 조사를 고를 때 쓴다 (한자는 받침을 셀 수 없다) */
+  koSound: string | null;
+  /** shared[0] 의 한국 한자음. 같은 이유 */
+  sharedSound: string | null;
+};
 
 /**
  * 다음 카드 = 아는 노드에서 가장 가까운 모르는 노드 (CLAUDE.md 앵커 그래프).
@@ -74,13 +82,22 @@ export function nextCandidates(prog: InputProgress, justLit?: string): Candidate
   for (const n of prog.nodes) if (known.has(n.key)) for (const p of n.meta.parts ?? []) knownParts.add(p);
   for (const k of known) knownParts.add(k); // 아는 한자 자체도 부품이 된다 (力을 알면 助·加)
   const landed = new Set(prog.landedKanji);
+  // 조사를 고르려면 글자가 아니라 읽는 소리가 필요하다 (src/lib/ko.ts).
+  const soundOf = new Map(prog.nodes.map((n) => [n.key, n.meta.ko_sound ?? null]));
   return prog.nodes
     .filter((n) => !known.has(n.key) && !landed.has(n.key))
     .map((n) => {
       const shared = [...new Set(n.meta.parts ?? [])].filter((p) => knownParts.has(p));
-      return { kanji: n.key, shared, koWord: n.meta.ko_word ?? null, score: shared.length + (n.meta.ko_word ? 0.5 : 0) };
+      return {
+        kanji: n.key,
+        shared,
+        koWord: n.meta.ko_word ?? null,
+        koSound: n.meta.ko_sound ?? null,
+        sharedSound: shared.length ? (soundOf.get(shared[0]) ?? null) : null,
+        score: shared.length + (n.meta.ko_word ? 0.5 : 0),
+      };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, 2)
-    .map(({ kanji, shared, koWord }) => ({ kanji, shared, koWord }));
+    .map(({ kanji, shared, koWord, koSound, sharedSound }) => ({ kanji, shared, koWord, koSound, sharedSound }));
 }

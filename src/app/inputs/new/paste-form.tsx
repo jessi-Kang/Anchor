@@ -10,7 +10,7 @@ import { submitInput } from "./actions";
  * 첫 방문(이 언어의 자료가 없음)엔 예시 자료 행("日経 기사 한 문장")이 하나 더 있고, 탭 한 번에 상자가 채워진다 (F02 → F02a).
  * 주 버튼 "모르는 것만 뽑기" 하나.
  */
-export function PasteForm({ lang, example, firstVisit }: { lang: Lang3; example: { title: string; body: string }; firstVisit: boolean }) {
+export function PasteForm({ lang, example, firstVisit }: { lang: Lang3; example: { label: string; body: string }; firstVisit: boolean }) {
   const [text, setText] = useState("");
   const [usedExample, setUsedExample] = useState(false);
   const [pending, start] = useTransition();
@@ -35,7 +35,7 @@ export function PasteForm({ lang, example, firstVisit }: { lang: Lang3; example:
           <Space h={10} />
           <Card tint list>
             <Row
-              title="日経 기사 한 문장"
+              title={example.label}
               sub="붙여넣을 게 없으면 이걸로"
               right={isExample ? <Pill on>켜짐</Pill> : undefined}
               pressed={isExample}

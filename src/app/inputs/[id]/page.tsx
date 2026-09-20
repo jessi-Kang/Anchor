@@ -6,6 +6,7 @@ import { extractKanji } from "@/lib/kanji/extract";
 import { isDesignPreview } from "@/lib/design-preview";
 import { LANG_LABEL } from "@/lib/languages";
 import { Screen, Space, Title, Lead, Grow, Button } from "@/components/ui";
+import { nowKST } from "@/components/card-bits";
 import { JudgeRows, type JudgeItem } from "./judge-rows";
 
 export const dynamic = "force-dynamic";
@@ -79,7 +80,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
   const where = input.meta.example ? "이 기사에서" : input.title ? `${input.title.slice(0, 12)}에서` : "이 자료에서";
 
   return (
-    <Screen where={where} up="/today" aside={`한자 ${found.length}개`}>
+    <Screen where={where} up="/today" aside={nowKST()}>
       <Space h={28} />
       <JudgeRows inputId={input.id} anchored={anchored} bare={bare} empty={found.length === 0} />
     </Screen>

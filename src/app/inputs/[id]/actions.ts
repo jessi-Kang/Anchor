@@ -34,8 +34,16 @@ export async function startCard(inputId: string, kanji: string) {
     const counts = new Map<string, number>();
     for (const p of node.meta.parts ?? []) counts.set(p, (counts.get(p) ?? 0) + 1);
     const parts: CardPart[] = [...counts.entries()].map(([ch, count]) => ({ ch, name: names.get(ch) ?? null, count }));
+    // F03 은 nodes.meta 의 ko_word·ko_sound 로 "지출의 지" 를 보여 준다. 카드의 후킹도 같은 단어여야
+    // "지출은 알아. 支만 모르지" 로 이어진다. 문안 생성이 다른 단어를 골라 오면 두 화면이 다른 말을
+    // 하게 되므로, 사전에 앵커가 있으면 그쪽을 쓴다 (docs/FLOW.md 1장 4·5).
+    const hook =
+      node.meta.ko_word && node.meta.ko_sound
+        ? { word: node.meta.ko_word, mark: node.meta.ko_sound }
+        : content.hook;
     const payload: CardPayload = {
       ...content,
+      hook,
       kanji: node.key,
       reading: node.reading ?? node.meta.on?.[0] ?? "",
       parts,

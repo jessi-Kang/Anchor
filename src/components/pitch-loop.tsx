@@ -39,7 +39,7 @@ export function PitchLoop({
   const [native, setNative] = useState<Point[] | null>(() => (preview ? demoCurve(0) : null));
   const [mine, setMine] = useState<Point[] | null>(() => (preview ? demoCurve(1) : null));
   const [attempt, setAttempt] = useState(preview ? 3 : startAttempt);
-  const [state, setState] = useState<"idle" | "playing" | "recording" | "saving" | "denied">("idle");
+  const [state, setState] = useState<"idle" | "playing" | "recording" | "saving">("idle");
   const [note, setNote] = useState<string>(firstNote);
   const ctxRef = useRef<AudioContext | null>(null);
   const [pending, setPending] = useState(false);
@@ -89,7 +89,9 @@ export function PitchLoop({
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      setState("denied");
+      // 거부해도 화면은 idle 로 돌아간다. 말하기는 막히지만 **듣기는 계속 할 수 있어야 한다** —
+      // 안내문이 "듣기만 하고 넘어가도 돼" 라고 말해 놓고 듣기 버튼까지 꺼 두면 그 말이 거짓이 된다.
+      setState("idle");
       setNote("마이크를 허용하지 않았어. 듣기만 하고 넘어가도 돼.");
       return;
     }

@@ -58,7 +58,13 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
     <>
       <Title lg>{empty ? "이 자료엔 한자가 없어" : unknownCount > 0 ? `모르는 한자 ${unknownCount}개` : "다 아는 한자야"}</Title>
       <Space h={6} />
-      <Lead>{empty ? "다른 자료를 넣어 봐." : "아는 소리로 시작할 수 있는 것부터. 나머지는 나중에."}</Lead>
+      <Lead>
+        {empty
+          ? "다른 자료를 넣어 봐."
+          : unknownCount > 0
+            ? "아는 소리로 시작할 수 있는 것부터. 나머지는 나중에."
+            : "여기서 새로 배울 건 없어. 다른 자료를 넣어 봐."}
+      </Lead>
       <Space h={22} />
       {queueA.length > 0 && (
         <Card>
