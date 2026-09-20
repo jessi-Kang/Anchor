@@ -7,7 +7,7 @@
 
 ```mermaid
 flowchart TD
-  L[/ 로그인] --> O[/onboarding<br/>상황 → 가나 읽기 → 씨앗]
+  L[/ 로그인] --> O[/onboarding<br/>언어 고르기 → 언어별 상황 → 단계]
   O --> T[/today 홈]
   T --> I[/inputs 자료]
   T --> C[/cards 발견 카드]
@@ -22,11 +22,12 @@ flowchart TD
 | 라우트 | 화면 파일 | 하는 일 |
 | --- | --- | --- |
 | `/` | O01 | Google 로그인. 데이터 원칙 2줄 |
-| `/onboarding/purpose` | O02 | 상황 고르기 (수준 질문 없음). 상황을 고른 언어만 켜진다. /settings 에서 다시 들어와 언어를 추가한다 |
-| `/onboarding/kana` | O03 | 가나 6개 실제 읽기 (마이크). 일본어를 켰을 때만. 실패 시 가나 모듈로 분기(v2) |
-| `/onboarding/kanji` | O05 | 한자 40장 일본어 읽기 떠올리기 3분 → user_node_state(knows_meaning). 일본어를 켰을 때만, 가나 뒤 |
-| `/onboarding/seed` | O04 | 영어 뜻 떠올리기 3분 → user_node_state 씨앗. 영어·스페인어를 켰을 때만. 스페인어를 켰으면 스페인어 대응 표시 |
-| `/today` | F01 | 오늘 만난 것 큐 |
+| `/onboarding/languages` | O02a | 시작할 언어 고르기 (여러 개 가능). 홈·설정의 "언어 추가"도 여기로. 이 페이지는 리다이렉트하지 않는다 |
+| `/onboarding/purpose?lang=` | O02b | 한 언어의 상황 고르기 (수준 질문 없음). 상단 "일본어 1 / 3". 이미 고른 언어는 고치기("저장") |
+| `/onboarding/kana?lang=ja` | O03 | 가나 6개 실제 읽기 (마이크). 일본어를 켰을 때만. 실패 시 가나 모듈로 분기(v2). 건너뛰기 가능 |
+| `/onboarding/kanji?lang=ja` | O05 | 한자 40장 일본어 읽기 떠올리기 3분 → user_node_state(knows_meaning). 일본어를 켰을 때만, 가나 뒤. 건너뛰기 가능 |
+| `/onboarding/seed?lang=en\|es` | O04 | 영어 뜻 떠올리기 3분 → user_node_state 씨앗. 영어·스페인어를 켰을 때만(두 언어가 같은 40장). 스페인어를 켰으면 스페인어 대응 표시. 건너뛰기 가능 |
+| `/today` | F01 | 오늘 만난 것 큐. 켠 언어가 없으면 O02a 로. 남은 온보딩 단계·안 켠 언어는 "언어" 카드 행으로 |
 | `/today/done` | F15 | 하루 끝 요약 |
 | `/inputs/new` | F02 | 붙여넣기 / 공유 시트 수신 |
 | `/inputs/[id]` | F03 | 모르는 것 추출, 아는 소리로 시작할 것부터 |
@@ -37,6 +38,6 @@ flowchart TD
 | `/graph` | F11 | 앵커 그래프, 다음 카드 이유, 필터 |
 | `/talk` | F13 | 못 한 말 한 줄 입력 |
 | `/talk/[id]` | F14 | 덩어리 + 음성 루프 |
-| `/settings` | — | 언어 켜기·바꾸기, 계정, 전체 내보내기(JSON), 계정 삭제, 음성 보관 기간, 항목별 공개 설정, 목소리 선택 |
+| `/settings` | — | 언어 추가·남은 단계 이어서·상황 고치기, 계정, 전체 내보내기(JSON), 계정 삭제, 음성 보관 기간, 항목별 공개 설정, 목소리 선택 |
 
 API 경계(초안): `/api/inputs` (생성·추출), `/api/cards` (생성·추측 기록), `/api/graph/next` (다음 카드), `/api/talk` (덩어리 생성), `/api/tts`, `/api/pitch` (브라우저 처리가 기본, 서버는 저장만), `/api/export`, `/api/account/delete`.
