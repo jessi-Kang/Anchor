@@ -11,7 +11,7 @@ type Point = { t: number; f0: number };
  */
 const NO_NATIVE_NOTE = "아직 견줄 원어민 소리가 없어. 지금은 내 소리끼리 겹쳐 봐.";
 
-const legendAria = (noNative: boolean) => (noNative ? "지난번과 이번 내 억양 곡선" : "원어민과 내 억양 곡선");
+const legendAria = (noNative: boolean) => (noNative ? "앞 회차와 이번 내 억양 곡선" : "원어민과 내 억양 곡선");
 
 /**
  * 듣기 → 따라 말하기 → 곡선. 한자 카드(F10)와 대화 덩어리(F14)가 같은 루프를 쓴다.
@@ -174,11 +174,18 @@ export function PitchLoop({
         <div className={s.legend}>
           {noNative ? (
             // 겹치는 것은 **직전 하나**다. 곡선도 범례도 늘 둘 — 열둘이 겹치면 읽을 수 없다.
-            // 첫 회차라 지난번이 없으면 이 항목은 아예 안 낸다. 없는 것을 범례에 적지 않는다.
+            // 첫 회차라 앞 곡선이 없으면 이 항목은 아예 안 낸다. 없는 것을 범례에 적지 않는다.
+            //
+            // 이름에 회차를 남기는 이유: 숫자를 지우면 **어느 두 회차를 견주는지**가 사라진다.
+            // "같은 덩어리 5회차 곡선 일치도가 오르는가" 가 검증 기준이라(docs/SPEC.md 9장)
+            // 그 숫자가 뜻을 나른다.
+            //
+            // 이 `attempt - 1` 이 맞는 값인 건 쌓여 있던 곡선을 `mine` 에 넣기 때문이다. prevMine 에
+            // 넣었으면 N회차 곡선에 N-1 이 붙어 틀렸다. 여기 숫자는 늘 "한 번 전에 실제로 녹음한 회차" 다.
             prevMine && (
               <span className={s.legendItem}>
                 <span className={s.legendLine} style={{ background: "var(--curve-native)" }} />
-                지난번
+                나, {attempt - 1}회차
               </span>
             )
           ) : (

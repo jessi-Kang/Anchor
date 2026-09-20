@@ -52,7 +52,7 @@ export default async function TalkChunkPage({
   let chunk = PREVIEW;
   // 회차는 쌓인 사실이다. 화면을 다시 열어도 이어서 센다 (docs/FLOW.md 1′장, docs/SPEC.md 9장).
   let startAttempt = 0;
-  // 직전 회차 곡선도 같은 사실이다. 원어민 음성이 없을 때 겹칠 상대가 된다.
+  // 마지막 회차 곡선도 같은 사실이다. 회차만 읽고 곡선을 두고 오면 범례가 말하는 회차의 곡선이 없다.
   let startPrev: PitchPoint[] | null = null;
   // 원어민 음성이 있는지는 서버만 안다. 값이 채워지면 코드를 안 고쳐도 그 순간부터 F14 로 바뀐다.
   // 디자인 미리보기에서만 `?native=0` 으로 F14a(원어민 소리 없음)를 띄운다 — 참고 화면이 둘이라
@@ -69,7 +69,10 @@ export default async function TalkChunkPage({
     if (!hasEnglish(row)) redirect(`/talk/${id}/guess`);
     chunk = row;
     startAttempt = await countRecordings(user.id, { chunk: row.id });
-    startPrev = nativeVoice ? null : await lastPitch(user.id, { chunk: row.id });
+    // 원어민 음성이 있든 없든 읽는다. 범례가 "나, 2회차" 라고 말하는데 곡선이 없으면, 원어민이
+    // 생기는 순간 F14a 에서 고친 것과 **똑같은 결함**이 F14 에 남는다 (돌려서 확인했다).
+    // 겹치는 것과는 다른 이야기다 — 이건 내 마지막 곡선이고, "지난번" 은 원어민이 없을 때만 겹친다.
+    startPrev = await lastPitch(user.id, { chunk: row.id });
   }
 
   const highlight = chunk.meta.chunk ?? chunk.text;
