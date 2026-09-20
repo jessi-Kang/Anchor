@@ -11,7 +11,8 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | 이름 | 하는 일 | 이 세션만 고치는 곳 | 브랜치 | 세션 ID |
 | --- | --- | --- | --- | --- |
 | **Anchor · PM (조율)** | 결정·우선순위·통합 순서·완결 판정. 코드/디자인/기획 문서를 직접 고치지 않는다 | `docs/TEAM.md` | `claude/affectionate-brahmagupta-947f48` | `session_01QPJ4i1hJ5zENanv7ykjp1t` |
-| **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도 | `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` · `README.md` | `claude/create-readme-vibelog-9c5xnb` | `session_01GLHC1ArhYJTqPuDysDoSWt` |
+| **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도 | `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` | `claude/create-readme-vibelog-9c5xnb` | `session_01GLHC1ArhYJTqPuDysDoSWt` |
+| **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | (세션 생성 시 할당) | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
 | **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_019gYCLNic9TA9jvmQikfhfk` |
 | **Anchor · QA** | 실제로 써 보고 결함을 찾는다. **코드를 고치지 않는다** | (없음. 읽기 전용) | `claude/optimistic-hopper-kaafdu` | `session_01QxSgxQRsFT1grCVZrxTEhi` |
@@ -23,6 +24,7 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 - QA 가 찾은 것 → 코드 결함은 **개발**, 기획 문제는 **PM**. QA 가 두 곳에 같은 건을 보내지 않는다.
 - 디자인이 화면 순서·화면 추가/삭제·문구 의도를 바꾸고 싶으면 → **PM**. PM 이 결정하고 **기획**이 `docs/FLOW.md` 에 반영한 뒤 **개발**에 알린다.
 - 개발이 기획 문서와 다르게 만들어야 할 이유를 찾으면 → **PM**. 혼자 판단해서 문서와 다르게 만들지 않는다.
+- 문서에서 문체·중복·사실 불일치를 발견하면 → **문서**. 기준 문서(SPEC·FLOW·SITEMAP)에 대한 것이면 문서 세션이 고치지 않고 **PM** 에게 목록으로 보낸다.
 - 남의 영역이 고쳐져야 하면 직접 고치지 말고 그 세션에 요청한다. 두 세션이 같은 파일을 고치면 둘 중 하나는 반드시 버려진다.
 
 ## 2. 브랜치와 통합
@@ -54,3 +56,29 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | P3 | 영어 대화 루프 F13~F14 | Dev |
 
 P0 이 끝나기 전에 P3 를 시작하지 않는다. 화면 하나가 끝날 때마다 커밋하고 푸시한다.
+
+## 5. 문서 규칙
+
+문서는 무슨 일이 있었는지의 기록이 아니라 지금 무엇이 참인지의 서술이다.
+
+- **대화·결정 과정을 그대로 옮기지 않는다.** "논의 끝에 이렇게 하기로 했다", "원래는 A였는데 B로 바꿨다" 같은 서사는 쓰지 않는다. 결론만 현재형 규칙으로 쓴다. 변경 이력은 git 커밋과 vibelog 가 담당한다.
+- 새 결정이 들어오면 덧붙이지 말고 **어긋나는 옛 문장을 지운다.** 같은 사실이 두 문서에 다르게 적혀 있으면 한쪽을 지우고 다른 쪽을 가리킨다.
+- 문체: 한국어. 한 문장에 한 사실. 단정적인 평서문. 수식어를 걷어낸다. 목록보다 표가 맞으면 표. 제목은 명사구.
+- 분량을 늘리는 것은 성과가 아니다. 같은 내용을 더 짧게 만들면 그게 성과다.
+
+문서마다 맡은 것이 다르다. 겹치면 둘이 어긋난다.
+
+| 문서 | 무엇을 담는가 |
+| --- | --- |
+| `docs/SPEC.md` | 왜 이렇게 만드는가 (원칙·모델·로드맵) |
+| `docs/FLOW.md` | 사용자가 밟는 화면 순서와 각 화면의 목적 |
+| `docs/SITEMAP.md` | 라우트와 화면 파일의 대응 |
+| `docs/STATUS.md` | 지금 실제로 있는 것과 없는 것. 상태만 적고 계획은 적지 않는다 |
+| `docs/TEAM.md` | 누가 어디를 고치는가, 통합 규칙, 완결 기준, 우선순위 |
+| `docs/BACKUP.md` | 백업 세 층과 복구 절차 |
+| `README.md` | 처음 보는 사람에게 프로젝트를 설명하는 한 장 |
+
+### 기준 문서 편집 패스
+
+`docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` 는 기획 소유다. 문서 세션은 평소에 이 셋을 고치지 않는다.
+한 단계(P0·P1 등)가 끝날 때마다 PM 이 문서 세션에 **편집 패스**를 연다. 그 동안만 문서 세션이 세 파일을 고치고, 기획은 쓰지 않는다. 문서 세션이 푸시하고 PM 에게 알리면 패스가 닫힌다.
