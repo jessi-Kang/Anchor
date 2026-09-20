@@ -4,12 +4,14 @@
 
 | 층 | 무엇 | 어디 | 주기 | 보존 |
 | --- | --- | --- | --- | --- |
-| 1. PITR | Neon 히스토리(instant restore) | Neon 안 | 상시 | 무료 플랜은 **6시간 고정**. 유료로 올리면 7일 이상으로 늘린다 |
+| 1. PITR | Neon 히스토리(instant restore) | Neon 안 | 상시 | **6시간**. MVP 동안 무료 플랜을 유지한다 |
 | 2. 배포 전 스냅샷 | Neon 브랜치 스냅샷 | Neon 안 | 프로덕션 빌드마다 (`scripts/backup/neon-snapshot.ts`, `NEON_API_KEY` 있을 때) | 14일. 플랜 제한으로 실패하면 경고만 |
 | 3. 매일 JSON 백업 | 전체 테이블 + 로그인 계정 매핑(OAuth 토큰 제외)을 gzip JSON 으로 | **Neon 밖** Vercel Blob 비공개 스토어 `anchor-backups` (`/api/cron/backup`, Vercel cron) | 매일 03:17 KST | 35일 (`BACKUP_RETENTION_DAYS`) |
 | (선택) pg_dump | 원본 형식 덤프 | S3 호환 스토리지 (`.github/workflows/backup.yml`) | GitHub Actions | 외부 스토리지 계정(카드)이 있을 때만 |
 
-1·2는 Neon 장애나 계정 문제에 함께 사라질 수 있다. 3이 그 경우의 사본이다. 무료 플랜에서 1이 6시간뿐이라 3이 더 중요하다.
+1·2는 Neon 장애나 계정 문제에 함께 사라질 수 있다. 3이 그 경우의 사본이다. 1이 6시간뿐이라 하루 넘게 지난 사고는 3으로만 되돌린다.
+
+PITR 을 유료 플랜으로 늘릴지는 실사용을 시작하는 날 다시 본다. 그때까지 이 값은 정해진 것이다 (`docs/TEAM.md` 7장).
 
 3이 pg_dump 가 아니라 JSON 인 이유: 서버리스에는 pg_dump 가 없고, 외부 스토리지(R2 등)는 카드 등록이 필요했다. Vercel Blob 은 이미 결제 중인 Vercel 안에 있어 추가 계정이 없고, Neon 과는 다른 회사·다른 저장소다. 데이터 양이 작은 MVP 에서는 테이블별 JSON 으로 충분하며, 복구는 `pnpm backup:restore` 로 한다.
 
@@ -65,13 +67,13 @@ DATABASE_URL_ADMIN=<새 DB 소유자 연결> pnpm backup:restore anchor-<STAMP>.
 
 - 보존 기간(35일)이 지나면 `/api/cron/backup` 이 파일을 지우고 `backups_purged_at` 을 채운다. 그 시점에 사본이 완전히 사라진다.
 - 그 사이 복구를 하면 절차 C-4 로 해당 계정을 다시 지운다.
-- Neon PITR/스냅샷 안의 사본은 각각 6시간(무료 플랜)/14일 후 사라진다.
+- Neon PITR/스냅샷 안의 사본은 각각 6시간/14일 후 사라진다.
 
 사용자에게는 "삭제 후 최대 35일 안에 백업 사본까지 사라진다"고 명시한다.
 
 ## 분기 복구 리허설
 
-분기마다 절차 C 를 임시 Neon 브랜치에 실제로 수행한다. 기록:
+분기마다 절차 C 를 임시 Neon 브랜치에 실제로 수행한다. 프로덕션 브랜치는 건드리지 않는다. 기록:
 
 | 날짜 | 덤프 | 소요 시간 | 결과 / 발견한 문제 |
 | --- | --- | --- | --- |
