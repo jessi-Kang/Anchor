@@ -205,6 +205,18 @@ export function Button({ children, href, onClick, disabled, outline, type = "but
 }
 
 /** 회색 텍스트 보조 링크. 화면당 최대 1개. plain 이면 프리페치 없는 <a>. */
+/**
+ * 행 안에서 누르는 회색 텍스트 링크 (마이크 끄기 등). 알약과 갈라 둔다 — 알약은 시스템이 알려 주는
+ * 상태이고 이건 사용자가 누르는 것이다 (docs/FLOW.md 4장).
+ */
+export function TextAction({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return (
+    <button type="button" className={s.textAction} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
 export function Ghost({ children, href, plain, onClick }: { children: ReactNode; href?: string; plain?: boolean; onClick?: () => void }) {
   if (href && plain) {
     return (

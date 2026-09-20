@@ -43,7 +43,10 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           />
         </Card>
         <Space h={14} />
-        <Lead>力을 아니까 助가 가장 가까워.</Lead>
+        {/* 주어 자리에는 판정된 것만 온다 (docs/FLOW.md 4장). 미리보기 데이터에는 알아/몰라로 고른
+            것이 없으므로 "力을 아니까" 라고 부를 수 없다 — 발판이 없을 때 쓰는 갈래(130행)를 쓴다.
+            이 한 줄만 규칙을 안 따라와서, 미리보기가 틀린 본을 보이고 있었다. */}
+        <Lead>다음은 協. 日経 기사에서.</Lead>
         <Grow />
         <Button href="/inputs/new">자료 넣기</Button>
         <Ghost href="/settings">설정</Ghost>

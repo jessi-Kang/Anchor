@@ -125,6 +125,18 @@ async function main() {
   const rows: Array<{ id: string; pct: number }> = [];
   const unreachable: Array<{ id: string; why: string }> = [];
 
+  /**
+   * 두 목록 어디에도 없는 참고 화면을 먼저 센다. 없으면 **조용히 빠진다** — 그게 제일 나쁘다.
+   * SKIP 에 이유를 적게 한 것도 빠뜨린 것과 못 부르는 것을 가르려는 건데, 애초에 두 목록에
+   * 이름이 없으면 가를 것도 없다. 화면을 새로 그린 날 이 줄이 뜬다.
+   * Sitemap.html 은 화면이 아니라 라우트 그림이라 뺀다(`design:lint` 도 같은 이유로 뺀다).
+   */
+  const listed = new Set([...Object.keys(ROUTES), ...Object.keys(SKIP)]);
+  const missing = readdirSync(path.resolve(process.cwd(), "design/screens"))
+    .filter((f) => f.endsWith(".html") && f !== "Sitemap.html")
+    .map((f) => f.replace(/\.html$/, ""))
+    .filter((id) => !listed.has(id));
+
   for (const [id, route] of Object.entries(ROUTES)) {
     const refPath = path.resolve(process.cwd(), `design/screens/${id}.html`);
     if (!existsSync(refPath)) {
@@ -174,6 +186,10 @@ async function main() {
   if (unreachable.length) {
     console.log(`\n맞대어 보지 못한 것 (${unreachable.length}장)\n`);
     for (const u of unreachable) console.log(`  ${u.id.padEnd(8)} ${u.why}`);
+  }
+  if (missing.length) {
+    console.log(`\n어느 목록에도 없는 화면 (${missing.length}장) — ROUTES 나 SKIP 에 한 줄 더해라\n`);
+    for (const id of missing) console.log(`  ${id}`);
   }
   const skipped = Object.entries(SKIP);
   console.log(`\n대상이 아닌 것 (${skipped.length}장)\n`);
