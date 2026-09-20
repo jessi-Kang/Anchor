@@ -12,6 +12,7 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | --- | --- | --- | --- | --- |
 | **Anchor · PM (조율)** | 결정·우선순위·통합 순서·완결 판정. 코드/디자인/기획 문서를 직접 고치지 않는다 | `docs/TEAM.md` | `claude/affectionate-brahmagupta-947f48` | `session_01QPJ4i1hJ5zENanv7ykjp1t` |
 | **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도, 제품 원칙 | `CLAUDE.md` · `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` | (세션 생성 시 할당) | `session_01YJ3vydkSn54KDcf69rC6Vp` |
+| **Anchor · 기록** | 사무실 대시보드에 오간 말과 상태를 기록한다. 판단하지 않는다 | (레포 파일 없음) | — | `session_01Ka5keuAQ5VnTkFg5DnjtG4` |
 | **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | `claude/docs-status-7t3m1a` | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
 | **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_01JXYTj8AuVoomHGMVQjEB6R` |
@@ -142,3 +143,21 @@ Jessi 가 결정할 것은 돈이 들거나(유료 플랜·외부 계정), 제�
 | DB 작업 도구 | 모든 세션이 **Bash 로 한다**: `psql`·`pnpm db:migrate`·`tsx` 스크립트·`curl`. Neon MCP(`mcp__Neon__*`)는 쓰지 않는다. MCP 는 허용 목록에 없는 도구가 나올 때마다 사람에게 승인창을 띄우는데, 세션마다 무엇이 빠졌는지 맞추는 것보다 한 경로로 통일하는 쪽이 사람 손을 덜 붙잡는다 |
 | 스키마 변경 | `db/migrations/` 의 SQL 파일로만 한다. MCP 로 프로덕션 DB 에 직접 DDL 을 치지 않는다. 복구(`docs/BACKUP.md` 절차 C)가 `pnpm db:migrate` 로 스키마를 다시 만드는 전제 위에 서 있어, 파일에 없는 테이블은 복구하면 행째로 사라진다. 조회(SELECT)는 MCP 로 해도 된다 |
 | 만드는 순서 | `docs/TEAM.md` 4장이 정한다. `docs/SPEC.md` 9장은 무엇을 검증하는가를 정하고 순서를 정하지 않는다 |
+
+## 8. 모델과 비용
+
+세션마다 쓰는 모델이 다르다. 판단이 무거운 자리에 비싼 모델을, 반복이 많은 자리에 싼 모델을 둔다. 토큰 비용은 PM 이 본다.
+
+| 역할 | 모델 | 왜 |
+| --- | --- | --- |
+| PM | 가장 센 것 | 결정이 틀리면 모두가 되돌아간다. 대신 PM 은 전달·기록을 직접 하지 않는다 |
+| 기획 · 보안 · 디자인 | 센 것 | 원칙이 부딪히는 자리를 가른다. 대신 작업량이 적다 |
+| 개발 | 중간 | 코드 양이 많아 단가가 곧 비용이다 |
+| QA · 문서 | 중간 | 정해진 목록을 돌리고 문장을 다듬는다. 판단은 PM 과 기획이 한다 |
+| 기록 | 가장 싼 것 | 받은 것을 줄여 적는다. 판단하지 않는다 |
+
+**세션의 모델은 만든 뒤에 바꿀 수 없다.** 바꾸려면 같은 역할로 새 세션을 세우고 옛 세션을 보관한다(Jessi 가 앱에서 직접 바꾸는 길도 있다). 그래서 모델은 세션을 세울 때 정하고, 이미 도는 세션은 컨텍스트가 차서 교체할 때 함께 바꾼다.
+
+**비용을 줄이는 것은 모델 교체보다 컨텍스트 관리다.** 오늘 가장 비싼 세션은 가장 센 모델을 쓴 세션이 아니라, 승인 대기로 같은 맥락을 1,500번 다시 읽은 세션이었다. 그래서: 한 세션이 여러 단계를 물고 있지 않게 자르고, 끝난 세션은 보관하고, 사람 승인을 기다리는 구조를 만들지 않는다.
+
+**진행 보고는 기록으로, 판단이 필요한 것만 PM 으로.** 같은 것을 둘에게 보내지 않는다.
