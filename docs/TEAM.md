@@ -15,7 +15,7 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | (세션 생성 시 할당) | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
 | **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_019gYCLNic9TA9jvmQikfhfk` |
-| **Anchor · QA** | 실제로 써 보고 결함을 찾는다. **코드를 고치지 않는다** | (없음. 읽기 전용) | `claude/optimistic-hopper-kaafdu` | `session_01QxSgxQRsFT1grCVZrxTEhi` |
+| **Anchor · QA** | 검증 플로우를 만들고, 돌려 보고, 판정한다. **코드를 고치지 않는다** | `docs/QA.md` | `claude/optimistic-hopper-kaafdu` | `session_01QxSgxQRsFT1grCVZrxTEhi` |
 | ~~Anchor · 버그픽스~~ | 개발로 통합, 종료. 브랜치만 남긴다 | — | `claude/gallant-clarke-qt36ez` | `session_01ANSrRXJkcbqr7SwicPUVpM` |
 
 모든 세션에 `anchor` 태그가 붙어 있다. 명단을 다시 볼 때는 `list_sessions(tags=["anchor"])`.
@@ -42,9 +42,13 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 1. 로그인 → 언어 → 예시 자료 → 뽑기 → 가나 1회 → 카드(F04 + 장면 5) → 말하기 → 그래프 → 홈
 2. 404 0건, 어느 화면에서도 홈까지 2탭, 5분 안
 3. `pnpm typecheck && pnpm lint && pnpm build` 통과, Vercel 프로덕션 배포 성공
-4. Anchor · QA 가 같은 경로를 초기화된 계정으로 돌려 "막힘" 등급 결함 0건
+4. Anchor · QA 가 `docs/QA.md` 의 검증 플로우를 초기화된 계정으로 처음부터 끝까지 돌려 "막힘" 등급 결함 0건
 
-넷이 다 되면 완결이다. QA 통과가 판정이고, Jessi 의 확인을 따로 기다리지 않는다. PM 이 아침 보고로 알린다.
+판정 절차는 셋이다.
+
+1. **QA 가 검증 플로우를 만든다.** 무엇을 어떤 순서로 눌러 보는지, 각 지점에서 무엇이 참이어야 하는지, 등급(막힘 / 헷갈림 / 다듬기)을 어떻게 나누는지를 `docs/QA.md` 에 적는다. 플로우는 다음 사람이 그대로 따라 할 수 있어야 한다.
+2. **QA 가 돌리고 판정한다.** 항목마다 통과·실패와 등급, 실패면 무엇이 일어났는지와 `docs/FLOW.md` 의 어느 절과 어긋나는지.
+3. **PM 과 기획이 그 결과를 보고 판단한다.** 코드가 틀렸는지, 기준 문서가 틀렸는지, 완결로 볼 수 있는지. QA 는 사실을 대고 등급을 매기고, 완결 여부를 스스로 선언하지 않는다. 기획과 PM 의 판단이 갈리면 PM 이 정한다.
 
 그다음이 영어 대화 루프(F13~F14) → 재만남(F12) → 하루 끝(F15).
 
@@ -113,5 +117,5 @@ Jessi 가 결정할 것은 돈이 들거나(유료 플랜·외부 계정), 제�
 | --- | --- |
 | Neon PITR | MVP 동안 무료 플랜 6시간을 유지한다. Neon 밖 매일 JSON 백업(35일)이 최악의 경우를 막는다. 실사용을 시작하는 날 유료로 올릴지 다시 본다 |
 | 복구 리허설 | PM 이 임시 Neon 브랜치에 수행한다. 프로덕션 브랜치는 건드리지 않는다 |
-| 완결 판정 | Anchor · QA 의 "막힘 0건" 통과가 판정이다 |
+| 완결 판정 | QA 가 검증 플로우를 돌려 판정하고, 그 결과를 PM 과 기획이 보고 완결을 판단한다. Jessi 의 확인을 따로 기다리지 않는다 |
 | API 키 | `ANTHROPIC_API_KEY` · `ELEVENLABS_API_KEY` 는 Jessi 가 Vercel 에 직접 넣는다. 키 값은 채팅·커밋·문서 어디에도 쓰지 않는다 |
