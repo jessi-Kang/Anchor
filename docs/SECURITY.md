@@ -235,3 +235,64 @@ WITH CHECK (user_id = app.current_user_id()
 - RLS 가 실제로 남의 행을 막는지(A4)는 두 계정으로 돌려 봐야 확인이 끝난다. 임시 브랜치 `sec-rls-check` 는 만들어 뒀고 프로덕션과 같은 스키마(`0005`)다. 그 브랜치에서 SQL 을 실행할 권한이 이 세션에 없어 멈춰 있다. 읽기·쓰기 모두 막힌다.
   - 그 브랜치에서 확인된 것: 소유자 역할 `neondb_owner` 는 `BYPASSRLS` 가 **있다**. 앱이 소유자 연결을 쓰면 RLS 가 통째로 무력화된다는 뜻이고, A7 이 지켜져야 하는 이유다. `anchor_app` 은 `BYPASSRLS`·`SUPERUSER` 둘 다 없다.
 - C4(보존 기간 만료 삭제)는 2026-10-25 이후에 스토어의 실제 파일 목록으로 확인한다.
+
+## 부록. A4 검증 스크립트 (두 계정 RLS)
+
+**임시 브랜치에서만 돌린다.** 테스트 계정을 만들고 지운다. 프로덕션 브랜치에 돌리지 않는다.
+
+`anchor_app` 연결로 돌린다. 소유자 연결(`neondb_owner`)은 `BYPASSRLS` 가 있어 아무것도 검증하지 못한다. 기대값이 하나라도 어긋나면 그것이 "샘" 이다.
+
+```sql
+\set ON_ERROR_STOP off
+SELECT current_user, (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user) AS bypassrls;
+-- 기대: anchor_app / false
+
+-- 1) 컨텍스트 없음 → 어떤 행도 보이지 않는다
+SELECT set_config('app.user_id','',false);
+SELECT (SELECT count(*) FROM users) u, (SELECT count(*) FROM inputs) i,
+       (SELECT count(*) FROM cards) c, (SELECT count(*) FROM recordings) r;
+-- 기대: 0 0 0 0
+
+-- 2) A 와 B 를 각자의 컨텍스트에서 만든다 (앱이 쓰는 경로 그대로)
+SELECT set_config('app.user_id','sec_test_a',false);
+INSERT INTO users (id,email) VALUES ('sec_test_a','a@sec.test');
+INSERT INTO nodes (id,user_id,lang,kind,key,display) VALUES ('aaaaaaaa-0000-4000-8000-00000000000a','sec_test_a','en','word','sec_a','A');
+INSERT INTO inputs (user_id,kind,lang,body) VALUES ('sec_test_a','paste','en','A body');
+INSERT INTO cards (id,user_id,kind,lang,node_id,payload) VALUES ('cccccccc-0000-4000-8000-00000000000a','sec_test_a','discover','en','aaaaaaaa-0000-4000-8000-00000000000a','{"answer":"A"}');
+
+SELECT set_config('app.user_id','sec_test_b',false);
+INSERT INTO users (id,email) VALUES ('sec_test_b','b@sec.test');
+INSERT INTO nodes (id,user_id,lang,kind,key,display) VALUES ('bbbbbbbb-0000-4000-8000-00000000000b','sec_test_b','en','word','sec_b','B');
+INSERT INTO inputs (user_id,kind,lang,body) VALUES ('sec_test_b','paste','en','B body');
+INSERT INTO cards (id,user_id,kind,lang,node_id,payload) VALUES ('cccccccc-0000-4000-8000-00000000000b','sec_test_b','discover','en','bbbbbbbb-0000-4000-8000-00000000000b','{"answer":"B"}');
+
+-- 3) A 는 A 만 본다
+SELECT set_config('app.user_id','sec_test_a',false);
+SELECT (SELECT count(*) FROM users) u, (SELECT count(*) FROM inputs) i, (SELECT count(*) FROM cards) c;
+-- 기대: 1 1 1
+SELECT count(*) FROM cards WHERE id='cccccccc-0000-4000-8000-00000000000b';
+-- 기대: 0  (id 를 알아도 안 보인다)
+
+-- 4) A 는 B 를 고치거나 지우지 못한다
+UPDATE cards SET guess='x' WHERE id='cccccccc-0000-4000-8000-00000000000b';  -- 기대: UPDATE 0
+DELETE FROM inputs WHERE user_id='sec_test_b';                               -- 기대: DELETE 0
+INSERT INTO inputs (user_id,kind,lang,body) VALUES ('sec_test_b','paste','en','x');
+-- 기대: ERROR  new row violates row-level security policy
+
+-- 5) 삭제 원장은 앱이 읽지 못한다
+SELECT count(*) FROM account_deletions;   -- 기대: ERROR  permission denied
+
+-- 6) 공용 노드는 읽고, 공용 노드를 만들지는 못한다
+SELECT count(*) > 0 AS shared_readable FROM nodes WHERE user_id IS NULL;   -- 기대: true
+INSERT INTO nodes (user_id,lang,kind,key,display) VALUES (NULL,'en','word','sec_shared','X');
+-- 기대: ERROR  new row violates row-level security policy
+
+-- 7) 계정 삭제가 CASCADE 된다
+DELETE FROM users WHERE id='sec_test_a';   -- 기대: DELETE 1
+SELECT (SELECT count(*) FROM inputs) i, (SELECT count(*) FROM cards) c, (SELECT count(*) FROM nodes WHERE user_id IS NOT NULL) n;
+-- 기대: 0 0 0
+
+-- 8) 정리
+SELECT set_config('app.user_id','sec_test_b',false);
+DELETE FROM users WHERE id='sec_test_b';
+```
