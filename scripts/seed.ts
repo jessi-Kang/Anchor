@@ -13,7 +13,20 @@ import { loadEnv } from "./lib/load-env";
 
 loadEnv();
 
-type SeedItem = { kind: "root" | "chunk"; key: string; display: string; definition: string; example: string };
+type SeedItem = {
+  kind: "root" | "chunk";
+  key: string;
+  display: string;
+  definition: string;
+  example: string;
+  /** 어근·접사: 스페인어 대응, 들어가는 업무 단어 */
+  es?: string;
+  words?: string[];
+  /** 덩어리: 태도 9종, 강도(1→2), 한국어 말끝 앵커 */
+  attitude?: string;
+  intensity?: number;
+  ko_anchor?: string;
+};
 
 async function main() {
   const url = process.env.DATABASE_URL_ADMIN;
@@ -33,7 +46,20 @@ async function main() {
          VALUES (NULL, 'en', $1, $2, $3, $4)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
          DO UPDATE SET display = EXCLUDED.display, meta = nodes.meta || EXCLUDED.meta`,
-        [it.kind, it.key, it.display, JSON.stringify({ seed: "en-onboarding", seed_order: i, definition: it.definition, example: it.example })],
+        [
+          it.kind,
+          it.key,
+          it.display,
+          JSON.stringify({
+            seed: "en-onboarding",
+            seed_order: i,
+            definition: it.definition,
+            example: it.example,
+            ...(it.es ? { es: it.es } : {}),
+            ...(it.words ? { words: it.words } : {}),
+            ...(it.attitude ? { attitude: it.attitude, intensity: it.intensity ?? 1, ko_anchor: it.ko_anchor } : {}),
+          }),
+        ],
       );
       n++;
     }
