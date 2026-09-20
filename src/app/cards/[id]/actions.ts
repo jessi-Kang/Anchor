@@ -2,14 +2,22 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { withUser } from "@/lib/db";
 import { getCard, land, reveal, saveGuess } from "@/lib/db/cards";
 import { lightUp, markSaid } from "@/lib/db/kanji";
-import { judgeGuess } from "@/lib/kanji/card-content";
 
 /**
- * Scene3 "확인": 추측을 먼저 저장하고(guess_at), 판정을 내린 뒤 정답 화면으로.
+ * Scene3 "확인": 추측을 저장하고 정답 화면으로.
  * 추측이 정답보다 먼저라는 원칙은 이 순서와 DB 제약(cards CHECK)이 함께 지킨다.
+ *
+ * **채점하지 않는다.** 쓴 말과 정답은 여기서 이미 행에 남으므로, 나중에 정답률을 재는 데
+ * 필요한 것은 다 있다(docs/SPEC.md 9장). 지금 재는 것과 나중에 재는 것은 다른 일이다 —
+ * 지금 채점하면 추측 한 번마다 사용자가 쓴 말이 밖으로 나가고, 그렇게 얻은 값을 읽는 자리는
+ * `src` 와 `db/migrations` 어디에도 없다. 화면 판정 글자도 뺐다(원칙 1: "틀려도 돼" 라고 해 놓고
+ * 다음 화면에서 판정을 붙이지 않는다).
+ *
+ * 그래서 `guess_correct` 는 null 로 남는다. 맞혔는지 모르니 모른다고 두는 것이고, 화면도 그에 맞게
+ * 말한다 — 이유 한 줄의 "맞혔으니" 갈래(`KNEW_VERB`)는 저절로 안 쓰이고 "켰으니" 가 된다.
+ * 그 갈래를 지우지는 않는다. 채점이 다시 서는 날 되살아날 자리다.
  */
 export async function submitGuess(cardId: string, guess: string) {
   const user = await requireUser();
@@ -17,15 +25,7 @@ export async function submitGuess(cardId: string, guess: string) {
   if (!card) throw new Error("카드가 없다");
   if (!card.revealed_at) {
     await saveGuess(user.id, cardId, guess);
-    const verdict = guess.trim() ? await judgeGuess(guess, card.payload.answer, []) : null;
-    await withUser(user.id, async (tx) => {
-      await tx.query("UPDATE cards SET payload = payload || jsonb_build_object('verdict', $3::text) WHERE user_id = $1 AND id = $2", [
-        user.id,
-        cardId,
-        verdict ?? "",
-      ]);
-    });
-    await reveal(user.id, cardId, verdict === null ? null : verdict !== "다름");
+    await reveal(user.id, cardId, null);
   }
   redirect(`/cards/${cardId}/4`);
 }
