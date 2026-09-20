@@ -236,6 +236,23 @@
   color: var(--color-accent-dark);
 }
 
+/* 행 오른쪽의 회색 텍스트 링크. **알약이 아니다** — 알약은 시스템이 알려 주는 상태이고 누르는
+   것이 아니다(docs/FLOW.md 4장). 누르는 것을 알약 모양으로 두면 "마이크 끄기" 가 이미 꺼졌다는
+   알림으로 읽힌다. 탭 영역은 44px 이상으로 키우되 여백으로 키워 레이아웃을 밀지 않는다 (CLAUDE.md). */
+.textAction {
+  display: inline-flex;
+  align-items: center;
+  font: inherit;
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  color: var(--color-text2);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 15px 0;
+  margin: -15px 0;
+}
+
 /* 상태 카드 (틴트, 얇은 패딩) */
 .status {
   display: flex;
@@ -528,10 +545,6 @@ a.row,
 }
 .compareGuess {
   color: var(--color-text2);
-}
-.compareVerdict {
-  color: var(--color-accent-dark);
-  font-weight: 700;
 }
 
 /* 착지 단어 카드 (Scene5) */
