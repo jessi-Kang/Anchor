@@ -13,7 +13,13 @@ BEGIN
   END IF;
 END $$;
 
-GRANT CONNECT ON DATABASE neondb TO anchor_app;
+-- 복구하는 자리에서는 DB 이름이 neondb 가 아닐 수 있다(스냅샷을 다른 프로젝트·다른 이름으로 되살리는 경우).
+-- 이름을 박아 두면 바로 여기서 마이그레이션 전체가 멈춘다. 그래서 접속 중인 DB 에 준다.
+DO $$
+BEGIN
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO anchor_app', current_database());
+END $$;
+
 GRANT USAGE ON SCHEMA public TO anchor_app;
 
 -- ── 헬퍼 스키마 ───────────────────────────────────────────────────────────────
