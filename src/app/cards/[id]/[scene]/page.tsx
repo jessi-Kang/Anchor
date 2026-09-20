@@ -4,6 +4,7 @@ import { getCard, type CardPayload } from "@/lib/db/cards";
 import { cardContext } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Label, Lead, Card, Grow, Button, Ghost, Mark, Ja, rubyKanji, uiStyles as s } from "@/components/ui";
+import { withParticle } from "@/lib/ko";
 import { GuessForm } from "./guess-form";
 import { LandingButtons } from "./landing-buttons";
 
@@ -186,7 +187,7 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   return (
     <Screen {...common}>
       <Grow />
-      <Label as="h1">이미 아는 단어에 {p.kanji}이 들어 있어</Label>
+      <Label as="h1">이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.hook.mark }, "이가")} 들어 있어</Label>
       <Space h={10} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {(p.landing.length ? p.landing : [{ word: p.kanji, reading: p.reading, ko: p.hook.word }]).map((w) => (

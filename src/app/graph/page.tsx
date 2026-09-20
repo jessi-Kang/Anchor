@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { getCard } from "@/lib/db/cards";
-import { cardContext, nextCandidates } from "@/lib/cards/progress";
+import { cardContext, nextCandidates, KNEW_VERB } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
-import { eulReul, iGa } from "@/lib/ko";
+import { withParticle } from "@/lib/ko";
 import { Screen, Space, Title, Lead, Card, Grow, Button, Ghost, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
 import { NextCard } from "./next-card";
@@ -55,7 +55,7 @@ function Graph({ g }: { g: GraphData }) {
 }
 
 /**
- * `/graph?card=` — F11 그래프 1장. "協이 켜졌어. 力을 아니까 助(조력)·加(추가)가 가장 가까워." 뼈대는 F11.html.
+ * `/graph?card=` — F11 그래프 1장. "協이 켜졌어. 協을 맞혔으니 助·加가 가장 가까워." 뼈대는 F11.html.
  * 다음 카드 = 아는 노드에서 가장 가까운 모르는 노드 (이 자료 안에서). 주 버튼 → 다음 카드, 보조 → 자료(F03).
  */
 export default async function GraphPage({ searchParams }: { searchParams: Promise<{ card?: string; fixed?: string }> }) {
@@ -67,10 +67,10 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
         <Space h={28} />
         <Title lg>協이 켜졌어</Title>
         <Space h={6} />
-        <Lead>力을 아니까 助(조력)·加(추가)가 가장 가까워. 다음 카드는 이 둘 중 하나.</Lead>
+        <Lead>協을 맞혔으니 助·加가 가장 가까워. 다음 카드는 이 둘 중 하나.</Lead>
         <Space h={18} />
         <Card style={{ padding: "20px 20px" }}>
-          <Graph g={{ center: "協", known: ["十", "力"], next: ["助", "加"] }} />
+          <Graph g={{ center: "協", known: ["開", "基"], next: ["助", "加"] }} />
           <Legend />
         </Card>
         <Grow />
@@ -89,25 +89,28 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
   const ctx = await cardContext(user.id, card);
   const p = card.payload;
   const cands = nextCandidates(ctx, p.kanji);
-  const known = p.parts.map((pt) => pt.ch).filter((ch, i, a) => a.indexOf(ch) === i);
-  const fromCand = cands.find((c) => c.shared.length);
-  const shared = fromCand?.shared[0] ?? known[0] ?? null;
-  const candText = cands.map((c) => `${c.kanji}${c.koWord ? `(${c.koWord})` : ""}`).join("·");
-  // 조사는 마지막에 읽는 말을 따른다: 한국어 단어가 붙어 있으면 그 단어, 없으면 한자음 (src/lib/ko.ts).
+  // 「아는 것」 칸에는 **판정된** 노드만 올린다. 여기에 카드의 부품(p.parts)을 올리고 있어서
+  // 보여 주기만 한 力 이 「아는 것」과 「다음」에 동시에 서 있었다 (docs/FLOW.md 8·4장).
+  // 방금 켠 한자는 가운데에 따로 서므로 뺀다.
+  const known = [...ctx.anchors].filter((k) => k !== p.kanji);
+  const via = cands.find((c) => c.via)?.via ?? null;
+  // 괄호로 앵커 단어를 보여 주면 아직 안 푼 카드의 정답을 미리 까는 꼴이다 (원칙 1).
+  // F03 은 거기서 판정하니까 "支 · 지출의 지" 가 괜찮지만, 그래프는 판정하는 자리가 아니다.
+  const candText = cands.map((c) => c.kanji).join("·");
   const last = cands[cands.length - 1];
-  const lastParticle = last ? iGa(last.koWord ?? last.kanji, last.koWord ? null : last.koSound) : "이";
+  const candSubject = { text: candText, sound: last?.koSound ?? null };
   const lead =
     cands.length === 0
       ? "이 자료의 한자는 다 봤어. 다음 자료를 넣으면 이어져."
-      : shared
-        ? `${shared}${eulReul(shared, fromCand?.sharedSound)} 아니까 ${candText}${lastParticle} 가장 가까워. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`
-        : `${candText}${lastParticle} 남았어. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`;
+      : via
+        ? `${withParticle({ text: via.kanji, sound: via.koSound }, "을를")} ${KNEW_VERB[via.how]} ${withParticle(candSubject, "이가")} 가장 가까워. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`
+        : `${withParticle(candSubject, "이가")} 남았어. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`;
   const backLabel = ctx.input?.meta.example ? "아침 기사로 돌아가기" : "자료로 돌아가기";
 
   return (
     <Screen where={`${ctx.where} 끝`} up={card.input_id ? `/inputs/${card.input_id}` : "/today"} aside={nowKST()}>
       <Space h={28} />
-      <Title lg>{p.kanji}이 켜졌어</Title>
+      <Title lg>{withParticle({ text: p.kanji, sound: p.hook.mark }, "이가")} 켜졌어</Title>
       <Space h={6} />
       <Lead>{lead}</Lead>
       <Space h={18} />

@@ -1,6 +1,6 @@
 import { withUser } from "@/lib/db";
 import { getInput, type InputRow } from "@/lib/db/inputs";
-import { getKanjiNodes, getKanjiStates, type KanjiNode } from "@/lib/db/kanji";
+import { getKanjiNodes, getKanjiStates, isJudged, type KanjiNode } from "@/lib/db/kanji";
 import type { CardRow } from "@/lib/db/cards";
 
 /**
@@ -11,6 +11,13 @@ export type InputProgress = {
   input: InputRow;
   nodes: KanjiNode[];
   known: Set<string>;
+  /**
+   * 「아는 것」이라고 부를 수 있는 것: 아는 것 중 **사용자가 판정한** 것만 (docs/FLOW.md 4장).
+   * `known` 과 갈라 둔 이유 — 순서 계산에는 추론으로 올라간 것도 쓰지만, 이름을 부르는 자리에는 못 쓴다.
+   */
+  anchors: Set<string>;
+  /** 카드에서 **추측을 맞힌** 한자. 틀렸거나 건너뛴 카드는 여기 없다 — "맞혔으니" 는 맞혔을 때만 쓴다. */
+  solved: Set<string>;
   landedKanji: string[];
   /** 아직 카드로 안 본 모르는 한자 수 */
   remaining: number;
@@ -27,17 +34,20 @@ export async function inputProgress(userId: string, input: InputRow): Promise<In
     nodes.map((n) => n.id),
   );
   const known = new Set(nodes.filter((n) => states.get(n.id)?.knows_meaning).map((n) => n.key));
-  const landed = await withUser(userId, async (tx) => {
-    const { rows } = await tx.query<{ key: string }>(
-      `SELECT n.key FROM cards c JOIN nodes n ON n.id = c.node_id
+  const anchors = new Set(nodes.filter((n) => states.get(n.id)?.knows_meaning && isJudged(states.get(n.id))).map((n) => n.key));
+  const landedRows = await withUser(userId, async (tx) => {
+    const { rows } = await tx.query<{ key: string; guess_correct: boolean | null }>(
+      `SELECT n.key, c.guess_correct FROM cards c JOIN nodes n ON n.id = c.node_id
        WHERE c.user_id = $1 AND c.input_id = $2 AND c.landed_at IS NOT NULL ORDER BY c.landed_at`,
       [userId, input.id],
     );
-    return rows.map((r) => r.key);
+    return rows;
   });
+  const landed = landedRows.map((r) => r.key);
+  const solved = new Set(landedRows.filter((r) => r.guess_correct).map((r) => r.key));
   const landedSet = new Set(landed);
   const remaining = nodes.filter((n) => !known.has(n.key) && !landedSet.has(n.key)).length;
-  return { input, nodes, known, landedKanji: landed, remaining, total: landedSet.size + remaining };
+  return { input, nodes, known, anchors, solved, landedKanji: landed, remaining, total: landedSet.size + remaining };
 }
 
 export type CardContext = InputProgress & { where: string; n: number };
@@ -49,6 +59,8 @@ export async function cardContext(userId: string, card: CardRow): Promise<CardCo
       input: { id: "", lang: "ja", title: null, body: "", created_at: "", extracted_at: null, meta: {} },
       nodes: [],
       known: new Set(),
+      anchors: new Set(),
+      solved: new Set(),
       landedKanji: [],
       remaining: 0,
       total: 1,
@@ -61,43 +73,70 @@ export async function cardContext(userId: string, card: CardRow): Promise<CardCo
   return { ...prog, total, where: `카드 ${n} / ${total}`, n };
 }
 
+/**
+ * 발판을 어떻게 얻었는지. 이유 한 줄의 동사가 여기서 갈린다 — 틀린 추측을 "맞혔으니" 라고 부르면
+ * 화면이 거짓말을 한다.
+ *  - `knew`   F03 에서 "알아" 를 골랐다      → "支를 아니까"
+ *  - `solved` 카드에서 추측을 맞혔다          → "協을 맞혔으니"
+ *  - `lit`    카드는 끝냈지만 못 맞혔다/건너뛰었다 → "協을 켰으니"
+ */
+export type Knew = "knew" | "solved" | "lit";
+
+/** 발판 하나를 화면 문장의 주어로 쓸 때의 동사. 홈과 그래프가 같은 말을 쓴다 (docs/FLOW.md 4장). */
+export const KNEW_VERB: Record<Knew, string> = { knew: "아니까", solved: "맞혔으니", lit: "켰으니" };
+
 export type Candidate = {
   kanji: string;
-  shared: string[];
   koWord: string | null;
   /** 이 한자의 한국 한자음. 조사를 고를 때 쓴다 (한자는 받침을 셀 수 없다) */
   koSound: string | null;
-  /** shared[0] 의 한국 한자음. 같은 이유 */
-  sharedSound: string | null;
+  /**
+   * 이 후보를 가깝게 만든 **판정된** 한자. 이유 한 줄의 주어가 되는 것은 이것뿐이다.
+   * null 이면 부를 발판이 없다 — 억지로 붙이지 말고 자료를 대야 한다 (docs/FLOW.md 4장).
+   */
+  via: { kanji: string; koSound: string | null; how: Knew } | null;
 };
 
 /**
  * 다음 카드 = 아는 노드에서 가장 가까운 모르는 노드 (CLAUDE.md 앵커 그래프).
  * 가까움 = 아는 한자·부품과 공유하는 부품 수 (+ 한국어 앵커가 있으면 반 점). 같으면 자료에 나온 순서.
+ *
+ * **부품은 순서를 정하는 데만 쓰고 이름을 부르지 않는다.** 카드에서 十·力 을 보여 준 것은 판정이 아니라
+ * 보여 준 것이라, "力을 아니까" 라고 하면 보여 준 것을 아는 것으로 바꿔 부르게 되고 같은 노드가
+ * 「아는 것」과 「다음」에 동시에 선다. 그래서 주어 자리에는 그 부품을 가진 **판정된 한자**를 댄다
+ * ("協을 맞혔으니 助가"). docs/FLOW.md 4장.
  */
 export function nextCandidates(prog: InputProgress, justLit?: string): Candidate[] {
   const known = new Set(prog.known);
   if (justLit) known.add(justLit);
-  const knownParts = new Set<string>();
-  for (const n of prog.nodes) if (known.has(n.key)) for (const p of n.meta.parts ?? []) knownParts.add(p);
-  for (const k of known) knownParts.add(k); // 아는 한자 자체도 부품이 된다 (力을 알면 助·加)
+  // 방금 켠 카드는 판정된 것이다(끝까지 풀었다). 주어로 가장 자연스러우니 맨 앞에 둔다.
+  const anchors = [...(justLit ? [justLit] : []), ...[...prog.anchors].filter((k) => k !== justLit)];
+  const nodeOf = new Map(prog.nodes.map((n) => [n.key, n]));
+
+  // 부품 → 그 부품을 가진 판정된 한자. 먼저 들어온 것이 이긴다(방금 켠 카드 우선).
+  const owner = new Map<string, string>();
+  for (const a of anchors) {
+    if (!owner.has(a)) owner.set(a, a); // 아는 한자 자체도 부품이 된다 (協을 알면 協이 든 말로)
+    for (const part of nodeOf.get(a)?.meta.parts ?? []) if (!owner.has(part)) owner.set(part, a);
+  }
+
   const landed = new Set(prog.landedKanji);
-  // 조사를 고르려면 글자가 아니라 읽는 소리가 필요하다 (src/lib/ko.ts).
   const soundOf = new Map(prog.nodes.map((n) => [n.key, n.meta.ko_sound ?? null]));
+  const howOf = (k: string): Knew => (prog.solved.has(k) ? "solved" : landed.has(k) ? "lit" : "knew");
   return prog.nodes
     .filter((n) => !known.has(n.key) && !landed.has(n.key))
     .map((n) => {
-      const shared = [...new Set(n.meta.parts ?? [])].filter((p) => knownParts.has(p));
+      const shared = [...new Set(n.meta.parts ?? [])].filter((part) => owner.has(part));
+      const viaKanji = shared.length ? owner.get(shared[0])! : null;
       return {
         kanji: n.key,
-        shared,
         koWord: n.meta.ko_word ?? null,
         koSound: n.meta.ko_sound ?? null,
-        sharedSound: shared.length ? (soundOf.get(shared[0]) ?? null) : null,
+        via: viaKanji ? { kanji: viaKanji, koSound: soundOf.get(viaKanji) ?? null, how: howOf(viaKanji) } : null,
         score: shared.length + (n.meta.ko_word ? 0.5 : 0),
       };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, 2)
-    .map(({ kanji, shared, koWord, koSound, sharedSound }) => ({ kanji, shared, koWord, koSound, sharedSound }));
+    .map(({ kanji, koWord, koSound, via }) => ({ kanji, koWord, koSound, via }));
 }

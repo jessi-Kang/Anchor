@@ -39,7 +39,20 @@ export type KanjiNode = {
   meta: KanjiMeta;
 };
 
-export type KanjiState = { knows_meaning: boolean; knows_sound: boolean; can_say: boolean; confidence: number };
+/**
+ * `source` 가 "이 상태가 어디서 왔는지" 를 지고 있다. 화면이 「아는 것」이라고 부르거나 이유 한 줄의
+ * 주어로 쓸 수 있는 것은 **사용자가 판정한 것뿐**이다 (docs/FLOW.md 4장):
+ *  - `input`  F03 에서 알아/몰라를 골랐다
+ *  - `card`   카드를 끝까지 풀어 맞혔다
+ * 나머지(`inferred` 등)는 순서를 정하는 데만 쓰고 이름을 부르지 않는다.
+ */
+export type StateSource = "default" | "onboarding" | "card" | "input" | "talk" | "inferred";
+export type KanjiState = { knows_meaning: boolean; knows_sound: boolean; can_say: boolean; confidence: number; source: StateSource };
+
+/** 이 상태가 사용자의 판정에서 온 것인가. 「아는 것」·이유 한 줄의 주어는 이걸 통과해야 한다. */
+export function isJudged(st: KanjiState | undefined): boolean {
+  return st?.source === "input" || st?.source === "card";
+}
 
 export async function getKanjiNodes(chars: string[]): Promise<Map<string, KanjiNode>> {
   if (chars.length === 0) return new Map();
@@ -80,7 +93,7 @@ export async function getKanjiStates(userId: string, nodeIds: string[]): Promise
   if (nodeIds.length === 0) return new Map();
   return withUser(userId, async (tx) => {
     const { rows } = await tx.query<KanjiState & { node_id: string }>(
-      "SELECT node_id, knows_meaning, knows_sound, can_say, confidence FROM user_node_state WHERE user_id = $1 AND node_id = ANY($2::uuid[])",
+      "SELECT node_id, knows_meaning, knows_sound, can_say, confidence, source FROM user_node_state WHERE user_id = $1 AND node_id = ANY($2::uuid[])",
       [userId, nodeIds],
     );
     return new Map(rows.map((r) => [r.node_id, r]));
