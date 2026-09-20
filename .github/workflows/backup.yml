@@ -1,0 +1,73 @@
+# 매일 pg_dump 를 Neon 밖의 S3 호환 스토리지로. (CLAUDE.md 데이터 원칙: PITR + 매일 스냅샷을 별도 스토리지에)
+# Secrets: DATABASE_URL_ADMIN, BACKUP_S3_BUCKET, BACKUP_S3_ENDPOINT, BACKUP_S3_REGION,
+#          BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY
+# Variables (선택): BACKUP_RETENTION_DAYS (기본 35)
+name: nightly-backup
+
+on:
+  schedule:
+    - cron: "17 18 * * *" # 매일 03:17 KST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.BACKUP_S3_REGION }}
+      AWS_ENDPOINT_URL: ${{ secrets.BACKUP_S3_ENDPOINT }}
+      BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+      RETENTION_DAYS: ${{ vars.BACKUP_RETENTION_DAYS || 35 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install postgresql-client 17
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: pg_dump
+        env:
+          DATABASE_URL_ADMIN: ${{ secrets.DATABASE_URL_ADMIN }}
+        run: |
+          set -euo pipefail
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          echo "stamp=$STAMP" >> "$GITHUB_ENV"
+          # custom format(-Fc): pg_restore 로 테이블 단위 복구 가능. neon_auth 스키마 포함(전체).
+          pg_dump "$DATABASE_URL_ADMIN" -Fc --no-owner --no-privileges -f "anchor-$STAMP.dump"
+          sha256sum "anchor-$STAMP.dump" > "anchor-$STAMP.dump.sha256"
+          ls -la anchor-*
+
+      - name: Upload
+        run: |
+          set -euo pipefail
+          aws s3 cp "anchor-$stamp.dump"        "s3://$BUCKET/anchor/daily/anchor-$stamp.dump"
+          aws s3 cp "anchor-$stamp.dump.sha256" "s3://$BUCKET/anchor/daily/anchor-$stamp.dump.sha256"
+
+      - name: Apply retention + mark purged deletions
+        env:
+          DATABASE_URL_ADMIN: ${{ secrets.DATABASE_URL_ADMIN }}
+        run: |
+          set -euo pipefail
+          CUTOFF=$(date -u -d "-$RETENTION_DAYS days" +%Y%m%dT%H%M%SZ)
+          aws s3 ls "s3://$BUCKET/anchor/daily/" | awk '{print $4}' | while read -r f; do
+            [ -z "$f" ] && continue
+            ts=$(echo "$f" | sed -E 's/^anchor-([0-9TZ]+)\.dump.*$/\1/')
+            if [[ "$ts" < "$CUTOFF" ]]; then
+              echo "delete $f"; aws s3 rm "s3://$BUCKET/anchor/daily/$f"
+            fi
+          done
+          # 삭제 요청 후 보존 기간이 지난 계정: 백업 사본이 모두 사라졌음을 원장에 기록
+          psql "$DATABASE_URL_ADMIN" -v ON_ERROR_STOP=1 -c \
+            "UPDATE account_deletions SET backups_purged_at = now()
+             WHERE backups_purged_at IS NULL AND requested_at < now() - make_interval(days => $RETENTION_DAYS)"
