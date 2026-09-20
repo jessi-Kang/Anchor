@@ -10,8 +10,6 @@ import type { Lang3 } from "@/lib/db/settings";
 export type ChunkMeta = {
   /** text 안에서 강조·연습할 덩어리 ("push this to") */
   chunk?: string;
-  /** 화면 맨 윗줄 ("\"~하죠\"는 제안. 영어로는 이 덩어리 하나로") */
-  note?: string;
   /** 문안 출처 */
   content_source?: "claude" | "fallback";
 };

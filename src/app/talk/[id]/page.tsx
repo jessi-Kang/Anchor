@@ -14,7 +14,7 @@ const PREVIEW: ChunkRow = {
   situation: "이건 다음 스프린트로 미루죠",
   text: "Let's push this to the next sprint.",
   attitude: "제안",
-  meta: { chunk: "push this to", note: '"~하죠"는 제안. 영어로는 이 덩어리 하나로' },
+  meta: { chunk: "push this to" },
   created_at: "",
 };
 
@@ -34,7 +34,8 @@ function markChunk(text: string, chunk: string) {
 /**
  * `/talk/[id]` — F14 덩어리 + 음성 루프. 뼈대·문구는 design/screens/F14.html.
  * 상단 라벨 → F13(못 한 말). 원칙 3: 연음·억양을 글로 설명하지 않는다. 덩어리를 듣고, 따라 말하고, 곡선을 겹쳐 본다.
- * 화면의 글은 셋뿐이다 — 말끝의 태도 한 줄, 문장 하나, 곡선 밑 한 줄.
+ * 맨 위는 F13 에서 쓴 그 한국어 한 줄이다 — 다음 화면에서 사라지면 무엇을 말하려 했는지 잃는다.
+ * 한국어 말끝이 무슨 태도인지는 화면에 쓰지 않는다. 그건 문법 설명이고 원칙 1 에 걸린다(태도는 DB 에만 남긴다).
  */
 export default async function TalkChunkPage({
   params,
@@ -59,10 +60,15 @@ export default async function TalkChunkPage({
   const highlight = chunk.meta.chunk ?? chunk.text;
 
   return (
-    <Screen where="저녁" up="/talk" aside={preview ? "오후 7:11" : nowKST()} fixed={fixed === "1"}>
+    <Screen where="못 한 말" up="/talk" aside={preview ? "오후 7:11" : nowKST()} fixed={fixed === "1"}>
       <Space h={28} />
       <Card>
-        <Label>{chunk.meta.note ?? `"${chunk.situation}"에서 이 덩어리 하나로`}</Label>
+        <Label>내가 하려던 말</Label>
+        <div className={s.talkSituation}>{chunk.situation}</div>
+      </Card>
+      <Space h={10} />
+      <Card>
+        <Label>영어로는 이 덩어리 하나로</Label>
         <h1 className={s.source} lang="en">
           {markChunk(chunk.text, highlight)}
         </h1>

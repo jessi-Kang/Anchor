@@ -622,3 +622,11 @@ a.row,
   border-bottom: 2px dashed var(--color-text3);
   vertical-align: middle;
 }
+
+/* F14 맨 위 "내가 하려던 말" 한 줄 (design/screens/F14.html) */
+.talkSituation {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--color-text1);
+}

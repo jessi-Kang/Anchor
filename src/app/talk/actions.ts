@@ -25,7 +25,7 @@ export async function submitMissed(line: string) {
     situation,
     text: content.english,
     attitude: content.attitude,
-    meta: { chunk: content.chunk, note: content.note, content_source: source },
+    meta: { chunk: content.chunk, content_source: source },
   });
   redirect(`/talk/${id}`);
 }

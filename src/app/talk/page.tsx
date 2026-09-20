@@ -25,7 +25,7 @@ export default async function TalkPage({ searchParams }: { searchParams: Promise
   }
 
   return (
-    <Screen where="저녁" up="/today" aside={isDesignPreview() ? "오후 7:10" : nowKST()} fixed={fixed === "1"}>
+    <Screen where="못 한 말" up="/today" aside={isDesignPreview() ? "오후 7:10" : nowKST()} fixed={fixed === "1"}>
       <Space h={28} />
       <Title lg>
         오늘 회의에서
