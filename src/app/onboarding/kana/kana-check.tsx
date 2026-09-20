@@ -37,7 +37,7 @@ type State = "idle" | "listening" | "off" | "unsupported" | "denied";
  * 미지원·거부는 통과가 아니라 recheck 로 저장하고 O03b(마이크 문구) 1장 뒤 카드로 (자기 보고 통과 금지).
  * 이탈은 하나: "못 읽겠어" → module → O03b 예고 1장 → 카드. 문구는 O03.html · O03a.html 그대로.
  */
-export function KanaCheck({ kana, preview, next }: { kana: Kana[]; preview: boolean; next: string }) {
+export function KanaCheck({ kana, preview, next, from }: { kana: Kana[]; preview: boolean; next: string; from: string }) {
   const [heard, setHeard] = useState<Set<string>>(() => new Set(preview ? kana.slice(0, 4).map((k) => k.say) : []));
   const [state, setState] = useState<State>(preview ? "listening" : "idle");
   const recRef = useRef<Recognition | null>(null);
@@ -109,7 +109,7 @@ export function KanaCheck({ kana, preview, next }: { kana: Kana[]; preview: bool
 
   /** 미지원·거부: 마이크 없이 저장(recheck) → O03b 마이크 문구 */
   const submitNow = (cannotRead: boolean) => {
-    start(() => submitKana({ recognized: heard.size, total: kana.length, supported: false, cannotRead, next }));
+    start(() => submitKana({ recognized: heard.size, total: kana.length, supported: false, cannotRead, next, from }));
   };
 
   const finish = (cannotRead: boolean) => {
@@ -121,6 +121,7 @@ export function KanaCheck({ kana, preview, next }: { kana: Kana[]; preview: bool
         supported: state !== "unsupported" && state !== "denied",
         cannotRead,
         next,
+        from,
       }),
     );
   };

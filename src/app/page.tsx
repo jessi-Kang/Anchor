@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
+import { safeNext } from "@/lib/safe-next";
 import { Screen, Grow, Space, Card, LogoMark } from "@/components/ui";
 import { GoogleSignIn } from "./google-sign-in";
 import s from "./page.module.css";
@@ -9,8 +10,8 @@ export const dynamic = "force-dynamic";
 /** `/` — O01 로그인. design/screens/O01.html 을 그대로 옮김. `?fixed=1` 은 픽셀 비교용. */
 export default async function Home({ searchParams }: { searchParams: Promise<{ fixed?: string; next?: string }> }) {
   const { fixed, next } = await searchParams;
-  // 로그인 뒤 목적지. 같은 사이트 경로만 (열린 리다이렉트 방지)
-  const to = next && next.startsWith("/") && !next.startsWith("//") ? next : "/today";
+  // 로그인 뒤 목적지. 같은 사이트 경로만 (열린 리다이렉트 방지, src/lib/safe-next.ts)
+  const to = safeNext(next);
   const user = await currentUser();
   if (user) redirect(to);
 
