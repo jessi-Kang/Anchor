@@ -222,6 +222,28 @@ export function Ghost({ children, href, plain, onClick }: { children: ReactNode;
   );
 }
 
+/** 일본어 글자 (한자·가나). 항상 Noto Sans JP 로. 크기는 sm(18, 행 제목) / md(44) / lg(132). */
+export function Ja({ children, size = "sm", mark }: { children: ReactNode; size?: "sm" | "md" | "lg" | "xl"; mark?: boolean }) {
+  return (
+    <span lang="ja" className={cx(s.ja, size === "md" && s.jaMd, size === "lg" && s.jaLg, size === "xl" && s.jaXl, mark && s.mark)}>
+      {children}
+    </span>
+  );
+}
+
+/** 알아 / 몰라 처럼 한 행 안의 작은 선택. 켜진 것만 배경 틴트. */
+export function Choice({ children, on, onClick, disabled }: { children: ReactNode; on?: boolean; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" className={cx(s.choice, on && s.choiceOn)} aria-pressed={on} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
+}
+
+export function ChoiceRow({ children }: { children: ReactNode }) {
+  return <span className={s.choiceRow}>{children}</span>;
+}
+
 export function GoogleMark() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">

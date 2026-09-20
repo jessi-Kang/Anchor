@@ -318,3 +318,49 @@ a.row,
   color: var(--color-text3);
   font-weight: 400;
 }
+
+/* 일본어 글자. 행 제목(18px) / 44px / 132px, 카드 출처 문장 30px */
+.ja {
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-weight: 700;
+}
+.jaMd {
+  font-size: var(--font-size-kanji-sm);
+  line-height: 1;
+}
+.jaLg {
+  font-size: 84px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.jaXl {
+  font-size: var(--font-size-kanji-lg);
+  line-height: 1;
+}
+
+/* 행 안의 작은 선택 (알아 / 몰라). 알약과 같은 크기, 누를 수 있다 */
+.choiceRow {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+.choice {
+  font: inherit;
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--color-text3);
+  background: transparent;
+  border: 1px solid var(--color-line);
+  cursor: pointer;
+  min-height: 32px;
+}
+.choiceOn {
+  color: var(--color-accent-dark);
+  background: var(--color-tint);
+  border-color: var(--color-tint);
+}
+.choice:disabled {
+  opacity: 0.6;
+}

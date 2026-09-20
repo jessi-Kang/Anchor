@@ -99,9 +99,9 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 │   └── proxy.ts         라우트 보호 미들웨어
 ├── db/
 │   ├── migrations/      SQL 마이그레이션 (0001 스키마·역할, 0002 RLS, 0003 소유자 읽기)
-│   ├── seed/            공용 참조 노드 (en-seed.json 영어 씨앗 40장, ja-seed.json 한자 씨앗 40장)
+│   ├── seed/            공용 참조 노드 (kanji.json 상용한자, parts-ko.json 부품 훈음, kanji-ko.json 앵커 단어, kanji-cards.json 카드 문안, en-seed.json 영어 40)
 │   └── recovery/        복구 시 역할·RLS 재적용
-├── scripts/             migrate.ts, backup/neon-snapshot.ts, design/tokens-to-css.ts·check-screen.ts
+├── scripts/             migrate.ts, seed.ts, kanji/build-kanjidic.ts, backup/, design/tokens-to-css.ts·check-screen.ts
 └── .github/workflows/   backup.yml (선택: pg_dump → 외부 S3)
 ```
 
@@ -164,7 +164,8 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 pnpm install
 cp .env.example .env.local        # 값 채우기 (아래 표)
 pnpm db:migrate                    # DATABASE_URL_ADMIN(또는 DATABASE_URL) 로 스키마 + RLS 적용
-pnpm db:seed                       # 공용 참조 노드 적재 (영어 어근·덩어리 40, 한자 40. F03 의 앵커·패턴 재료)
+pnpm kanji:build                   # KANJIDIC2 + IDS → db/seed/kanji.json (상용한자 2,136자, 이미 커밋돼 있어 보통은 생략)
+pnpm db:seed                       # 공용 참조 노드 적재 (한자 2,136 + 부품 + 한국 한자음, 영어 어근·덩어리 40)
 pnpm dev                           # http://localhost:3000
 ```
 

@@ -10,7 +10,7 @@ export type InputRow = {
   body: string;
   created_at: string;
   extracted_at: string | null;
-  meta: { example?: boolean };
+  meta: { example?: boolean; kanji?: string[] };
 };
 
 /** 제목이 없으면 첫 줄 앞 20자 */
@@ -58,5 +58,16 @@ export async function listInputs(userId: string, limit = 20): Promise<InputRow[]
       [userId, limit],
     );
     return rows;
+  });
+}
+
+/** F03 을 처음 열 때: 뽑은 한자 목록과 시각을 기록한다 (홈 행의 "한자 n개"). */
+export function markExtracted(userId: string, id: string, kanji: string[]) {
+  return withUser(userId, async (tx) => {
+    await tx.query(
+      `UPDATE inputs SET extracted_at = coalesce(extracted_at, now()), meta = meta || jsonb_build_object('kanji', $3::jsonb)
+       WHERE user_id = $1 AND id = $2`,
+      [userId, id, JSON.stringify(kanji)],
+    );
   });
 }

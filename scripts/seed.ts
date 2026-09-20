@@ -3,8 +3,14 @@
  *   pnpm db:seed
  *
  * DATABASE_URL_ADMIN (없으면 DATABASE_URL) 로 접속한다. 앱 역할은 공용 노드를 쓸 수 없다(RLS).
- * O04 영어 씨앗(db/seed/en-seed.json)과 O05 한자 씨앗(db/seed/ja-seed.json). 이후 KANJIDIC2·IDS·한자음 적재도 여기에 붙인다.
  * 같은 (lang, kind, key) 는 갱신하고, 새 것만 추가한다. 사용자 상태(user_node_state)는 건드리지 않는다.
+ *
+ * 1. en-seed.json   영어 어근·덩어리 40 (F03 영어 뽑기·F13 재료. 씨앗 단계는 폐기됐지만 노드는 남긴다)
+ * 2. parts-ko.json  한자 부품 이름 → radical 노드 (meta.ko_name "열 십")
+ * 3. kanji.json     상용한자 2,136 → kanji 노드 (음독·훈독·한국 한자음·영어 뜻·부품)
+ *    + kanji-ko.json / ja-seed.json 의 한국어 앵커 단어 (meta.ko_word)
+ *    + kanji-cards.json 의 손으로 적은 카드 문안 (meta.card)
+ *    + 엣지: 부품 part_of 한자, 한국 한자음 sound 노드 ko_sound_of 한자
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -19,31 +25,36 @@ type SeedItem = {
   display: string;
   definition: string;
   example: string;
-  /** 어근·접사: 스페인어 대응, 들어가는 업무 단어 */
   es?: string;
   words?: string[];
-  /** 덩어리: 태도 9종, 강도(1→2), 한국어 말끝 앵커 */
   attitude?: string;
   intensity?: number;
   ko_anchor?: string;
 };
+type KanjiSeedItem = { kanji: string; ko_sound: string; ko_word: string; onyomi: string; example: string; reading: string; pattern: string };
+type KanjiItem = { kanji: string; grade: number; freq: number | null; jlpt: number | null; on: string[]; kun: string[]; ko: string | null; meanings: string[]; parts: string[] };
 
-type KanjiItem = { kanji: string; ko_sound: string; ko_word: string; onyomi: string; example: string; reading: string; pattern: string };
+const read = <T,>(f: string) => JSON.parse(readFileSync(path.resolve(process.cwd(), "db/seed", f), "utf8")) as T;
 
 async function main() {
-  // 관리 연결: DATABASE_URL_ADMIN 이 없으면 Vercel Neon 통합이 주입하는 DATABASE_URL(소유자 역할)을 쓴다.
   const url = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL_ADMIN (또는 DATABASE_URL) 이 필요하다");
 
-  const file = path.resolve(process.cwd(), "db/seed/en-seed.json");
-  const { items } = JSON.parse(readFileSync(file, "utf8")) as { items: SeedItem[] };
+  const en = read<{ items: SeedItem[] }>("en-seed.json").items;
+  const partsKo = read<{ parts: Record<string, string> }>("parts-ko.json").parts;
+  const kanji = read<{ items: KanjiItem[] }>("kanji.json").items;
+  const koWords = read<{ words: Record<string, string> }>("kanji-ko.json").words;
+  const jaSeed = read<{ items: KanjiSeedItem[] }>("ja-seed.json").items;
+  const cards = read<{ cards: Record<string, unknown> }>("kanji-cards.json").cards;
+  const seedByKanji = new Map(jaSeed.map((it) => [it.kanji, it]));
 
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
     await client.query("BEGIN");
-    let n = 0;
-    for (const [i, it] of items.entries()) {
+
+    // 1. 영어 어근·덩어리
+    for (const [i, it] of en.entries()) {
       await client.query(
         `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
          VALUES (NULL, 'en', $1, $2, $3, $4)
@@ -64,36 +75,93 @@ async function main() {
           }),
         ],
       );
-      n++;
     }
-    console.log(`en-seed: ${n} 노드 적재`);
+    console.log(`en-seed: ${en.length} 노드`);
 
-    const ja = JSON.parse(readFileSync(path.resolve(process.cwd(), "db/seed/ja-seed.json"), "utf8")) as { items: KanjiItem[] };
-    let m = 0;
-    for (const [i, it] of ja.items.entries()) {
-      await client.query(
+    // 2. 부품 (radical). 이름이 있는 것 + kanji.json 부품에 나오는 이름 없는 것
+    const partChars = new Set<string>(Object.keys(partsKo));
+    for (const it of kanji) for (const p of it.parts) partChars.add(p);
+    const partId = new Map<string, string>();
+    for (const ch of partChars) {
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
+         VALUES (NULL, 'ja', 'radical', $1, $1, $2)
+         ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
+         DO UPDATE SET meta = nodes.meta || EXCLUDED.meta
+         RETURNING id`,
+        [ch, JSON.stringify(partsKo[ch] ? { ko_name: partsKo[ch] } : {})],
+      );
+      partId.set(ch, rows[0].id);
+    }
+    console.log(`부품: ${partChars.size} 노드`);
+
+    // 3. 한자
+    const kanjiId = new Map<string, string>();
+    const soundId = new Map<string, string>();
+    let edges = 0;
+    for (const it of kanji) {
+      const seed = seedByKanji.get(it.kanji);
+      const koWord = koWords[it.kanji] ?? seed?.ko_word;
+      const meta: Record<string, unknown> = {
+        on: it.on,
+        kun: it.kun,
+        ko_sound: it.ko ?? seed?.ko_sound ?? null,
+        meanings: it.meanings,
+        parts: it.parts,
+        grade: it.grade,
+        freq: it.freq,
+        jlpt: it.jlpt,
+        ...(koWord ? { ko_word: koWord } : {}),
+        ...(seed ? { seed: "ja-onboarding", example: seed.example, example_reading: seed.reading, pattern: seed.pattern } : {}),
+        ...(cards[it.kanji] ? { card: cards[it.kanji] } : {}),
+      };
+      const reading = seed?.onyomi ?? it.on[0] ?? null;
+      const { rows } = await client.query<{ id: string }>(
         `INSERT INTO nodes (user_id, lang, kind, key, display, reading, meta)
          VALUES (NULL, 'ja', 'kanji', $1, $1, $2, $3)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
-         DO UPDATE SET reading = EXCLUDED.reading, meta = nodes.meta || EXCLUDED.meta`,
-        [
-          it.kanji,
-          it.onyomi,
-          JSON.stringify({
-            seed: "ja-onboarding",
-            seed_order: i,
-            ko_sound: it.ko_sound,
-            ko_word: it.ko_word,
-            example: it.example,
-            example_reading: it.reading,
-            pattern: it.pattern,
-          }),
-        ],
+         DO UPDATE SET reading = EXCLUDED.reading, meta = nodes.meta || EXCLUDED.meta
+         RETURNING id`,
+        [it.kanji, reading, JSON.stringify(meta)],
       );
-      m++;
+      const id = rows[0].id;
+      kanjiId.set(it.kanji, id);
+
+      // 부품 ∈ 한자
+      for (const p of new Set(it.parts)) {
+        const pid = partId.get(p);
+        if (!pid || pid === id) continue;
+        await client.query(
+          `INSERT INTO edges (user_id, src, dst, rel, weight, meta) VALUES (NULL, $1, $2, 'part_of', $3, '{}')
+           ON CONFLICT (src, dst, rel) WHERE user_id IS NULL DO UPDATE SET weight = EXCLUDED.weight`,
+          [pid, id, it.parts.filter((x) => x === p).length],
+        );
+        edges++;
+      }
+
+      // 한국 한자음 → 한자 (ko sound 노드는 한 소리에 하나)
+      const ko = it.ko ?? seed?.ko_sound;
+      if (ko) {
+        let sid = soundId.get(ko);
+        if (!sid) {
+          const { rows: s } = await client.query<{ id: string }>(
+            `INSERT INTO nodes (user_id, lang, kind, key, display, meta) VALUES (NULL, 'ko', 'sound', $1, $1, '{}')
+             ON CONFLICT (lang, kind, key) WHERE user_id IS NULL DO UPDATE SET display = EXCLUDED.display RETURNING id`,
+            [ko],
+          );
+          sid = s[0].id;
+          soundId.set(ko, sid);
+        }
+        await client.query(
+          `INSERT INTO edges (user_id, src, dst, rel) VALUES (NULL, $1, $2, 'ko_sound_of')
+           ON CONFLICT (src, dst, rel) WHERE user_id IS NULL DO NOTHING`,
+          [sid, id],
+        );
+        edges++;
+      }
     }
     await client.query("COMMIT");
-    console.log(`ja-seed: ${m} 노드 적재`);
+    console.log(`한자: ${kanji.length} 노드, 한국 한자음: ${soundId.size} 노드, 엣지: ${edges}`);
   } catch (e) {
     await client.query("ROLLBACK");
     throw e;
