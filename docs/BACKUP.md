@@ -60,6 +60,11 @@ DATABASE_URL_ADMIN=<새 DB 소유자 연결> pnpm backup:restore anchor-<STAMP>.
 ```
 
 (선택) pg_dump 덤프가 있으면 `pg_restore --no-owner --no-privileges` 뒤 `db/recovery/reapply-roles-and-rls.sql` 을 적용한다.
+비밀번호를 넘겨야 한다 — 안 넘기면 스크립트가 먼저 멈춘다:
+
+```bash
+psql "$DATABASE_URL_ADMIN" -v app_password="$ANCHOR_APP_PASSWORD" -f db/recovery/reapply-roles-and-rls.sql
+```
 
 ## 계정 삭제와 백업
 
