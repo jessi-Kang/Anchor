@@ -13,7 +13,11 @@ export type InputRow = {
   meta: { example?: boolean; kanji?: string[] };
 };
 
-/** 제목이 없으면 첫 줄 앞 20자 */
+/**
+ * 제목이 없으면 첫 줄 앞 20자. **이건 저장하는 제목이지 화면에서 부르는 이름이 아니다.**
+ * 화면 이름은 `lib/input-name.ts` 한 곳에서 정한다 — 여기 길이를 바꿔도 화면은 안 바뀐다.
+ * 이 값은 내보내기·목록처럼 "무엇을 붙여넣었는지" 를 남기는 자리에 쓰이므로 자르는 쪽이 맞다.
+ */
 function titleOf(body: string): string {
   const first = body.split(/\r?\n/).find((l) => l.trim())?.trim() ?? "";
   return first.length > 20 ? `${first.slice(0, 20)}…` : first;

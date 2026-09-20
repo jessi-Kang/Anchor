@@ -7,6 +7,7 @@ import { isDesignPreview } from "@/lib/design-preview";
 import { LANG_LABEL } from "@/lib/languages";
 import { Screen, Space, Title, Lead, Grow, Button } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
+import { inputName } from "@/lib/input-name";
 import { JudgeRows, type JudgeItem } from "./judge-rows";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
     ];
     const bare: JudgeItem[] = [{ nodeId: "d", kanji: "妥", anchor: null, known: null }];
     return (
-      <Screen where="이 기사에서" up="/today" aside="오전 8:42" fixed={fixed === "1"}>
+      <Screen where="아침 기사" up="/today" aside="오전 8:42" fixed={fixed === "1"}>
         <Space h={28} />
         <JudgeRows inputId="preview" anchored={anchored} bare={bare} empty={false} />
       </Screen>
@@ -43,7 +44,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
 
   if (input.lang !== "ja") {
     return (
-      <Screen where={input.title ?? "자료"} up="/today" aside={nowKST()}>
+      <Screen where={inputName(input)} up="/today" aside={nowKST()}>
         <Space h={28} />
         <Title lg>자료는 저장됐어</Title>
         <Space h={6} />
@@ -77,7 +78,8 @@ export default async function InputPage({ params, searchParams }: { params: Prom
   });
   const anchored = items.filter((i) => i.anchor);
   const bare = items.filter((i) => !i.anchor);
-  const where = input.meta.example ? "이 기사에서" : input.title ? `${input.title.slice(0, 12)}에서` : "이 자료에서";
+  // 상단 "지금 어디" 라벨에는 이름만 온다. 조사를 붙이면 라벨이 아니라 문장이 된다.
+  const where = inputName(input);
 
   return (
     <Screen where={where} up="/today" aside={nowKST()}>

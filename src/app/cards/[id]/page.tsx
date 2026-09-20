@@ -6,6 +6,7 @@ import { isDesignPreview } from "@/lib/design-preview";
 import { eunNeun } from "@/lib/ko";
 import { Screen, Label, Lead, Grow, Button, Mark, rubyKanji, uiStyles as s } from "@/components/ui";
 import { markWord, nowKST } from "@/components/card-bits";
+import { inputFrom } from "@/lib/input-name";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default async function CardSourcePage({ params, searchParams }: { params:
       <Screen where="카드 1 / 4" up="/today" aside="점심 12:30" progress={[1, 6]} fixed={fixed === "1"}>
         <Grow />
         <div className={s.center}>
-          <Label>오늘 아침 기사에서</Label>
+          <Label>아침 기사에서</Label>
           <h1 className={s.source} lang="ja">
             {markWord("トヨタとNTT、協力して", "協力")}
           </h1>
@@ -41,7 +42,8 @@ export default async function CardSourcePage({ params, searchParams }: { params:
   const ctx = await cardContext(user.id, card);
   const p = card.payload;
   const src = p.source;
-  const label = ctx.input?.meta.example ? "오늘 아침 기사에서" : ctx.input?.title ? `${ctx.input.title.slice(0, 14)}에서` : "내 자료에서";
+  // 출처를 대는 문장이라 조사를 붙인다 ("아침 기사에서"). 이름 자체는 lib/input-name.ts 한 곳에서 온다.
+  const label = inputFrom(ctx.input);
 
   return (
     <Screen where={ctx.where} up={card.input_id ? `/inputs/${card.input_id}` : "/today"} aside={nowKST()} progress={[1, 6]}>

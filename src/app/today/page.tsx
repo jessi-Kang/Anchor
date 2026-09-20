@@ -5,6 +5,7 @@ import { getSettings } from "@/lib/db/settings";
 import { listInputs } from "@/lib/db/inputs";
 import { countChunks } from "@/lib/db/chunks";
 import { inputProgress, nextCandidates, KNEW_VERB } from "@/lib/cards/progress";
+import { inputName, inputFrom } from "@/lib/input-name";
 import { enabledLanguages, homeRedirect, inputPath, LANG_LABEL, LANG_START } from "@/lib/languages";
 import { withParticle } from "@/lib/ko";
 import { isDesignPreview } from "@/lib/design-preview";
@@ -120,7 +121,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const reason = nx
     ? nx.via
       ? `${withParticle({ text: nx.via.kanji, sound: nx.via.koSound }, "을를")} ${KNEW_VERB[nx.via.how]} ${withParticle({ text: nx.kanji, sound: nx.koSound }, "이가")} 가장 가까워.`
-      : `다음은 ${nx.kanji}. ${nextRow.input.title?.slice(0, 12) ?? "자료"}에서.`
+      : `다음은 ${nx.kanji}. ${inputFrom(nextRow.input)}.`
     : null;
 
   return (
@@ -135,7 +136,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <HomeRows
           rows={[...rows.map(({ input, kanji, remaining, next }) => ({
             id: input.id,
-            title: input.title ?? input.body.slice(0, 20),
+            title: inputName(input),
             sub:
               input.lang !== "ja"
                 ? `${LANG_LABEL[input.lang]} · 뽑기는 다음 단계`
