@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { getChunk, type ChunkRow } from "@/lib/db/chunks";
+import { countRecordings } from "@/lib/db/recordings";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Card, Label, Mark, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
@@ -48,6 +49,8 @@ export default async function TalkChunkPage({
   const { fixed } = await searchParams;
   const preview = isDesignPreview();
   let chunk = PREVIEW;
+  // 회차는 쌓인 사실이다. 화면을 다시 열어도 이어서 센다 (docs/FLOW.md 1′장, docs/SPEC.md 9장).
+  let startAttempt = 0;
 
   if (!preview) {
     const user = await currentUser();
@@ -55,6 +58,7 @@ export default async function TalkChunkPage({
     const row = await getChunk(user.id, id);
     if (!row) notFound();
     chunk = row;
+    startAttempt = await countRecordings(user.id, { chunk: row.id });
   }
 
   const highlight = chunk.meta.chunk ?? chunk.text;
@@ -74,7 +78,7 @@ export default async function TalkChunkPage({
         </h1>
       </Card>
       <Space h={16} />
-      <TalkLoop chunkId={chunk.id} text={highlight} preview={preview} />
+      <TalkLoop chunkId={chunk.id} text={highlight} preview={preview} startAttempt={startAttempt} />
     </Screen>
   );
 }
