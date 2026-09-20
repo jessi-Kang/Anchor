@@ -1,0 +1,219 @@
+# 보안 점검 (데이터 원칙이 실제로 성립하는가)
+
+`CLAUDE.md` 의 데이터 원칙은 협상 불가 전제다. 이 문서는 그 전제가 코드와 DB 에서 실제로 성립하는지를 항목으로 풀고, 항목마다 지금 상태를 적는다.
+
+기능이 예쁜지, 코드가 깔끔한지는 여기서 보지 않는다. 보는 것은 셋이다. 데이터를 잃지 않는가, 남에게 새지 않는가, 지운다고 한 것이 실제로 지워지는가.
+
+점검 시각: 2026-09-20. 대상: `main` (`77aa306`) 과 프로덕션 배포.
+
+## 1. 점검 항목
+
+### A. 계정 간 분리
+
+| # | 무엇이 참이어야 하는가 | 어떻게 확인하는가 |
+| --- | --- | --- |
+| A1 | 사용자 데이터를 담는 모든 표에 `user_id` 가 있고 `users(id)` 로 FK + `ON DELETE CASCADE` 다 | `db/migrations/*.sql` 의 `CREATE TABLE` 전부 |
+| A2 | 모든 표에 RLS 가 켜져 있다 | `/api/health` 의 `rls_all_enabled`, `tables[].rowsecurity` |
+| A3 | 앱 런타임 역할은 `anchor_app` 이고 `BYPASSRLS` 가 없다 | `/api/health` 의 `db_role`, `role_bypasses_rls` |
+| A4 | 정책은 `anchor_app` 에만 걸려 있고 `app.current_user_id()` 와 비교한다. 이 값이 없으면 어떤 행도 보이지 않는다 | `db/migrations/0002_rls.sql` |
+| A5 | 사용자 데이터 쿼리는 전부 `withUser()` 안에서 돈다. `withoutUser()` 는 공용 참조 데이터와 헬스체크에만 쓴다 | `src/lib/db/index.ts` 와 `withoutUser` 호출처 |
+| A6 | `USING (true)` 정책이 있는 표는 사용자 자료를 담지 않고, 남이 쓴 것이 내 화면에 뜨지 않는다 | `pg_policies` 또는 RLS 마이그레이션 |
+| A7 | 앱은 소유자 연결(`DATABASE_URL`)을 쓰지 않는다. 소유자 연결은 마이그레이션·백업·복구 전용이다 | `src/lib/env.ts`, `src/**` 의 `process.env` 사용처 |
+
+### B. 비밀값
+
+| # | 무엇이 참이어야 하는가 | 어떻게 확인하는가 |
+| --- | --- | --- |
+| B1 | 추적되는 env 파일은 `.env.example` 하나다 | `git ls-files` |
+| B2 | `.env.example` 에는 자리표시자만 있다 | 파일과 그 이력 |
+| B3 | 저장소 이력 전체에 연결 문자열·API 키가 없다 | `git grep` 을 전 커밋에 |
+| B4 | 서버 전용 값이 클라이언트 번들에 섞이지 않는다. `NEXT_PUBLIC_` 변수가 없다 | `"use client"` 파일의 import, `process.env` 검색 |
+| B5 | 인증 안 된 응답에 호스트·연결 문자열·스택이 실리지 않는다 | 각 라우트의 오류 경로 |
+| B6 | 커밋 메시지에 키·내부 URL·개인정보가 없다 | `git log` 전문 검색 |
+
+### C. 지운다고 한 것이 지워지는가
+
+| # | 무엇이 참이어야 하는가 | 어떻게 확인하는가 |
+| --- | --- | --- |
+| C1 | `POST /api/account/delete` 는 로그인한 본인만, 확인 문구가 있어야 돈다 | `src/app/api/account/delete/route.ts` |
+| C2 | `users` 행 삭제가 모든 사용자 표로 CASCADE 된다. 빠진 표가 없다 | A1 의 FK 목록과 표 목록을 맞춰 본다 |
+| C3 | 삭제 원장 `account_deletions` 에 행이 남고, CASCADE 에 딸려 지워지지 않는다 | `0001_init.sql` 의 `account_deletions` (FK 없음) |
+| C4 | 보존 기간이 지난 백업 사본이 실제로 지워지고 `backups_purged_at` 이 채워진다 | `/api/cron/backup` 의 `list`+`del` 경로, 스토어의 실제 파일 목록 |
+| C5 | 원장이 "사본이 사라졌다"고 표시하는 시각이 마지막 사본이 사라지는 시각보다 이르지 않다 | 백업 주기와 보존 기간 계산 |
+| C6 | 음성 원본이 `voice_retention_days` 뒤 스토리지에서 지워진다 | 만료 오브젝트를 지우는 코드 |
+| C7 | 계정 삭제가 오브젝트 스토리지의 음성 원본까지 지운다 | 삭제 라우트의 스토리지 호출 |
+
+### D. 외부로 나가는 것
+
+| # | 무엇이 참이어야 하는가 | 어떻게 확인하는가 |
+| --- | --- | --- |
+| D1 | Claude API 호출이 학습에 쓰지 않는 설정으로 나간다 | 호출부의 요청 헤더·옵션 |
+| D2 | ElevenLabs 호출도 같다 | 같음 |
+| D3 | 한 번 호출에 필요한 것만 싣는다. 사용자 자료 전체를 보내지 않는다 | 호출부가 만드는 payload |
+| D4 | 외부 호출 결과가 다른 사용자에게 닿는 캐시에 사용자 자료를 남기지 않는다 | 캐시 표의 키와 값 |
+
+### E. 백업과 복구
+
+| # | 무엇이 참이어야 하는가 | 어떻게 확인하는가 |
+| --- | --- | --- |
+| E1 | 매일 JSON 백업이 비공개 스토어에 저장된다 | `put(..., access: "private")` 와 스토어 설정 |
+| E2 | `/api/cron/backup` 이 `CRON_SECRET` 없이 호출되지 않는다 | 헤더 없이 호출해 본다 |
+| E3 | 어떤 백업에도 Google OAuth 토큰이 담기지 않는다 | 백업이 뜨는 표와 컬럼 목록 (세 층 전부) |
+| E4 | 복구 절차가 역할·권한·RLS 까지 되살린다 | `db/recovery/reapply-roles-and-rls.sql` |
+| E5 | 복구 절차가 프로덕션에 실제로 적용된 스키마를 그대로 다시 만든다 | `/api/health` 의 `latest_migration` 과 `main` 의 `db/migrations/` 를 맞춰 본다 |
+| E6 | 복구 뒤 같은 Google 계정이 같은 `user_id` 로 이어진다 | 복원 스크립트가 넣는 표 목록 |
+| E7 | 복구 리허설이 분기마다 실제로 수행된다 | `docs/BACKUP.md` 의 리허설 표 |
+
+### F. 인증
+
+| # | 무엇이 참이어야 하는가 | 어떻게 확인하는가 |
+| --- | --- | --- |
+| F1 | 세션 쿠키가 `HttpOnly`·`Secure`·`SameSite`·`__Secure-` 접두사를 갖는다 | 로그인해서 `Set-Cookie` 를 본다 |
+| F2 | 쿠키 서명 비밀이 32자 이상이다 | `src/lib/env.ts` |
+| F3 | 로그인 없이 보호 경로에 닿으면 로그인 화면으로 돌아간다 | 세션 없이 각 경로를 호출해 본다 |
+| F4 | 모든 API 라우트와 서버 액션이 스스로 사용자 확인을 한다. 미들웨어에만 기대지 않는다 | `src/app/api/**`, `**/actions.ts` 전부 |
+| F5 | 미들웨어 matcher 에서 뺀 경로는 각자 다른 방식으로 막혀 있다 | `src/proxy.ts` 의 matcher 와 뺀 경로들 |
+
+## 2. 지금 상태
+
+| # | 판정 | 근거 |
+| --- | --- | --- |
+| A1 | 확인함 | `inputs`·`nodes`·`edges`·`user_node_state`·`cards`·`chunks`·`recordings`·`encounters` 전부 `REFERENCES users(id) ON DELETE CASCADE` |
+| A2 | 확인함 | 프로덕션 `/api/health` 200, `rls_all_enabled: true`, 표 10개 모두 `rowsecurity: true` |
+| A3 | 확인함 | 같은 응답의 `db_role: anchor_app`, `role_bypasses_rls: false`. 역할은 `0001` 이 `NOBYPASSRLS` 로 만든다 |
+| A4 | 확인함 | `0002` 의 모든 정책이 `TO anchor_app` 이고 `app.current_user_id()` 와 비교한다. 값이 없으면 비교가 NULL 이라 행이 0개다 |
+| A5 | 확인함 | `withoutUser()` 를 쓰는 곳은 `/api/health` 하나다. 나머지 사용자 데이터 경로는 전부 `withUser()` |
+| A6 | 확인함 | `main` 의 열 표에 `USING (true)` 정책이 없다. 개발 브랜치의 `0006` 은 3장 N1 |
+| A7 | 확인함 | `src/lib/env.ts` 는 `ANCHOR_DATABASE_URL` 만 읽는다. `DATABASE_URL` 을 읽는 런타임 코드는 `/api/cron/backup` 뿐이고, 그것은 백업이라 소유자 연결이 필요하다 |
+| B1 | 확인함 | `.gitignore` 의 `.env*` + `!.env.example`. 추적되는 env 파일은 `.env.example` 하나 |
+| B2 | 확인함 | 값이 있는 줄은 자리표시자와 공개된 voice_id 뿐. 이 파일의 모든 과거 버전도 같다 |
+| B3 | 확인함 | 전 커밋 검색에서 연결 문자열·API 키 형태 0건. `.env` 가 커밋된 적 없다 |
+| B4 | 확인함 | `NEXT_PUBLIC_` 0건. 클라이언트 컴포넌트가 `@/lib/db/onboarding` 에서 가져오는 것은 `import type` 뿐이라 번들에서 지워진다 |
+| B5 | **못 지킴** | `/api/health` 의 예외 경로가 인증 없이 드라이버 오류 문구를 돌려준다 (3장 N2) |
+| B6 | 확인함 | 커밋 메시지 전문 검색에서 0건 |
+| C1 | 확인함 | `requireUser()` 로 401, `confirm: "삭제"` 아니면 400. 미들웨어가 `/api/account/*` 도 막는다 |
+| C2 | 확인함 | A1 의 FK 목록에 빠진 사용자 표가 없다. CASCADE 는 참조 무결성 동작이라 RLS 와 무관하게 돈다 |
+| C3 | 확인함 | `account_deletions` 는 `users` 를 참조하지 않는다. 원장 INSERT 와 `users` DELETE 가 같은 트랜잭션이고 INSERT 가 먼저다 |
+| C4 | **확인 못 함** | 코드 경로는 있다. 첫 백업이 2026-09-20 이라 35일 만료 삭제는 아직 한 번도 돌지 않았다. 2026-10-25 이후에 실제 파일 목록으로 확인한다 |
+| C5 | 확인함 | 삭제 요청 뒤의 백업에는 그 계정이 없다. 마지막 사본은 요청 직전 백업이고 `requested_at` 보다 이르다. 원장 표시 시각(`requested_at` + 보존 기간)이 그보다 늦다 |
+| C6 | **확인 못 함** | 녹음 기능이 아직 없다. 만료 오브젝트를 지우는 코드가 없다 (3장 N4) |
+| C7 | **확인 못 함** | 같음 (3장 N4) |
+| D1 | **확인 못 함** | `main` 에 외부 호출 코드가 없다. 개발 브랜치에 Claude API 호출이 생기는 중이다 |
+| D2 | **확인 못 함** | 같음 |
+| D3 | **확인 못 함** | 같음 |
+| D4 | **확인 못 함** | 같음. 캐시 표는 3장 N1 |
+| E1 | 확인함 (코드) | `/api/cron/backup` 이 `access: "private"` 로 올린다. 스토어 자체의 설정은 Vercel 콘솔에서만 보이고 이 세션은 보지 않는다 |
+| E2 | 확인함 | 프로덕션에서 헤더 없이 호출하면 403 |
+| E3 | **못 지킴** | 매일 JSON 백업은 `accessToken`·`refreshToken`·`idToken` 을 빼고 매핑 컬럼만 뜬다. `.github/workflows/backup.yml` 의 `pg_dump` 는 DB 전체를 떠서 토큰이 함께 나간다 (3장 S1) |
+| E4 | 확인함 | `db/recovery/reapply-roles-and-rls.sql` 이 역할·권한·`0002`·`0003` 을 다시 적용한다 |
+| E5 | **못 지킴** | 프로덕션의 `latest_migration` 은 `0005` 인데 `main` 에는 `0004` 까지만 있다 (3장 L1) |
+| E6 | **못 지킴** | 백업은 `neon_auth.user`·`account` 를 담지만 복원 스크립트는 `public.*` 만 넣는다 (3장 L2) |
+| E7 | **확인 못 함** | `docs/BACKUP.md` 의 리허설 표가 비어 있다. 백업에서 실제로 복구된 적이 없다 (3장 L3) |
+| F1 | **확인 못 함** | 로그인 시작이 내려주는 쿠키는 `__Secure-` 접두사에 `HttpOnly; Secure; SameSite=Lax; Path=/` 를 모두 갖는다. 로그인을 마친 뒤의 세션 쿠키는 실제 Google 로그인이 있어야 본다 |
+| F2 | 확인함 | `src/lib/env.ts` 가 32자 미만이면 시작 시점에 던진다 |
+| F3 | 확인함 | 세션 없이 `/today`·`/settings`·`/onboarding/languages`·`/api/export`·`/api/account/delete` 가 모두 307 로 `/` 로 간다 |
+| F4 | 확인함 | API 라우트 둘(`export`·`account/delete`)과 서버 액션 여덟이 전부 `requireUser()` 를 먼저 부른다. 페이지는 `currentUser()` 가 없으면 리다이렉트한다 |
+| F5 | 확인함 | matcher 에서 뺀 셋은 `/api/auth`(인증 자체), `/api/health`(사용자 데이터 없음), `/api/cron`(`CRON_SECRET` 으로 막힘) |
+
+## 3. 못 지키는 것과 그 이유
+
+등급 셋. **샘** = 남의 데이터가 보이거나 비밀값이 나간다. **잃음** = 데이터가 사라지거나 되돌릴 수 없다. **나중에** = 지금 사용자가 한 명이라 영향이 없지만 다수 계정에서 문제가 된다.
+
+고치는 곳은 전부 `src/**` · `db/**` · `scripts/**` · `.github/**` 라 Anchor · 개발 소유다. 아래 제안은 제안이고, 이 세션은 코드를 고치지 않는다.
+
+### S1 · 샘 — pg_dump 백업이 Google OAuth 토큰을 외부 스토리지로 내보낸다
+
+`.github/workflows/backup.yml` 은 `pg_dump` 로 DB 전체를 뜬다. 거기에 `neon_auth.account` 의 `accessToken`·`refreshToken`·`idToken` 이 그대로 들어가고, S3 호환 스토리지에 35일 남는다. 매일 JSON 백업은 같은 표에서 매핑 컬럼만 뜨고 토큰은 일부러 뺀다. 두 층이 다른 기준을 쓴다.
+
+이 워크플로는 아직 한 번도 실행된 적이 없다(실행 기록 0건). 지금 나간 토큰은 없다. 다만 켜는 조건이 "Secrets 를 넣는 것" 하나뿐이고, 넣는 사람에게 아무 경고가 없다.
+
+제안: 덤프에서 토큰 컬럼을 뺀다. 매핑은 매일 JSON 백업이 이미 담고 있다.
+
+```
+pg_dump "$DATABASE_URL_ADMIN" -Fc --no-owner --no-privileges \
+  --exclude-table-data='neon_auth.account' -f "anchor-$STAMP.dump"
+```
+
+### L1 · 잃음 — 프로덕션 스키마가 `main` 보다 앞서 있다
+
+프로덕션 `/api/health` 의 `latest_migration` 은 `0005_drop_onboarding_steps.sql` 이다. `main` 의 `db/migrations/` 는 `0004` 까지다. `0005` 와 `0006` 은 개발 브랜치에만 있다.
+
+`docs/BACKUP.md` 절차 C 는 `pnpm db:migrate` 로 스키마를 다시 만드는 전제 위에 서 있고, 그 기준은 체크아웃한 브랜치다. 지금 `main` 으로 복구하면 프로덕션과 다른 스키마가 나온다. `0005` 는 `settings` jsonb 의 내용만 바꾸므로 지금은 피해가 작다. `0006` 은 새 표를 만드는 마이그레이션이라, 프로덕션에 적용된 뒤에도 병합되지 않으면 복구가 그 표를 아예 만들지 못하고 행은 통째로 사라진다.
+
+`docs/TEAM.md` 7장이 "스키마 변경은 마이그레이션 파일로만" 으로 막으려던 것과 같은 사고가, 파일은 있는데 `main` 에 없는 모양으로 일어나 있다.
+
+제안: 마이그레이션은 프로덕션 DB 에 적용하기 전에 `main` 에 들어간다. 순서를 뒤집지 않는다.
+
+### L2 · 잃음 — 복구해도 사용자가 자기 데이터에 닿지 못한다
+
+매일 JSON 백업은 `neon_auth.user` 와 `neon_auth.account` 를 담는다. `scripts/backup/restore-json.ts` 의 복원 목록은 `public.*` 열 개뿐이다.
+
+그래서 복구한 DB 에는 행이 다 있는데, 같은 Google 계정으로 다시 로그인하면 Neon Auth 가 새 `user.id` 를 발급하고, RLS 가 옛 행을 전부 가린다. 데이터는 남아 있고 주인만 닿지 못한다. 사용자에게는 유실과 같다.
+
+`docs/BACKUP.md` C-4 는 이것을 "콘솔에서 사용자를 다시 만들 때 id 를 맞춘다" 는 수동 단계로 적어 두었다. 그 단계는 한 번도 수행된 적이 없어서 실제로 가능한지, 얼마나 걸리는지 아무도 모른다.
+
+제안: 다음 리허설(L3)에서 C-4 를 실제로 해 보고 걸린 시간을 표에 적는다. 콘솔에서 id 를 맞출 수 없으면 복원 스크립트가 `neon_auth` 매핑도 넣도록 바꾼다.
+
+### L3 · 잃음 — 복구 리허설이 한 번도 없었다
+
+`docs/BACKUP.md` 설정 체크리스트의 마지막 칸이 비어 있고 리허설 표가 비어 있다. 백업이 떠지는 것은 확인됐고, 그 백업에서 실제로 복구되는 것은 확인된 적이 없다. 백업은 복구된 적이 있어야 백업이다.
+
+L2 는 리허설을 한 번만 했어도 나왔을 문제다.
+
+리허설은 `docs/TEAM.md` 7장이 PM 의 일로 정했다. 임시 Neon 브랜치에서 하고 프로덕션 브랜치는 건드리지 않는다.
+
+### N1 · 나중에 — 공용 카드 캐시 표를 누구나 쓴다
+
+개발 브랜치의 `0006_node_cards.sql` 이 만드는 `node_cards` 의 정책은 `USING (true) WITH CHECK (true)` 다. 아직 `main` 에도 프로덕션에도 없다.
+
+키는 `nodes(id)` 이고, 사용자는 자기 개인 노드를 만들 수 있다(`nodes_write_own`). 그래서 한 사용자가 임의의 `node_id` 로 임의의 `card` 를 넣을 수 있고, 그 내용은 다른 사용자 화면에 그대로 뜰 수 있다. "사용자 자료는 넣지 않는다" 는 전제가 주석에만 있고 표가 막지 않는다.
+
+남의 기존 데이터가 보이는 것은 아니다. 계정을 건너가는 것은 한 사용자가 써 넣은 것이다. 사용자가 한 명인 동안은 아무 일도 없다.
+
+아직 병합되지 않아 지금 고치는 값이 가장 싸다. 제안: 읽기는 열어 두고, 쓰기는 공용 노드로만 제한한다.
+
+```sql
+CREATE POLICY node_cards_read ON node_cards FOR SELECT TO anchor_app USING (true);
+CREATE POLICY node_cards_write ON node_cards FOR INSERT TO anchor_app
+  WITH CHECK (EXISTS (SELECT 1 FROM nodes n WHERE n.id = node_id AND n.user_id IS NULL));
+```
+
+`node_cards` 는 `/api/cron/backup` 의 표 목록에도 없다. 사전 데이터에서 다시 만들 수 있는 캐시라 유실이 아니지만, 목록에 넣을지 빼기로 할지는 정해 두는 편이 낫다.
+
+### N2 · 나중에 — `/api/health` 예외 응답이 내부 오류 문구를 그대로 돌려준다
+
+`/api/health` 는 인증이 필요 없다. DB 연결이 끊기면 드라이버 오류 문구가 그대로 나가고, 거기에 DB 호스트 이름이 섞일 수 있다. 그 호스트는 로그인 시작 응답에도 이미 나오므로 새로 새는 것은 없다.
+
+제안: 예외 경로는 `{ ok: false }` 만 돌려주고 자세한 것은 서버 로그로 남긴다.
+
+### N3 · 나중에 — `user_node_state` 가 남의 개인 노드를 가리킬 수 있다
+
+`recordSeedJudgement` 는 `node_id` 의 uuid 모양만 확인한다. `user_node_state` 의 RLS 는 `user_id` 만 본다. 그래서 다른 사용자의 개인 노드 id 를 알면 그 id 로 자기 상태 행을 만들 수 있다.
+
+남의 데이터가 읽히지는 않는다. `nodes_read` 가 공용 노드와 자기 노드만 돌려주므로 그 행은 아무것도 보여 주지 않는다. 쓰레기 행이 남을 뿐이다. 다수 계정에서 그래프 통계가 어긋난다.
+
+제안: INSERT 정책에 노드 조건을 더한다.
+
+```sql
+WITH CHECK (user_id = app.current_user_id()
+  AND EXISTS (SELECT 1 FROM nodes n
+              WHERE n.id = node_id AND (n.user_id IS NULL OR n.user_id = app.current_user_id())))
+```
+
+### N4 · 나중에 — 음성 원본을 지우는 경로가 없다
+
+`recordings.audio_object_key`·`audio_expires_at` 과 `users.voice_retention_days` 는 표에만 있다. 만료된 오브젝트를 지우는 코드도, 계정 삭제가 오브젝트를 지우는 코드도 없다.
+
+녹음 기능이 아직 없어 지금 남아 있는 원본이 하나도 없다. 그래서 오늘은 영향이 없다. 녹음이 들어오는 순간 C6·C7 이 동시에 못 지킴이 된다. 녹음을 붙이는 단계에서 삭제 경로도 같이 들어와야 한다.
+
+### N5 · 나중에 — `db/README.md` 가 지금의 RLS 와 다르게 적혀 있다
+
+`db/README.md` 는 "모든 사용자 테이블은 `FORCE ROW LEVEL SECURITY` 라 소유자 연결에서도 정책이 적용된다" 고 적는다. `0003` 이후 거짓이다. 소유자 연결은 정책을 통과해 전체를 읽는다. 백업이 그래야 해서 일부러 푼 것이고, 앱 역할의 격리는 그대로다.
+
+다음 사람이 소유자 연결을 실제보다 안전하다고 오해한다. `db/**` 는 Anchor · 개발 소유다.
+
+## 4. 다음에 볼 것
+
+- `main` 에 없는 것은 보지 않았다. 개발 브랜치의 `0006`·Claude API 호출(D1~D4)은 P0 가 끝나면 본다.
+- RLS 가 실제로 남의 행을 막는지는 두 계정으로 돌려 봐야 확인이 끝난다. 임시 Neon 브랜치가 필요하고, 그 전에 PM 에게 알린다. 프로덕션 브랜치는 건드리지 않는다.
+- C4(보존 기간 만료 삭제)는 2026-10-25 이후에 스토어의 실제 파일 목록으로 확인한다.
