@@ -4,6 +4,7 @@ import { getCard } from "@/lib/db/cards";
 import { cardContext, nextCandidates, KNEW_VERB } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
 import { withParticle, type Spoken } from "@/lib/ko";
+import { inputTo } from "@/lib/input-name";
 import { Screen, Space, Title, Lead, Card, Grow, Button, Ghost, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
 import { NextCard } from "./next-card";
@@ -85,7 +86,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
           <Legend />
         </Card>
         <Grow />
-        <Button href="/today">아침 기사로 돌아가기</Button>
+        <Button href="/today">{`${inputTo({ title: null, meta: { example: true } })} 돌아가기`}</Button>
         <Ghost href="/today">다음 카드 助</Ghost>
       </Screen>
     );
@@ -116,7 +117,8 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
       : via
         ? `${withParticle({ text: via.kanji, sound: via.koSound }, "을를")} ${KNEW_VERB[via.how]} ${withParticle(candSubject, "이가")} 가장 가까워. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`
         : `${withParticle(candSubject, "이가")} 남았어. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`;
-  const backLabel = ctx.input?.meta.example ? "아침 기사로 돌아가기" : "자료로 돌아가기";
+  // 일곱째 자리였다 — 다른 화면이 전부 inputName 을 거치는데 여기만 예시/아님 두 갈래로 직접 썼다.
+  const backLabel = `${inputTo(ctx.input)} 돌아가기`;
 
   return (
     <Screen where={`${ctx.where} 끝`} up={card.input_id ? `/inputs/${card.input_id}` : "/today"} aside={nowKST()}>
