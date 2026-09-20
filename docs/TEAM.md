@@ -11,7 +11,7 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | 이름 | 하는 일 | 이 세션만 고치는 곳 | 브랜치 | 세션 ID |
 | --- | --- | --- | --- | --- |
 | **Anchor · PM (조율)** | 결정·우선순위·통합 순서·완결 판정. 코드/디자인/기획 문서를 직접 고치지 않는다 | `docs/TEAM.md` | `claude/affectionate-brahmagupta-947f48` | `session_01QPJ4i1hJ5zENanv7ykjp1t` |
-| **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도 | `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` | `claude/create-readme-vibelog-9c5xnb` | `session_01GLHC1ArhYJTqPuDysDoSWt` |
+| **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도, 제품 원칙 | `CLAUDE.md` · `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` | `claude/create-readme-vibelog-9c5xnb` | `session_01GLHC1ArhYJTqPuDysDoSWt` |
 | **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | (세션 생성 시 할당) | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
 | **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_019gYCLNic9TA9jvmQikfhfk` |
@@ -42,7 +42,9 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 1. 로그인 → 언어 → 예시 자료 → 뽑기 → 가나 1회 → 카드(F04 + 장면 5) → 말하기 → 그래프 → 홈
 2. 404 0건, 어느 화면에서도 홈까지 2탭, 5분 안
 3. `pnpm typecheck && pnpm lint && pnpm build` 통과, Vercel 프로덕션 배포 성공
-4. UX_QA 가 같은 경로를 초기화된 계정으로 돌려 "막힘" 등급 결함 0건
+4. Anchor · QA 가 같은 경로를 초기화된 계정으로 돌려 "막힘" 등급 결함 0건
+
+넷이 다 되면 완결이다. QA 통과가 판정이고, Jessi 의 확인을 따로 기다리지 않는다. PM 이 아침 보고로 알린다.
 
 그다음이 영어 대화 루프(F13~F14) → 재만남(F12) → 하루 끝(F15).
 
@@ -102,3 +104,14 @@ PM 은 매일 아침 8시(KST) Jessi 에게 한 번 보고한다. 담는 것은 
 | 오늘 할 것 | 세션별 한 줄 |
 
 Jessi 가 결정할 것은 돈이 들거나(유료 플랜·외부 계정), 제품의 방향을 바꾸거나, 사람이 직접 해야 하는 일(복구 리허설 등)뿐이다. 그 밖의 것은 PM 이 정하고 결과만 보고한다.
+
+## 7. 정해진 것
+
+한 번 정해진 것은 다시 묻지 않는다. 바꾸려면 PM 을 거친다.
+
+| 무엇 | 결정 |
+| --- | --- |
+| Neon PITR | MVP 동안 무료 플랜 6시간을 유지한다. Neon 밖 매일 JSON 백업(35일)이 최악의 경우를 막는다. 실사용을 시작하는 날 유료로 올릴지 다시 본다 |
+| 복구 리허설 | PM 이 임시 Neon 브랜치에 수행한다. 프로덕션 브랜치는 건드리지 않는다 |
+| 완결 판정 | Anchor · QA 의 "막힘 0건" 통과가 판정이다 |
+| API 키 | `ANTHROPIC_API_KEY` · `ELEVENLABS_API_KEY` 는 Jessi 가 Vercel 에 직접 넣는다. 키 값은 채팅·커밋·문서 어디에도 쓰지 않는다 |
