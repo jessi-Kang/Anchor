@@ -112,13 +112,16 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 | 라우트 | 화면 | 하는 일 |
 | --- | --- | --- |
 | `/` | O01 | Google 로그인 + 데이터 원칙 2줄 |
-| `/onboarding/languages` · `/purpose?lang=` · `/kana` · `/kanji` · `/seed` | O02a–O05 | 언어 고르기(여러 개 가능) → 언어마다: 상황 고르기 → 가나 6개 읽기 → 한자 씨앗 40장(일본어) / 영어 씨앗 40장(영어·스페인어). 단계는 건너뛰고 홈에서 이어서 할 수 있다 |
+| `/onboarding/languages` | O02a | 시작할 언어 고르기(여러 개 가능) → 바로 그 언어의 자료 넣기. 준비 단계 없음 |
+| `/onboarding/kana` | O03 | 가나 6개 실제 읽기. 일본어 첫 카드 직전에 한 번만 |
 | `/today` | F01 | 오늘 만난 것 큐 |
 | `/inputs/new` · `/inputs/[id]` · `/inputs/[id]/read` | F02 · F03 · F12 | 자료 넣기 → 모르는 것 추출 → 재만남 읽기 |
 | `/cards/[id]` · `/cards/[id]/1..5` · `/cards/[id]/speak` | F04 · Scene1–5 · F10 | 카드 출처 → 발견 5장면 → 듣기·말하기·곡선 비교 |
 | `/graph` | F11 | 앵커 그래프, 다음 카드 이유 |
 | `/talk` · `/talk/[id]` | F13 · F14 | 못 한 말 한 줄 → 덩어리 + 음성 루프 |
-| `/settings` | — | 언어 켜기·바꾸기, 내보내기(JSON), 계정 삭제, 음성 보관 기간, 항목별 공개, 목소리 선택 |
+| `/settings` | — | 언어 추가·끄기, 로그아웃, 내보내기(JSON), 계정 삭제, 음성 보관 기간, 항목별 공개, 목소리 선택 |
+
+화면 순서와 각 화면의 목적·나가는 길은 [docs/FLOW.md](./docs/FLOW.md) 가 기준이다.
 
 ### 디자인 시스템 요약
 
@@ -161,7 +164,7 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 pnpm install
 cp .env.example .env.local        # 값 채우기 (아래 표)
 pnpm db:migrate                    # DATABASE_URL_ADMIN(또는 DATABASE_URL) 로 스키마 + RLS 적용
-pnpm db:seed                       # 공용 참조 노드 적재 (지금은 O04 영어 씨앗 40장)
+pnpm db:seed                       # 공용 참조 노드 적재 (영어 어근·덩어리 40, 한자 40. F03 의 앵커·패턴 재료)
 pnpm dev                           # http://localhost:3000
 ```
 
@@ -195,8 +198,9 @@ curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_fo
 | --- | --- |
 | 1. 골격: Next.js + Neon Auth(Google) + 스키마·RLS 마이그레이션 + 내보내기·삭제 엔드포인트 + 매일 백업(Vercel cron → Blob) | 완료, 배포됨 |
 | 2. 디자인 토큰 → CSS 변수(`pnpm design:tokens`), 공통 레이아웃 컴포넌트, O01 픽셀 재현(`pnpm design:check`) | 완료 |
-| 3. 온보딩 O02a–O05: 언어 고르기, 언어별 상황, 가나 6개 마이크 인식(Web Speech API), 한자 씨앗 40장, 영어 씨앗 40장 → `user_node_state`. 언어는 하나씩 켜고 필요한 단계만 | 완료 |
-| 4. 일본어 발견 카드 F04 → Scene1–5 → F11 | 다음 |
+| 3. 온보딩 O02a–O05 (언어별 상황, 한자 씨앗 40장, 영어 씨앗 40장) | 폐기. 플로우 점검 결과 준비 단계가 서비스 본체 없이 80장 세션이 돼 "단계 넘기기"가 됐다. [docs/FLOW.md](./docs/FLOW.md) 5장 |
+| 3′. 첫 방문 4화면 (O01 → O02a → F02 자료 넣기 → F03 뽑기) + 걷어내기 | 다음 (Dev 세션) |
+| 4. 일본어 발견 카드 O03(1회) → F04 → Scene1–5 → F10 → F11 + 홈 F01 | 다음 (Dev 세션) |
 | 5. 영어 대화 루프 F13–F14 | |
 
 ## 작업 방식
