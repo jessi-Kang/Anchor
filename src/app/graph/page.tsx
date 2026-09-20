@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { getCard } from "@/lib/db/cards";
-import { cardContext, nextCandidates, KNEW_VERB } from "@/lib/cards/progress";
+import { cardContext, cardsLeft, nextCandidates, KNEW_VERB } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
 import { withParticle, type Spoken } from "@/lib/ko";
 import { inputTo } from "@/lib/input-name";
@@ -118,6 +118,12 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
         : `${withParticle(candSubject, "이가")} 남았어. 다음 카드는 ${cands.length > 1 ? "이 둘 중 하나" : "이거"}.`;
   // 일곱째 자리였다 — 다른 화면이 전부 inputName 을 거치는데 여기만 예시/아님 두 갈래로 직접 썼다.
   const backLabel = `${inputTo(ctx.input)} 돌아가기`;
+  // 다음 카드가 없을 때만 묻는다 — 있으면 하루가 끝난 게 아니라서 셀 이유가 없다.
+  // 이 자료가 아니라 계정 전체를 본다: 다른 기사에 카드가 남았으면 아직 홈이다 (docs/FLOW.md 4장).
+  const done =
+    cands.length === 0 && (await cardsLeft(user.id)) === 0
+      ? { href: "/today/done", label: "오늘 켜진 것" }
+      : { href: "/today", label: "홈으로" };
 
   return (
     <Screen where={`${ctx.where} 끝`} up={card.input_id ? `/inputs/${card.input_id}` : "/today"} aside={nowKST()}>
@@ -131,7 +137,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
         <Legend />
       </Card>
       <Grow />
-      <NextCard inputId={card.input_id} next={cands[0]?.kanji ?? null} backLabel={backLabel} />
+      <NextCard inputId={card.input_id} next={cands[0]?.kanji ?? null} backLabel={backLabel} done={done} />
     </Screen>
   );
 }
