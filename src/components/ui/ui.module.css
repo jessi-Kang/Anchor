@@ -657,3 +657,42 @@ a.row,
   flex-direction: column;
   gap: 6px;
 }
+
+/*
+ * F12 재만남: 이미 만난 한자. 틴트는 "아는 것" 이 아니라 **"새로 배울 것이 아니다"** 를 말한다.
+ * 글자색이 아니라 배경 틴트다 (CLAUDE.md 디자인 시스템 — 글자 세기 3단계는 위계에만 쓴다).
+ */
+.metSeen {
+  background: var(--color-accent-bg);
+  border-radius: 6px;
+  padding: 0 5px;
+  color: var(--color-accent-dark);
+}
+
+/* F12 본문. 줄 간격이 넓은 건 ruby 가 줄 위로 올라가기 때문이다 (design/screens/F12.html). */
+.metBody {
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.9;
+  color: var(--color-text1);
+}
+
+/* F12 아래 한 줄 + "재만남" 알약 (design/screens/F12.html). 틴트 배경 위에 놓인다. */
+.metFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #f1f4f9;
+  border: 1px solid var(--color-line);
+}
+
+.metFootLine {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-text1);
+}

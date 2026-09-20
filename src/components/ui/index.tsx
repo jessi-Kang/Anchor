@@ -241,7 +241,7 @@ export function Ja({ children, size = "sm", mark }: { children: ReactNode; size?
  * 읽기를 아직 가리는 자리(그 카드에서 맞혀야 할 한자, F04~Scene3 앞)는 `reading` 없이 쓰면
  * 점선 빈칸이 뜬다. 빈칸 폭은 글자 크기에만 비례하고 읽기 글자 수를 따르지 않는다 (docs/FLOW.md 4장).
  */
-export function Ruby({ children, reading }: { children: string; reading?: string }) {
+export function Ruby({ children, reading }: { children: ReactNode; reading?: string }) {
   return (
     <ruby lang="ja">
       {children}

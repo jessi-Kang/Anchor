@@ -10,7 +10,16 @@ export type InputRow = {
   body: string;
   created_at: string;
   extracted_at: string | null;
-  meta: { example?: boolean; kanji?: string[] };
+  meta: {
+    example?: boolean;
+    kanji?: string[];
+    /**
+     * 본문의 한자 덩어리마다 붙는 よみがな. `kanjiRuns(body)` 와 길이·순서가 같다.
+     * 재만남(F12)이 이미 만난 한자의 읽기를 보여 줄 때 쓴다 — 한 번 만들어 두고 다시 안 만든다.
+     * 사전 음이 아니라 이 문장에서 실제로 읽히는 소리다 (`lib/kanji/furigana.ts`).
+     */
+    readings?: string[];
+  };
 };
 
 /**
@@ -73,5 +82,16 @@ export function markExtracted(userId: string, id: string, kanji: string[]) {
        WHERE user_id = $1 AND id = $2`,
       [userId, id, JSON.stringify(kanji)],
     );
+  });
+}
+
+/** F12 가 한 번 만든 본문 よみがな 를 굳힌다. 같은 자료를 다시 열 때 또 만들지 않는다. */
+export function saveInputReadings(userId: string, id: string, readings: string[]) {
+  return withUser(userId, async (tx) => {
+    await tx.query(`UPDATE inputs SET meta = meta || jsonb_build_object('readings', $3::jsonb) WHERE user_id = $1 AND id = $2`, [
+      userId,
+      id,
+      JSON.stringify(readings),
+    ]);
   });
 }
