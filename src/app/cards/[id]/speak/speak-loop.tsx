@@ -24,7 +24,7 @@ export function SpeakLoop({ cardId, text, preview }: { cardId: string; text: str
   const audioCtx = () => (ctxRef.current ??= new AudioContext());
 
   const listen = async () => {
-    if (state !== "idle") return;
+    if (state !== "idle" || preview) return;
     setState("playing");
     try {
       const res = await fetch(`/api/tts?text=${encodeURIComponent(text)}`);
@@ -61,7 +61,7 @@ export function SpeakLoop({ cardId, text, preview }: { cardId: string; text: str
   };
 
   const speak = async () => {
-    if (state !== "idle") return;
+    if (state !== "idle" || preview) return;
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -126,10 +126,10 @@ export function SpeakLoop({ cardId, text, preview }: { cardId: string; text: str
       </Card>
       <Grow />
       <ButtonRow>
-        <Button outline disabled={state !== "idle" || preview} onClick={listen}>
+        <Button outline disabled={state !== "idle"} onClick={listen}>
           {state === "playing" ? "듣는 중" : "듣기"}
         </Button>
-        <Button disabled={state !== "idle" || preview} onClick={speak}>
+        <Button disabled={state !== "idle"} onClick={speak}>
           {state === "recording" ? "말하는 중" : state === "saving" ? "저장 중" : "말하기"}
         </Button>
       </ButtonRow>

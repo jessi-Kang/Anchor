@@ -4,7 +4,7 @@ import { getCard } from "@/lib/db/cards";
 import { cardContext } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
 import { eunNeun } from "@/lib/ko";
-import { Screen, Label, Lead, Grow, Button, Mark, uiStyles as s } from "@/components/ui";
+import { Screen, Label, Lead, Grow, Button, Mark, rubyKanji, uiStyles as s } from "@/components/ui";
 import { markWord, nowKST } from "@/components/card-bits";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +23,9 @@ export default async function CardSourcePage({ params, searchParams }: { params:
         <Grow />
         <div className={s.center}>
           <Label>오늘 아침 기사에서</Label>
-          <div className={s.source} lang="ja">
-            トヨタとNTT、<Mark>協力</Mark>して
-          </div>
+          <h1 className={s.source} lang="ja">
+            {markWord("トヨタとNTT、協力して", "協力")}
+          </h1>
           <Lead>협력은 알아. 協만 모르지.</Lead>
         </div>
         <Grow />
@@ -48,9 +48,9 @@ export default async function CardSourcePage({ params, searchParams }: { params:
       <Grow />
       <div className={s.center}>
         <Label>{label}</Label>
-        <div className={s.source} lang="ja">
-          {src ? markWord(src.sentence, src.word) : <Mark>{p.kanji}</Mark>}
-        </div>
+        <h1 className={s.source} lang="ja">
+          {src ? markWord(src.sentence, src.word) : <Mark>{rubyKanji(p.kanji)}</Mark>}
+        </h1>
         <Lead>
           {p.hook.word}
           {eunNeun(p.hook.word)} 알아. {p.kanji}만 모르지.

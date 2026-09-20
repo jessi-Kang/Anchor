@@ -3,7 +3,7 @@ import { currentUser } from "@/lib/auth/server";
 import { getCard, type CardPayload } from "@/lib/db/cards";
 import { cardContext } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
-import { Screen, Space, Label, Lead, Card, Grow, Button, Mark, Ja, uiStyles as s } from "@/components/ui";
+import { Screen, Space, Label, Lead, Card, Grow, Button, Ghost, Mark, Ja, rubyKanji, uiStyles as s } from "@/components/ui";
 import { GuessForm } from "./guess-form";
 import { LandingButtons } from "./landing-buttons";
 
@@ -87,11 +87,11 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
         <div className={`${s.center} ${s.centerWide}`}>
           <Label>늘 쓰는 단어</Label>
           <Ja size="lg">{markSyllable(p.hook.word, p.hook.mark)}</Ja>
-          <div className={s.ask}>
+          <h1 className={s.ask}>
             이 {p.hook.mark}, 한자로는
             <br />
             어떤 모양일까?
-          </div>
+          </h1>
         </div>
         <Grow />
         <Button href={next(2)}>부품 보기</Button>
@@ -111,7 +111,7 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
               <div key={pt.ch + i} style={{ display: "contents" }}>
                 {i > 0 && <span className={s.partPlus}>+</span>}
                 <div className={`${s.partTile} ${small ? s.partTileSm : ""}`} lang="ja">
-                  {pt.ch}
+                  {rubyKanji(pt.ch)}
                   {pt.count > 1 && <span className={s.partBadge}>×{pt.count}</span>}
                 </div>
               </div>
@@ -122,7 +122,7 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
               <span key={pt.ch + i}>{pt.name ?? pt.ch}</span>
             ))}
           </div>
-          <div className={s.ask}>{p.parts_meaning}</div>
+          <h1 className={s.ask}>{p.parts_meaning}</h1>
         </div>
         <Grow />
         <Button href={next(3)}>뜻 맞혀보기</Button>
@@ -136,7 +136,7 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
       <Screen {...common}>
         <Grow />
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className={s.answer}>
+          <h1 className={s.answer}>
             {q1}
             {q2 && (
               <>
@@ -144,7 +144,7 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
                 {q2}
               </>
             )}
-          </div>
+          </h1>
           <Lead>틀려도 돼. 떠오르는 대로.</Lead>
           {preview ? <input id="guess" className={s.guess} defaultValue={guess} readOnly /> : <GuessForm cardId={id} initial={guess} />}
         </div>
@@ -165,7 +165,7 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
           <div className={s.reading} lang="ja">
             {p.reading}
           </div>
-          <div className={s.answer}>{p.answer}</div>
+          <h1 className={s.answer}>{p.answer}</h1>
           {guess && (
             <Card tint style={{ padding: "12px 16px" }}>
               <div className={s.compare}>
@@ -186,7 +186,7 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   return (
     <Screen {...common}>
       <Grow />
-      <Label>이미 아는 단어에 {p.kanji}이 들어 있어</Label>
+      <Label as="h1">이미 아는 단어에 {p.kanji}이 들어 있어</Label>
       <Space h={10} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {(p.landing.length ? p.landing : [{ word: p.kanji, reading: p.reading, ko: p.hook.word }]).map((w) => (
@@ -215,7 +215,10 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
       )}
       <Grow />
       {preview ? (
-        <Button href="/cards/preview/speak">소리 내서 말해보기</Button>
+        <>
+          <Button href="/cards/preview/speak">소리 내서 말해보기</Button>
+          <Ghost href="/graph">다음 한자로</Ghost>
+        </>
       ) : (
         <LandingButtons cardId={id} />
       )}
