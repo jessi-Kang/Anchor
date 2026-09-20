@@ -2,7 +2,7 @@
 
 지금 저장소에 무엇이 있고 무엇이 없는지만 적는다. 계획과 우선순위는 `docs/TEAM.md` 4장에 있다.
 
-기준: 2026-09-20 · `main` `20e2a0f` · 프로덕션 `https://anchor-jessikang.vercel.app`
+기준: 2026-09-20 · `main` `b8a04ef` · 프로덕션 `https://anchor-jessikang.vercel.app`
 
 ## 1. 라우트
 
@@ -36,7 +36,7 @@
 
 | 경로 | 상태 |
 | --- | --- |
-| `/api/auth/[...path]` · `/api/health` · `/api/export` · `/api/account/delete` · `/api/cron/backup` · `/api/tts` · `/api/recordings` | 있음 |
+| `/api/auth/[...path]` · `/api/health` · `/api/export` · `/api/account/delete` · `/api/cron/backup` · `/api/cron/voice` · `/api/tts` · `/api/recordings` | 있음 |
 | `/api/inputs` · `/api/cards` · `/api/graph/next` · `/api/talk` · `/api/pitch` | 없음 |
 
 ## 2. 데이터와 운영
@@ -53,6 +53,7 @@
 | 선택 pg_dump | `.github/workflows/backup.yml`. 외부 S3 Secrets 가 없어 실행되지 않는다 |
 | 내보내기 | `GET /api/export` 동작. 설정 화면에 행 있음 |
 | 계정 삭제 | `POST /api/account/delete` 동작. 설정 → `/settings/delete` 확인 1장에서 부른다 |
+| 음성 원본 삭제 | `vercel.json` cron 이 매일 18:47 UTC 에 `/api/cron/voice` 호출. 보관 기간이 지난 원본을 지우고 피치는 남긴다. 기간은 계정마다 `users.voice_retention_days` |
 | 복구 리허설 | 기록 없음. `docs/BACKUP.md` 의 표가 비어 있다 |
 | 공용 참조 노드 | `db/seed/`. `pnpm db:seed` 로 적재 |
 
