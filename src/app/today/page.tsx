@@ -120,7 +120,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   if (japanese.length > 0 && japanese.every((r) => r.remaining === 0)) redirect("/today/done");
   // 아는 것 → 다음 것, 한 문장. 아는 것을 앞에 둔다 (docs/FLOW.md 4장). 두 줄로 늘리지 않는다.
   // 주어 자리에는 **판정된** 것만 온다(`via`). 부를 발판이 없으면 억지로 붙이지 말고 자료를 댄다.
-  // 괄호로 앵커 단어를 보여 주지 않는다 — 아직 안 푼 카드의 정답을 미리 까는 꼴이라 원칙 1 위반이다.
+  // 앵커 단어는 붙이지 않는다 — 판정하는 자리에서만 붙인다 (docs/FLOW.md 4장).
   const nx = nextRow?.next;
   const reason = nx
     ? nx.via

@@ -3,6 +3,32 @@ import { Ruby, uiStyles as s } from "@/components/ui";
 import { kanjiRuns } from "@/lib/kanji/extract";
 
 /**
+ * 본문의 한자 덩어리를 "이미 만났는가" 기준으로 갈라 둔다. **읽기를 가릴지, 한국어 낱말을 보일지가
+ * 여기 한 값에서 나온다** — 따로 계산하면 언젠가 읽기는 보이는데 한국어는 안 보이는 낱말이 생긴다.
+ */
+export type RunState = {
+  text: string;
+  chars: string[];
+  /** 덩어리의 한자를 **전부** 만났는가. 읽기도 한국어 낱말도 이게 참일 때만 보인다. */
+  allMet: boolean;
+  met: string[];
+  fresh: string[];
+};
+
+export function runStates(body: string, met: Set<string>): RunState[] {
+  return kanjiRuns(body).map((r) => {
+    const chars = Array.from(r.text);
+    return {
+      text: r.text,
+      chars,
+      allMet: chars.every((c) => met.has(c)),
+      met: chars.filter((c) => met.has(c)),
+      fresh: chars.filter((c) => !met.has(c)),
+    };
+  });
+}
+
+/**
  * 재만남(F12)의 자료 본문. **틴트와 읽기가 한 사실에서 나온다.**
  *
  * 그 사실은 "이 한자를 이미 만났는가" 하나다 (docs/FLOW.md 1′장 F12 행):

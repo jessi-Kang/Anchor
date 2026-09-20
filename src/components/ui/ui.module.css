@@ -678,12 +678,12 @@ a.row,
   color: var(--color-text1);
 }
 
-/* F12 아래 한 줄 + "재만남" 알약 (design/screens/F12.html). 틴트 배경 위에 놓인다. */
+/* F12 아래 칸 (design/screens/F12.html). 말 두 줄만 세로로 쌓는다 — 알약이 들어가는 자리가 아니다
+   (docs/FLOW.md 4장 알약 규칙). */
 .metFoot {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 3px;
   padding: 16px 18px;
   border-radius: 18px;
   background: var(--color-tint2);
@@ -693,6 +693,14 @@ a.row,
 .metFootLine {
   font-size: 15px;
   font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-text1);
+}
+
+/* F12 아래 칸 첫 줄 — 이미 만난 글자를 짚어 주는 말. 아래 한 줄보다 세다. */
+.metFootWord {
+  font-size: 17px;
+  font-weight: 700;
   line-height: 1.5;
   color: var(--color-text1);
 }
