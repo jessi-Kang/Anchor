@@ -99,7 +99,7 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 │   └── proxy.ts         라우트 보호 미들웨어
 ├── db/
 │   ├── migrations/      SQL 마이그레이션 (0001 스키마·역할, 0002 RLS)
-│   ├── seed/            공용 참조 노드 (en-seed.json: 영어 씨앗 40장)
+│   ├── seed/            공용 참조 노드 (en-seed.json 영어 씨앗 40장, ja-seed.json 한자 씨앗 40장)
 │   └── recovery/        복구 시 역할·RLS 재적용
 ├── scripts/             migrate.ts, backup/neon-snapshot.ts, design/tokens-to-css.ts·check-screen.ts
 └── .github/workflows/   backup.yml (매일 pg_dump → 외부 S3)
@@ -112,7 +112,7 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 | 라우트 | 화면 | 하는 일 |
 | --- | --- | --- |
 | `/` | O01 | Google 로그인 + 데이터 원칙 2줄 |
-| `/onboarding/purpose` · `/kana` · `/seed` | O02–O04 | 상황 고르기(고른 언어만 켜짐) → 가나 6개 읽기(일본어) → 영어 씨앗 3분(영어·스페인어). 켠 언어의 단계만 돈다 |
+| `/onboarding/purpose` · `/kana` · `/kanji` · `/seed` | O02–O05 | 상황 고르기(고른 언어만 켜짐) → 가나 6개 읽기 → 한자 씨앗 40장(일본어) → 영어 씨앗 40장(영어·스페인어). 켠 언어의 단계만 돈다 |
 | `/today` | F01 | 오늘 만난 것 큐 |
 | `/inputs/new` · `/inputs/[id]` · `/inputs/[id]/read` | F02 · F03 · F12 | 자료 넣기 → 모르는 것 추출 → 재만남 읽기 |
 | `/cards/[id]` · `/cards/[id]/1..5` · `/cards/[id]/speak` | F04 · Scene1–5 · F10 | 카드 출처 → 발견 5장면 → 듣기·말하기·곡선 비교 |
@@ -195,7 +195,7 @@ curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_fo
 | --- | --- |
 | 1. 골격: Next.js + Neon Auth(Google) + 스키마·RLS 마이그레이션 + 내보내기·삭제 엔드포인트 + 백업(스냅샷·pg_dump) | 완료, 배포됨 |
 | 2. 디자인 토큰 → CSS 변수(`pnpm design:tokens`), 공통 레이아웃 컴포넌트, O01 픽셀 재현(`pnpm design:check`) | 완료 |
-| 3. 온보딩 O02–O04: 상황 고르기, 가나 6개 마이크 인식(Web Speech API), 영어 씨앗 40장 → `user_node_state`. 언어는 하나씩 켜고 필요한 단계만 | 완료 |
+| 3. 온보딩 O02–O05: 상황 고르기, 가나 6개 마이크 인식(Web Speech API), 한자 씨앗 40장, 영어 씨앗 40장 → `user_node_state`. 언어는 하나씩 켜고 필요한 단계만 | 완료 |
 | 4. 일본어 발견 카드 F04 → Scene1–5 → F11 | 다음 |
 | 5. 영어 대화 루프 F13–F14 | |
 
