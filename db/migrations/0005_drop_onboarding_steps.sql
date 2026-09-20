@@ -9,14 +9,14 @@
 -- 멱등: 두 번 실행해도 결과가 같다.
 
 UPDATE users
-SET settings = (settings - 'steps' - 'kana_module')
+SET settings = (settings - 'steps'::text - 'kana_module'::text)
   || CASE WHEN settings ? 'languages' THEN jsonb_build_object(
        'languages',
-       coalesce((SELECT jsonb_object_agg(k, v - 'purposes') FROM jsonb_each(settings->'languages') AS e(k, v)), '{}'::jsonb))
+       coalesce((SELECT jsonb_object_agg(k, v - 'purposes'::text) FROM jsonb_each(settings->'languages') AS e(k, v)), '{}'::jsonb))
      ELSE '{}'::jsonb END
   || CASE WHEN settings ? 'kana' AND NOT (settings->'kana' ? 'status') THEN jsonb_build_object(
        'kana',
-       (settings->'kana' - 'passed') || jsonb_build_object(
+       ((settings->'kana') - 'passed'::text) || jsonb_build_object(
          'status',
          CASE WHEN coalesce((settings->'kana'->>'passed')::boolean, false) THEN 'passed'
               WHEN coalesce((settings->>'kana_module')::boolean, false) THEN 'locked'

@@ -14,8 +14,8 @@
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { Client } from "pg";
 import { loadEnv } from "./lib/load-env";
+import { adminClient } from "./lib/admin-client";
 
 loadEnv();
 
@@ -37,8 +37,6 @@ type KanjiItem = { kanji: string; grade: number; freq: number | null; jlpt: numb
 const read = <T,>(f: string) => JSON.parse(readFileSync(path.resolve(process.cwd(), "db/seed", f), "utf8")) as T;
 
 async function main() {
-  const url = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL_ADMIN (또는 DATABASE_URL) 이 필요하다");
 
   const en = read<{ items: SeedItem[] }>("en-seed.json").items;
   const partsKo = read<{ parts: Record<string, string> }>("parts-ko.json").parts;
@@ -48,7 +46,7 @@ async function main() {
   const cards = read<{ cards: Record<string, unknown> }>("kanji-cards.json").cards;
   const seedByKanji = new Map(jaSeed.map((it) => [it.kanji, it]));
 
-  const client = new Client({ connectionString: url });
+  const client = adminClient();
   await client.connect();
   try {
     await client.query("BEGIN");

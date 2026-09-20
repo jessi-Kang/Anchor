@@ -11,8 +11,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { Client } from "pg";
 import { loadEnv } from "./lib/load-env";
+import { adminClient } from "./lib/admin-client";
 
 loadEnv();
 
@@ -25,12 +25,10 @@ function sha256(s: string) {
 
 async function main() {
   // 관리 연결: DATABASE_URL_ADMIN 이 없으면 Vercel Neon 통합이 주입하는 DATABASE_URL(소유자 역할)을 쓴다.
-  const url = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL_ADMIN (또는 DATABASE_URL) 이 필요하다 (.env.example 참고)");
 
   const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith(".sql")).sort();
 
-  const client = new Client({ connectionString: url });
+  const client = adminClient();
   await client.connect();
   try {
     await client.query(`
