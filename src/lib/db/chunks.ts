@@ -63,12 +63,18 @@ export async function getChunk(userId: string, id: string): Promise<ChunkRow | n
 }
 
 /**
- * F17 이 쓰는 **한 칸짜리** 조회. 추측 화면은 situation 말고 아무것도 안 읽는다 —
- * 행 전체를 가져오면 나중에 붙는 것이 그 화면의 렌더 트리로 딸려 들어온다 (답이 새는 자리).
+ * F17 이 쓰는 조회. 추측 화면은 situation 말고 아무것도 안 읽는다 — 행 전체를 가져오면 나중에
+ * 붙는 것이 그 화면의 렌더 트리로 딸려 들어온다 (답이 새는 자리).
+ *
+ * `done` 은 "이미 지났다"만 알려 주는 **불리언**이다. 추측도 영어 문장도 값이 아니라 있는지 없는지로만
+ * 나온다 — 그래야 이 화면이 지나간 추측을 다시 채워 보여 줄 수도, 영어가 새어 나올 수도 없다.
  */
-export async function getSituation(userId: string, id: string): Promise<{ situation: string } | null> {
+export async function getSituation(userId: string, id: string): Promise<{ situation: string; done: boolean } | null> {
   return withUser(userId, async (tx) => {
-    const { rows } = await tx.query<{ situation: string }>("SELECT situation FROM chunks WHERE user_id = $1 AND id = $2", [userId, id]);
+    const { rows } = await tx.query<{ situation: string; done: boolean }>(
+      `SELECT situation, (meta ? 'guess' OR btrim(text) <> '') AS done FROM chunks WHERE user_id = $1 AND id = $2`,
+      [userId, id],
+    );
     return rows[0] ?? null;
   });
 }

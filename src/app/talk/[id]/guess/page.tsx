@@ -37,6 +37,9 @@ export default async function GuessPage({
     if (!user) redirect("/");
     const row = await getSituation(user.id, id);
     if (!row) notFound();
+    // 이미 추측을 보낸 줄이면 여기 다시 서지 않는다. 빈 칸을 또 내밀면 덮어쓰게 되고,
+    // 덮어쓰기는 유실이다 (CLAUDE.md 데이터 원칙: "추측 한 번도 유실 없음").
+    if (row.done) redirect(`/talk/${id}`);
     situation = row.situation;
   }
 

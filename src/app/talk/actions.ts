@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { createChunk, getChunk, saveGuessAndEnglish } from "@/lib/db/chunks";
+import { createChunk, getChunk, hasEnglish, saveGuessAndEnglish } from "@/lib/db/chunks";
 import { getSettings } from "@/lib/db/settings";
 import { enabledLanguages } from "@/lib/languages";
 import { getChunkContent } from "@/lib/talk/chunk-content";
@@ -55,6 +55,10 @@ export async function submitGuess(id: string, guess: string) {
 
   const row = await getChunk(user.id, id);
   if (!row) redirect("/talk");
+  // 화면만이 아니라 여기서도 본다 — 액션은 화면을 거치지 않고도 불린다.
+  // 막는 것 둘: 첫 추측이 덮이는 것(유실), 그리고 영어 문장을 **다시 만드는 것**. 이미 듣고 따라
+  // 말한 덩어리가 발밑에서 바뀌면 "같은 덩어리 5회차" 를 잴 수 없다 (docs/SPEC.md 9장).
+  if (row.meta.guess !== undefined || hasEnglish(row)) redirect(`/talk/${id}`);
 
   const { content, source } = await getChunkContent(row.situation);
   await saveGuessAndEnglish(user.id, id, line, {

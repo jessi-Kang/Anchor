@@ -70,6 +70,10 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
     const card = await getCard(user.id, id);
     if (!card) notFound();
     if (scene >= 4 && !card.revealed_at) redirect(`/cards/${id}/3`);
+    // 반대쪽도 막는다. 정답을 본 뒤 Scene3 으로 돌아오면 빈 추측 칸이 다시 서서 "저장이 안 됐나" 로
+    // 읽힌다. 쓴 값이 지워지지는 않지만(saveGuess 가 revealed_at IS NULL 일 때만 쓴다) 화면이
+    // 거짓을 말한다. 추측이 끝난 카드에서 Scene3 은 할 일이 없으므로 정답으로 보낸다.
+    if (scene === 3 && card.revealed_at) redirect(`/cards/${id}/4`);
     const ctx = await cardContext(user.id, card);
     p = card.payload;
     where = ctx.where;
