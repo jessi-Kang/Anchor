@@ -78,7 +78,9 @@ export default async function ReadPage({
     <Screen where={name} up={`/inputs/${id}`} aside={preview ? "점심 12:37" : nowKST()} fixed={fixed === "1"}>
       <Space h={20} />
       <Card>
-        <Label>{name}</Label>
+        {/* 화면마다 h1 하나 (CLAUDE.md). 상단 "지금 어디" 라벨은 제목이 아니다 — 이 화면의 제목은
+            다시 읽는 그 자료의 이름이다. Scene1~5 가 같은 꼴로 카드 라벨을 h1 으로 쓴다. */}
+        <Label as="h1">{name}</Label>
         <div className={s.metBody} lang="ja">
           <MetText body={body} met={met} readings={readings} />
         </div>
