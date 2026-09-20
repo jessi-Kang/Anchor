@@ -91,11 +91,26 @@ export async function POST(req: Request) {
     }
   }
 
-  const id = await withUser(user.id, async (tx) => {
+  const saved = await withUser(user.id, async (tx) => {
+    const column = cardId ? "card_id" : "chunk_id";
     const { rows: prev } = await tx.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM recordings WHERE user_id = $1 AND ${cardId ? "card_id" : "chunk_id"} = $2`,
+      `SELECT count(*)::text AS n FROM recordings WHERE user_id = $1 AND ${column} = $2`,
       [user.id, ownId],
     );
+    /*
+      **기준선은 1회차에 뽑은 곡선으로 고정한다** (docs/MEASURE.md 2장). 브라우저는 회차마다 TTS 를
+      새로 받아 곡선을 다시 만드는데, 같은 문장이어도 호출마다 오디오가 달라질 수 있다. 그러면
+      1회차와 5회차가 **다른 소리**를 기준으로 재게 되고, 거리가 줄어든 것이 발음이 나아져서인지
+      TTS 가 달라져서인지 구분할 수 없다. 기준선이 움직이면 그 비교는 아무 말도 안 한다.
+      그래서 이 대상에 이미 기준선이 있으면 이번에 보낸 것을 버리고 그것을 쓴다.
+    */
+    const { rows: base } = await tx.query<{ target_pitch: unknown }>(
+      `SELECT target_pitch FROM recordings
+        WHERE user_id = $1 AND ${column} = $2 AND target_pitch IS NOT NULL
+        ORDER BY created_at LIMIT 1`,
+      [user.id, ownId],
+    );
+    const target = base[0]?.target_pitch ?? targetPitch;
     const { rows } = await tx.query<{ id: string }>(
       `INSERT INTO recordings (user_id, card_id, chunk_id, attempt, pitch, target_pitch, duration_ms, audio_object_key, audio_expires_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
@@ -105,13 +120,13 @@ export async function POST(req: Request) {
         ownChunkId,
         Number(prev[0]?.n ?? 0) + 1,
         JSON.stringify(pitch),
-        targetPitch ? JSON.stringify(targetPitch) : null,
+        target ? JSON.stringify(target) : null,
         Number.isFinite(durationMs) ? Math.round(durationMs) : null,
         audioKey,
         expiresAt,
       ],
     );
-    return rows[0].id;
+    return { id: rows[0].id, target: Boolean(target) };
   });
-  return Response.json({ ok: true, id, audio_saved: Boolean(audioKey), target_saved: Boolean(targetPitch) });
+  return Response.json({ ok: true, id: saved.id, audio_saved: Boolean(audioKey), target_saved: saved.target });
 }
