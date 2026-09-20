@@ -8,10 +8,21 @@ import { isDesignPreview } from "@/lib/design-preview";
  */
 const protect = auth.middleware({ loginUrl: "/" });
 
-export default function proxy(...args: Parameters<typeof protect>) {
+export default async function proxy(...args: Parameters<typeof protect>) {
   // 디자인 미리보기(로컬 pnpm design:check 전용)에서는 세션 없이 화면을 찍는다. 배포에서는 켜지지 않는다.
   if (isDesignPreview()) return NextResponse.next();
-  return protect(...args);
+  const res = await protect(...args);
+  // 로그인 뒤 원래 가려던 곳으로 (FLOW 6장). 로그인 화면으로 보내는 응답에만 next 를 붙인다.
+  const location = res.headers.get("location");
+  const req = args[0];
+  if (location && req && req.method === "GET" && !req.nextUrl.pathname.startsWith("/api/")) {
+    const to = new URL(location, req.url);
+    if (to.origin === req.nextUrl.origin && to.pathname === "/" && !to.searchParams.has("next")) {
+      to.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search);
+      res.headers.set("location", to.toString());
+    }
+  }
+  return res;
 }
 
 export const config = {

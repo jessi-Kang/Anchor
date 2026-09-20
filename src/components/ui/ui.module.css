@@ -31,6 +31,14 @@
   font-weight: 500;
   color: var(--color-text3);
 }
+/* 상단 라벨이 한 단계 위 링크일 때. 모양은 같고, 탭 영역만 44px 로 넓힌다 */
+.topUp {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -15px 0;
+  color: inherit;
+}
 
 .progress {
   display: flex;
@@ -98,8 +106,13 @@
   padding: 16px 0;
   border-bottom: 1px solid var(--color-line);
 }
-.row:last-child {
+.row:last-child,
+.card > :last-child > .row:last-child {
   border-bottom: 0;
+}
+/* 행을 form 으로 감쌀 때(서버 액션 제출) 행 목록 모양을 유지한다 */
+.card > form {
+  display: contents;
 }
 .rowText {
   display: flex;
@@ -177,44 +190,7 @@
   cursor: pointer;
 }
 
-/* ── 온보딩에서 추가된 뼈대 ─────────────────────────────────────────────────── */
-
-/* 목록 카드 안의 묶음 (O02 언어별 칩 묶음) */
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--color-line);
-}
-.groupTitle {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--color-text1);
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.chip {
-  font-size: var(--font-size-body);
-  font-weight: 500;
-  padding: 10px 14px;
-  border-radius: var(--radius-pill);
-  background: var(--color-card);
-  color: var(--color-text1);
-  border: 1px solid var(--color-line);
-  font-family: inherit;
-  cursor: pointer;
-  line-height: normal;
-}
-.chipOn {
-  background: var(--color-tint);
-  color: var(--color-accent-dark);
-  border-color: var(--color-tint);
-}
+/* ── 가나·판정·상태 뼈대 ───────────────────────────────────────────────────── */
 
 /* 3열 타일 (O03 가나) */
 .tiles {
@@ -286,61 +262,10 @@
   width: auto;
 }
 
-/* 뒤집는 카드 (O04) */
-.flip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 0;
-  text-align: center;
-  cursor: pointer;
-  user-select: none;
-}
-.flipWord {
-  font-size: 40px;
-  font-weight: 700;
-  color: var(--color-text1);
-}
-.flipHint {
-  font-size: var(--font-size-body);
-  color: var(--color-text3);
-}
-.flipDef {
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 1.5;
-  color: var(--color-text1);
-}
-.flipExample {
-  font-size: var(--font-size-body);
-  line-height: 1.6;
-  color: var(--color-text2);
-}
-
 .logoMark {
   display: block;
   width: 72px;
   height: 72px;
-}
-
-/* 씨앗 카드 앞면이 한자일 때 (44~132px 범위, 여기선 84px) */
-.flipKanji {
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
-  font-size: 84px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--color-text1);
-}
-/* 한국어 앵커 한 줄: 설명이 아니라 아는 소리를 부르는 용도라 배경 틴트로 표시 */
-.flipAnchor {
-  font-size: var(--font-size-label);
-  font-weight: 500;
-  padding: 5px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--color-tint);
-  color: var(--color-accent-dark);
 }
 
 /* 행이 링크·버튼일 때: 모양은 같은 행, 색·정렬만 물려받는다 */
@@ -372,4 +297,286 @@ a.row,
 .topLink:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* F02 붙여넣기 상자. 참고 HTML 의 "붙여넣은 글" 본문(일본어 16px, 줄간 1.8)과 같은 글자로 */
+.paste {
+  width: 100%;
+  min-height: 176px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  resize: vertical;
+  font-family: var(--font-jp), var(--font-kr), "Noto Sans JP", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.8;
+  color: var(--color-text1);
+  outline: none;
+}
+.paste::placeholder {
+  color: var(--color-text3);
+  font-weight: 400;
+}
+
+/* 일본어 글자. 행 제목(18px) / 44px / 132px, 카드 출처 문장 30px */
+.ja {
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-weight: 700;
+}
+.jaMd {
+  font-size: var(--font-size-kanji-sm);
+  line-height: 1;
+}
+.jaLg {
+  font-size: 84px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.jaXl {
+  font-size: var(--font-size-kanji-lg);
+  line-height: 1;
+}
+
+/* 행 안의 작은 선택 (알아 / 몰라). 알약과 같은 크기, 누를 수 있다 */
+.choiceRow {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+.choice {
+  font: inherit;
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  color: var(--color-text2);
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  cursor: pointer;
+  min-height: 32px;
+}
+.choiceOn {
+  color: var(--color-accent-dark);
+  background: var(--color-tint);
+  border-color: var(--color-tint);
+}
+.choice:disabled {
+  opacity: 0.6;
+}
+
+/* ── 발견 카드 (F04 · Scene1~5 · F10 · F11) ─────────────────────────────────── */
+
+/* 가운데 세로 묶음 (참고 HTML: align-items center, text-align center) */
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+.centerWide {
+  gap: 18px;
+}
+
+/* 출처 문장 30px (F04) */
+.source {
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--color-text1);
+}
+
+/* 24px 굵은 제목 (Scene1·2 질문) */
+.ask {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text1);
+}
+
+/* 부품 타일 116px + ×n 배지 (Scene2) */
+.parts {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.partTile {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  border-radius: var(--radius-tile);
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-size: 68px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text1);
+}
+.partTileSm {
+  width: 92px;
+  height: 92px;
+  font-size: 52px;
+  border-radius: 20px;
+}
+.partBadge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-tint);
+  color: var(--color-accent-dark);
+  font-size: 14px;
+  font-weight: 700;
+}
+.partPlus {
+  font-size: 28px;
+  color: var(--color-text3);
+}
+.partNames {
+  display: flex;
+  gap: 24px;
+  font-size: 14px;
+  color: var(--color-text2);
+}
+
+/* 추측 입력 (Scene3) */
+.guess {
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  height: 64px;
+  padding: 0 18px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-button);
+  background: var(--color-card);
+  color: var(--color-text1);
+  width: 100%;
+  outline: none;
+}
+.guess::placeholder {
+  color: var(--color-text3);
+  font-weight: 400;
+}
+
+/* 정답 타일 200px + 132px 한자 (Scene4) */
+.answerTile {
+  width: 200px;
+  height: 200px;
+  border-radius: 40px;
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.reading {
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--color-accent-dark);
+  line-height: 1;
+}
+.answer {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text1);
+}
+.compare {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.compareKey {
+  color: var(--color-text3);
+}
+.compareGuess {
+  color: var(--color-text2);
+}
+.compareVerdict {
+  color: var(--color-accent-dark);
+  font-weight: 700;
+}
+
+/* 착지 단어 카드 (Scene5) */
+.landing {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.landingWord {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.landingRuby {
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-accent-dark);
+}
+.landingKo {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text2);
+}
+.patternLine {
+  font-size: 14px;
+  color: var(--color-text2);
+  line-height: 1.6;
+}
+.patternKey {
+  font-weight: 700;
+  color: var(--color-text1);
+}
+
+/* F10 말하기 */
+.speakWord {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.speakBig {
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text1);
+}
+.speakReading {
+  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-accent-dark);
+}
+.legend {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--color-text2);
+}
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legendLine {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+}
+.legendDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-sizing: border-box;
 }
