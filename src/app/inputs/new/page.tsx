@@ -42,7 +42,10 @@ export default async function NewInputPage({ searchParams }: { searchParams: Pro
       <Space h={28} />
       <Title lg>무엇이든 붙여넣어</Title>
       <Space h={6} />
-      <Lead>기사 링크, 이메일, 슬라이드, 릴스. 브라우저 공유 버튼으로도 들어와.</Lead>
+      {/* 공유 버튼 이야기는 뺐다 — 공유 타깃(manifest 의 share_target)이 아직 없어서,
+          첫 방문 세 번째 화면에서 읽은 사람이 기사 앱의 공유 시트를 열었다가 빈손으로 돌아온다.
+          실제로 생기는 날 되살린다. */}
+      <Lead>기사 링크, 이메일, 슬라이드, 릴스.</Lead>
       <Space h={22} />
       {esOnly && (
         <>
