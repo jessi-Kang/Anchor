@@ -12,11 +12,11 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | --- | --- | --- | --- | --- |
 | **Anchor · PM (조율)** | 결정·우선순위·통합 순서·완결 판정. 코드/디자인/기획 문서를 직접 고치지 않는다 | `docs/TEAM.md` | `claude/affectionate-brahmagupta-947f48` | `session_01QPJ4i1hJ5zENanv7ykjp1t` |
 | **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도, 제품 원칙 | `CLAUDE.md` · `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` | (세션 생성 시 할당) | `session_01YJ3vydkSn54KDcf69rC6Vp` |
-| **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | (세션 생성 시 할당) | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
+| **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | `claude/docs-status-7t3m1a` | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
 | **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_019gYCLNic9TA9jvmQikfhfk` |
 | **Anchor · QA** | 검증 플로우를 만들고, 돌려 보고, 판정한다. **코드를 고치지 않는다** | `docs/QA.md` | `claude/optimistic-hopper-kaafdu` | `session_01QxSgxQRsFT1grCVZrxTEhi` |
-| ~~Anchor · 버그픽스~~ | 개발로 통합, 종료. 브랜치만 남긴다 | — | `claude/gallant-clarke-qt36ez` | `session_01ANSrRXJkcbqr7SwicPUVpM` |
+| ~~Anchor · 버그픽스~~ | 개발로 통합, 종료. 고친 것이 없어 브랜치도 버린다 | — | — | `session_01ANSrRXJkcbqr7SwicPUVpM` |
 
 모든 세션에 `anchor` 태그가 붙어 있다. 명단을 다시 볼 때는 `list_sessions(tags=["anchor"])`.
 
@@ -121,3 +121,6 @@ Jessi 가 결정할 것은 돈이 들거나(유료 플랜·외부 계정), 제�
 | 복구 리허설 | PM 이 임시 Neon 브랜치에 수행한다. 프로덕션 브랜치는 건드리지 않는다 |
 | 완결 판정 | QA 가 검증 플로우를 돌려 판정하고, 그 결과를 PM 과 기획이 보고 완결을 판단한다. Jessi 의 확인을 따로 기다리지 않는다 |
 | API 키 | `ANTHROPIC_API_KEY` · `ELEVENLABS_API_KEY` 는 Jessi 가 Vercel 에 직접 넣는다. 키 값은 채팅·커밋·문서 어디에도 쓰지 않는다 |
+| 가나를 못 읽을 때 | 한자 카드를 잠그지 않는다. 예고 1장을 보이고 그대로 카드로 보낸다. 읽기는 F10 에서 소리로 들려준다 |
+| PITR 기간이 적힌 곳 | `docs/BACKUP.md` 한 곳. 다른 문서는 숫자를 쓰지 않고 이 문서를 가리킨다 |
+| 만드는 순서 | `docs/TEAM.md` 4장이 정한다. `docs/SPEC.md` 9장은 무엇을 검증하는가를 정하고 순서를 정하지 않는다 |
