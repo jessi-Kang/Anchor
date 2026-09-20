@@ -32,6 +32,23 @@ function findChromium(): string | undefined {
   return undefined;
 }
 
+/**
+ * 화면에 쓰면 안 되는 내부 용어. 우리끼리 쓰는 말이지 사용자가 배운 적 없는 말이다
+ * (`CLAUDE.md` 하지 않는 것 · `design/SCREENS.md`). 픽셀 비교로는 못 잡는 종류라 여기 둔다 —
+ * `design:diff` 는 라우트로 부를 수 있는 화면만 보는데 S01~S04 는 일본어 카드와 라우트를
+ * 나눠 써서 닿지 않고, 닿는 화면도 낱말 하나 차이는 순위 아래쪽에 묻힌다.
+ */
+const INTERNAL = ["재만남", "씨앗", "노드", "앵커", "그래프에 심는"];
+
+/**
+ * "덩어리"도 내부 용어다 — 화면에서는 "이 말"이라고 쓴다(`design/SCREENS.md`).
+ * 다만 아래 다섯 장이 아직 옛말을 쓰고 있고 **바꿀 문구를 UX 가 들고 있다.**
+ * 고칠 수 없는 것으로 검사를 빨갛게 만들면 QA 가 매 라운드 같은 줄을 넘기게 되고,
+ * 그때부터 이 검사 전체가 넘기는 것이 된다. 그래서 여기 있는 동안은 세어서 알려만 준다.
+ * **문구가 오면 이 목록을 지운다** — 목록이 비면 "덩어리"도 그냥 INTERNAL 이 된다.
+ */
+const CHUNK_PENDING = ["F15", "S01", "S02", "S03", "S04"];
+
 async function main() {
   const picked = process.argv.slice(2);
   const ids = readdirSync(DIR)
@@ -42,6 +59,7 @@ async function main() {
   const browser = await chromium.launch({ executablePath: findChromium() });
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const problems: string[] = [];
+  const pending: string[] = [];
 
   for (const id of ids) {
     const page = await ctx.newPage();
@@ -50,7 +68,9 @@ async function main() {
     await page.evaluate(() => document.fonts.ready);
 
     const found = await page.evaluate((tapMin) => {
-      const frame = document.body.firstElementChild as HTMLElement;
+      // 화면 틀은 390×844 인 div 다. `body.firstElementChild` 를 쓰다가 <link> 를 집고 있었다 —
+      // 넘침은 documentElement 쪽 조건이 대신 잡아 줘서 표가 안 났고, 본문 글자를 읽으려니 그제야 빈 값이 나왔다.
+      const frame = (document.querySelector('div[style*="height: 844px"]') ?? document.body) as HTMLElement;
       const links = [...document.querySelectorAll("a")].filter((a) => !a.href.includes("fonts.g"));
       const tappable = [...document.querySelectorAll("a, button, [role=button], [data-tap]")].filter(
         (el) => !(el instanceof HTMLAnchorElement) || !el.href.includes("fonts.g"),
@@ -63,6 +83,7 @@ async function main() {
             return { text: (el.textContent || "").trim().slice(0, 14), h: Math.round(r.height), w: Math.round(r.width) };
           })
           .filter((x) => x.h < tapMin || x.w < tapMin),
+        text: (frame.innerText || "").replace(/\s+/g, " "),
         hrefs: links.map((a) => a.getAttribute("href") || ""),
         primary: links.filter((a) => /background: #2A2D33/.test(a.getAttribute("style") || "")).length,
       };
@@ -74,10 +95,17 @@ async function main() {
       if (!existsSync(path.join(DIR, href))) problems.push(`${id}: 없는 화면으로 간다 — ${href}`);
     }
     if (found.primary > 1) problems.push(`${id}: 주 버튼이 ${found.primary}개 (화면당 1개)`);
+    for (const w of INTERNAL) {
+      if (found.text.includes(w)) problems.push(`${id}: 화면에 내부 용어 "${w}" 가 있다`);
+    }
+    if (found.text.includes("덩어리")) (CHUNK_PENDING.includes(id) ? pending : problems).push(`${id}: 화면에 내부 용어 "덩어리" 가 있다`);
     await page.close();
   }
 
   await browser.close();
+  if (pending.length) {
+    console.log(`아직 못 고친 것 (${pending.length}장) — 바꿀 문구를 기다리는 중이라 세기만 한다\n${pending.join("\n")}\n`);
+  }
   if (problems.length) {
     console.error(problems.join("\n"));
     process.exit(1);
