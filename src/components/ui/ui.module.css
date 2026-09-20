@@ -338,10 +338,16 @@ a.row,
   font-weight: 400;
 }
 
-/* 일본어 글자. 행 제목(18px) / 44px / 132px, 카드 출처 문장 30px */
+/* 일본어 글자. 목록 행(30px) / 44px / 84px / 132px, 카드 출처 문장 30px */
 .ja {
   font-family: var(--font-jp), "Noto Sans JP", sans-serif;
   font-weight: 700;
+}
+/* 뽑기(F03) 행의 한자. 행 제목 크기(18px)로 두면 한글 부제와 구별이 안 가고 참고 화면보다 작다.
+   크게 보여 주는 자리가 아니라 목록이므로 44px 이 아니라 30px 이다 (design/screens/F03.html). */
+.jaSm {
+  font-size: 30px;
+  line-height: 1;
 }
 .jaMd {
   font-size: var(--font-size-kanji-sm);
