@@ -154,6 +154,10 @@ export function PitchLoop({
       if ("card" in target) form.set("card_id", target.card);
       else form.set("chunk_id", target.chunk);
       form.set("pitch", JSON.stringify(curve));
+      // 이 회차가 **겨눈 상대**. 원어민 음성을 들었으면 그 곡선이고, 없었으면 안 보낸다 —
+      // 없었다는 사실도 값이라 억지로 내 앞 회차를 채워 넣지 않는다. 나중에 일치도를 계산할 때
+      // 겨눈 상대가 무엇이었는지가 남아 있어야 한다 (api/recordings/route.ts).
+      if (native?.length) form.set("target_pitch", JSON.stringify(native));
       form.set("duration_ms", String(durationMs));
       form.set("audio", blob, "voice.webm");
       const res = await fetch("/api/recordings", { method: "POST", body: form });
