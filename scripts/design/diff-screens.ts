@@ -15,7 +15,7 @@
  */
 import { mkdirSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
-import { chromium } from "playwright-core";
+import { chromium, type BrowserContext } from "playwright-core";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
 
@@ -61,11 +61,22 @@ const SKIP: Record<string, string> = {
   F14a: "같은 라우트의 다른 상태(원어민 소리 없음)",
   X01: "라우트가 아니라 not-found 화면",
   X02: "라우트가 아니라 error 화면",
-  E01: "영어 축 — 아직 구현 없음", E02: "영어 축 — 아직 구현 없음",
-  E03: "영어 축 — 아직 구현 없음", E04: "영어 축 — 아직 구현 없음",
-  E05: "영어 축 — 아직 구현 없음", E06: "영어 축 — 아직 구현 없음",
-  S01: "스페인어 축 — 아직 구현 없음", S02: "스페인어 축 — 아직 구현 없음",
-  S03: "스페인어 축 — 아직 구현 없음", S04: "스페인어 축 — 아직 구현 없음",
+  // E·S 는 **없는 화면이 아니다.** 영어 어근 카드(E01~E06)와 스페인어 소리 카드(S01~S04)는
+  // 일본어 카드와 같은 라우트를 쓴다 — `/cards/[id]`, `/cards/[id]/1..5`, `/cards/[id]/speak`
+  // (docs/SITEMAP.md). 언어는 라우트가 아니라 데이터 속성이라 URL 로 "영어 카드"를 부를 수 없고,
+  // 디자인 미리보기가 내는 카드가 일본어 하나뿐이라 여기서는 맞대어 볼 수가 없다.
+  // 미리보기가 언어를 고를 수 있게 되면 그날 SKIP 에서 빠지고 ROUTES 로 옮겨 간다.
+  // (못 한 말 축 F13·F17·F14 는 이것과 다른 축이고 제 라우트가 있어서 위에서 돌고 있다.)
+  E01: "영어 어근 카드 — `/cards/[id]` 를 F04 와 나눠 쓴다. 미리보기가 일본어 카드만 낸다",
+  E02: "영어 어근 카드 — `/cards/[id]/1..5` 를 Scene1~5 와 나눠 쓴다",
+  E03: "영어 어근 카드 — 같은 장면 라우트",
+  E04: "영어 어근 카드 — 같은 장면 라우트",
+  E05: "영어 어근 카드 — 같은 장면 라우트",
+  E06: "영어 어근 카드 — `/cards/[id]/speak` 를 F10 과 나눠 쓴다",
+  S01: "스페인어 소리 카드 — `/cards/[id]` 를 F04 와 나눠 쓴다. 미리보기가 일본어 카드만 낸다",
+  S02: "스페인어 소리 카드 — `/cards/[id]/1..5` 를 Scene1~5 와 나눠 쓴다",
+  S03: "스페인어 소리 카드 — 같은 장면 라우트",
+  S04: "스페인어 소리 카드 — `/cards/[id]/speak` 를 F10 과 나눠 쓴다",
 };
 
 function findChromium(): string | undefined {
@@ -78,6 +89,30 @@ function findChromium(): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * 참고·구현·차이를 **한 장**으로 남긴다(`.design-check/<ID>.png`). 세 파일을 매번 나란히 붙여
+ * 놓고 봐야 했다 — 여는 값이 보는 값보다 크면 안 본다. 이름이 짧은 쪽이 먼저 여는 것이다:
+ * `<ID>.png` 가 세 칸짜리, `<ID>-ref/-app/-diff.png` 는 한 칸을 크게 볼 때 쓴다.
+ * 칸 이름을 그림 안에 넣는 건 브라우저로 그리기 때문이다 — 픽셀로 글자를 찍는 것보다 싸다.
+ */
+async function writeStrip(ctx: BrowserContext, id: string, ref: Buffer, app: Buffer, diff: Buffer) {
+  const src = (b: Buffer) => `data:image/png;base64,${b.toString("base64")}`;
+  const cell = (label: string, b: Buffer) =>
+    `<figure style="margin:0"><figcaption style="font:500 13px 'Noto Sans KR',sans-serif;color:#6B7078;padding-bottom:8px">${label}</figcaption>` +
+    `<img src="${src(b)}" width="${W}" height="${H}" style="display:block;border:1px solid #E6E7EA;border-radius:4px"></figure>`;
+  const page = await ctx.newPage();
+  await page.setContent(
+    `<body style="margin:0;background:#F6F6F7"><div id="s" style="display:inline-flex;gap:16px;padding:20px">` +
+      cell(`참고 ${id}`, ref) +
+      cell("구현", app) +
+      cell("다른 픽셀", diff) +
+      `</div></body>`,
+  );
+  const strip = await page.locator("#s").screenshot();
+  writeFileSync(path.join(outDir, `${id}.png`), strip);
+  await page.close();
 }
 
 async function main() {
@@ -124,7 +159,9 @@ async function main() {
     const b = PNG.sync.read(appPng);
     const diff = new PNG({ width: W, height: H });
     const n = pixelmatch(a.data, b.data, diff.data, W, H, { threshold: 0.1 });
-    writeFileSync(path.join(outDir, `${id}-diff.png`), PNG.sync.write(diff));
+    const diffPng = PNG.sync.write(diff);
+    writeFileSync(path.join(outDir, `${id}-diff.png`), diffPng);
+    await writeStrip(ctx, id, refPng, appPng, diffPng);
     rows.push({ id, pct: (n / (W * H)) * 100 });
   }
 
@@ -132,7 +169,7 @@ async function main() {
 
   rows.sort((x, y) => y.pct - x.pct);
   console.log(`\n참고 화면과 구현의 차이 — 큰 순서 (${rows.length}장, ${base})\n`);
-  for (const r of rows) console.log(`  ${r.pct.toFixed(2).padStart(6)}%  ${r.id.padEnd(8)} .design-check/${r.id}-diff.png`);
+  for (const r of rows) console.log(`  ${r.pct.toFixed(2).padStart(6)}%  ${r.id.padEnd(8)} .design-check/${r.id}.png`);
 
   if (unreachable.length) {
     console.log(`\n맞대어 보지 못한 것 (${unreachable.length}장)\n`);
