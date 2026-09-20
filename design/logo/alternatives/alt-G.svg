@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 400 100">
+<text x="8" y="70" font-family="Noto Sans KR, sans-serif" font-size="64" font-weight="700" fill="#2A2D33" letter-spacing="-2">anch</text>
+<circle cx="172" cy="50" r="19" fill="#5C7CB0"/>
+<text x="196" y="70" font-family="Noto Sans KR, sans-serif" font-size="64" font-weight="700" fill="#2A2D33" letter-spacing="-2">r</text>
+<path d="M172 69 V82 A12 12 0 0 0 196 82" fill="none" stroke="#2A2D33" stroke-width="7" stroke-linecap="round"/>
+</svg>
