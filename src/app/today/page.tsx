@@ -1,22 +1,27 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { ensureUser } from "@/lib/db/users";
-import { getSettings } from "@/lib/db/onboarding";
+import { finishOnboarding, getOnboardingState } from "@/lib/db/onboarding";
+import { activeLanguages, pendingSteps, STEP_PATH, LANG_LABEL } from "@/lib/onboarding-flow";
 import { Screen, Space, Title, Lead, Card, Label, Row, Pill, Grow, Button, Ghost } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 /**
  * `/today` — F01 홈. 문구·뼈대는 design/screens/F01.html. 큐 데이터는 5·6단계(인풋 레이어)에서 붙는다.
- * 지금은 로그인 → users 행 생성 → 세션 확인까지.
+ * 켠 언어에 필요한 온보딩 단계가 남아 있으면 그쪽으로 보낸다 (언어를 나중에 추가한 경우 포함).
  */
 export default async function TodayPage() {
   const user = await currentUser();
   if (!user) redirect("/");
   await ensureUser(user);
-  const { onboarded_at } = await getSettings(user.id);
-  if (!onboarded_at) redirect("/onboarding/purpose");
 
+  const state = await getOnboardingState(user.id);
+  const pending = pendingSteps(state.settings);
+  if (pending.length) redirect(STEP_PATH[pending[0]]);
+  if (!state.onboarded_at) await finishOnboarding(user.id);
+
+  const langs = activeLanguages(state.settings);
   const now = new Date().toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
 
   return (
@@ -28,11 +33,15 @@ export default async function TodayPage() {
       <Space h={22} />
       <Card>
         <Label>인풋</Label>
-        <Row title="아직 없어" sub={user.email} right={<Pill>0분</Pill>} />
+        <Row
+          title="아직 없어"
+          sub={langs.map((l) => LANG_LABEL[l]).join(" · ")}
+          right={<Pill>0분</Pill>}
+        />
       </Card>
       <Grow />
       <Button href="/inputs/new">자료 넣기</Button>
-      <Ghost href="/api/export">전체 내보내기</Ghost>
+      <Ghost href="/settings">설정</Ghost>
     </Screen>
   );
 }

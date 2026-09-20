@@ -2,9 +2,10 @@ import { withUser } from "@/lib/db";
 
 /**
  * 온보딩 데이터 (O02~O04). 수준을 묻지 않는다. 기록하는 것은 전부 "상황"과 "행동"이다.
- *  - purposes: 언어별로 고른 상황 (O02)
- *  - kana: 가나 6개 마이크 인식 결과 (O03)
- *  - seed: 영어 씨앗 카드 판정 → user_node_state (O04)
+ *  - purposes: 언어별로 고른 상황 (O02). 상황이 하나라도 있으면 그 언어가 "켜진" 것.
+ *  - kana: 가나 6개 마이크 인식 결과 (O03, 일본어를 켰을 때만)
+ *  - seed: 영어 씨앗 카드 판정 → user_node_state (O04, 영어·스페인어를 켰을 때만)
+ * 언어는 세트가 아니라 하나씩 켠다. 어느 단계가 남았는지는 src/lib/onboarding-flow.ts 가 정한다.
  */
 
 export type Lang3 = "en" | "ja" | "es";
@@ -16,6 +17,8 @@ export type UserSettings = {
   kana?: KanaResult;
   /** 가나를 못 읽어 가나 모듈(v2)로 분기해야 하는 사용자 */
   kana_module?: boolean;
+  /** 씨앗 단계를 끝냈거나 "여기까지"로 넘긴 시각 */
+  seed?: { finished_at: string };
 };
 
 export async function getSettings(userId: string): Promise<{ settings: UserSettings; onboarded_at: string | null }> {
@@ -25,6 +28,23 @@ export async function getSettings(userId: string): Promise<{ settings: UserSetti
       [userId],
     );
     return rows[0] ?? { settings: {}, onboarded_at: null };
+  });
+}
+
+/** 온보딩 흐름 판단에 필요한 것 한 번에: 설정 + 완료 시각 + 씨앗 판정 유무 */
+export async function getOnboardingState(userId: string) {
+  return withUser(userId, async (tx) => {
+    const { rows } = await tx.query<{ settings: UserSettings; onboarded_at: string | null }>(
+      "SELECT settings, onboarded_at FROM users WHERE id = $1",
+      [userId],
+    );
+    const { rows: seed } = await tx.query<{ n: string }>(
+      `SELECT count(*) AS n FROM user_node_state s JOIN nodes n ON n.id = s.node_id
+       WHERE s.user_id = $1 AND s.source = 'onboarding' AND n.meta->>'seed' = 'en-onboarding'`,
+      [userId],
+    );
+    const row = rows[0] ?? { settings: {}, onboarded_at: null };
+    return { settings: row.settings ?? {}, onboarded_at: row.onboarded_at, seedJudged: Number(seed[0]?.n ?? 0) > 0 };
   });
 }
 
@@ -40,6 +60,10 @@ export function savePurposes(userId: string, purposes: Purposes) {
 
 export function saveKanaResult(userId: string, kana: KanaResult, kanaModule: boolean) {
   return mergeSettings(userId, { kana, kana_module: kanaModule });
+}
+
+export function markSeedFinished(userId: string) {
+  return mergeSettings(userId, { seed: { finished_at: new Date().toISOString() } });
 }
 
 export function finishOnboarding(userId: string) {

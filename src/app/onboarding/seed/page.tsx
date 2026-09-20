@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
-import { getSeedDeck, type SeedNode } from "@/lib/db/onboarding";
+import { getOnboardingState, getSeedDeck, type SeedNode } from "@/lib/db/onboarding";
+import { activeLanguages, pendingSteps, nextPath, stepIndex, totalSteps } from "@/lib/onboarding-flow";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Title, Lead } from "@/components/ui";
 import { SeedDeck } from "./seed-deck";
@@ -15,11 +16,12 @@ const PREVIEW_DECK: SeedNode[] = Array.from({ length: 40 }, (_, i) => ({
   example: "a retrospective looks back at what happened",
 }));
 
-/** `/onboarding/seed` — O04 */
+/** `/onboarding/seed` — O04. 영어 또는 스페인어를 켠 사용자만 (스페인어는 영어 어근 위에 선다). */
 export default async function SeedPage({ searchParams }: { searchParams: Promise<{ fixed?: string }> }) {
   const { fixed } = await searchParams;
   let deck: SeedNode[];
   let judged: Record<string, boolean> = {};
+  let where = "3 / 3";
   const preview = isDesignPreview();
 
   if (preview) {
@@ -29,11 +31,18 @@ export default async function SeedPage({ searchParams }: { searchParams: Promise
   } else {
     const user = await currentUser();
     if (!user) redirect("/");
+    const state = await getOnboardingState(user.id);
+    const langs = activeLanguages(state.settings);
+    // 영어·스페인어를 안 켰거나 이미 끝낸(또는 "여기까지"로 넘긴) 단계면 다음으로
+    if (!pendingSteps(state.settings).includes("seed")) {
+      redirect(nextPath(state.settings, "seed"));
+    }
+    where = `${stepIndex("seed", langs)} / ${totalSteps(langs)}`;
     ({ deck, judged } = await getSeedDeck(user.id));
   }
 
   return (
-    <Screen where="3 / 3" fixed={fixed === "1"}>
+    <Screen where={where} fixed={fixed === "1"}>
       <Space h={24} />
       <Title>
         뜻을 먼저 떠올리고

@@ -1,0 +1,45 @@
+import { redirect } from "next/navigation";
+import { currentUser } from "@/lib/auth/server";
+import { getOnboardingState } from "@/lib/db/onboarding";
+import { activeLanguages, LANGS, LANG_LABEL } from "@/lib/onboarding-flow";
+import { Screen, Space, Title, Card, Label, Row, Pill, Grow, Button, Ghost } from "@/components/ui";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * `/settings` — SITEMAP: 계정, 전체 내보내기(JSON), 계정 삭제, 음성 보관 기간, 항목별 공개, 목소리 선택.
+ * 지금은 언어(하나씩 켜기)와 내보내기만. 나머지는 해당 기능이 생길 때 붙인다.
+ */
+export default async function SettingsPage() {
+  const user = await currentUser();
+  if (!user) redirect("/");
+  const { settings } = await getOnboardingState(user.id);
+  const active = activeLanguages(settings);
+
+  return (
+    <Screen where="설정">
+      <Space h={28} />
+      <Title lg>설정</Title>
+      <Space h={22} />
+      <Card>
+        <Label>언어</Label>
+        {LANGS.map((l) => (
+          <Row
+            key={l}
+            title={LANG_LABEL[l]}
+            sub={active.includes(l) ? settings.purposes?.[l].join(" · ") : "아직 안 켰어"}
+            right={<Pill on={active.includes(l)}>{active.includes(l) ? "켜짐" : "꺼짐"}</Pill>}
+          />
+        ))}
+      </Card>
+      <Space h={10} />
+      <Card>
+        <Label>계정</Label>
+        <Row title={user.email} sub="Google 로그인 · 기본 비공개" />
+      </Card>
+      <Grow />
+      <Button href="/onboarding/purpose">언어 켜기 · 바꾸기</Button>
+      <Ghost href="/api/export">전체 내보내기 (JSON)</Ghost>
+    </Screen>
+  );
+}
