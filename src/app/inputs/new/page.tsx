@@ -40,7 +40,7 @@ export default async function NewInputPage({ searchParams }: { searchParams: Pro
       <Space h={28} />
       <Title lg>무엇이든 붙여넣어</Title>
       <Space h={6} />
-      <Lead>{lang === "ja" ? "기사, 문장, 한국어 한자어 한 단어도 돼." : "이메일, 슬라이드, 회의에서 들은 문장 한 줄도 돼."}</Lead>
+      <Lead>기사 링크, 이메일, 슬라이드, 릴스. 브라우저 공유 버튼으로도 들어와.</Lead>
       <Space h={22} />
       {esOnly && (
         <>

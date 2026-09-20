@@ -33,9 +33,9 @@ function toHiragana(s: string) {
 type State = "idle" | "listening" | "off" | "unsupported" | "denied";
 
 /**
- * 마이크는 "읽기 시작"을 누른 뒤에만 켠다. 켜져 있으면 점과 알약으로 보이고, 알약을 탭하면 끈다 (FLOW 4장).
- * 미지원·거부는 통과가 아니라 "다음에 다시 확인"으로 저장되고 카드로 간다 (자기 보고 통과 금지).
- * 이탈은 하나: "못 읽겠어, 가나부터 시작할래" → locked.
+ * O03(마이크 꺼짐) → O03a(듣는 중). 마이크는 "읽기 시작"을 누른 뒤에만 켠다. 켜져 있으면 점과 "마이크 끄기"로 보인다 (FLOW 4장).
+ * 미지원·거부는 통과가 아니라 recheck 로 저장하고 O03b(마이크 문구) 1장 뒤 카드로 (자기 보고 통과 금지).
+ * 이탈은 하나: "못 읽겠어" → module → O03b 예고 1장 → 카드. 문구는 O03.html · O03a.html 그대로.
  */
 export function KanaCheck({ kana, preview, next }: { kana: Kana[]; preview: boolean; next: string }) {
   const [heard, setHeard] = useState<Set<string>>(() => new Set(preview ? kana.slice(0, 4).map((k) => k.say) : []));
@@ -62,6 +62,7 @@ export function KanaCheck({ kana, preview, next }: { kana: Kana[]; preview: bool
     const Ctor = getRecognition();
     if (!Ctor) {
       setState("unsupported");
+      submitNow(false);
       return;
     }
     const rec = new Ctor();
@@ -82,6 +83,7 @@ export function KanaCheck({ kana, preview, next }: { kana: Kana[]; preview: bool
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         recRef.current = null;
         setState("denied");
+        submitNow(false);
       }
     };
     // 브라우저가 침묵 후 끊으면 다시 켠다 (사용자가 끄기 전까지 계속 듣는다)
@@ -101,7 +103,13 @@ export function KanaCheck({ kana, preview, next }: { kana: Kana[]; preview: bool
     } catch {
       recRef.current = null;
       setState("unsupported");
+      submitNow(false);
     }
+  };
+
+  /** 미지원·거부: 마이크 없이 저장(recheck) → O03b 마이크 문구 */
+  const submitNow = (cannotRead: boolean) => {
+    start(() => submitKana({ recognized: heard.size, total: kana.length, supported: false, cannotRead, next }));
   };
 
   const finish = (cannotRead: boolean) => {
@@ -117,17 +125,14 @@ export function KanaCheck({ kana, preview, next }: { kana: Kana[]; preview: bool
     );
   };
 
-  const supported = state !== "unsupported" && state !== "denied";
   const statusText =
     state === "idle"
-      ? "마이크는 읽기 시작을 누르면 켜져"
-      : state === "unsupported"
-        ? "이 브라우저는 마이크 인식을 지원하지 않아. 다음에 다시 확인할게"
-        : state === "denied"
-          ? "마이크를 허용하지 않았어. 다음에 다시 확인할게"
-          : state === "off"
-            ? `마이크 껐어. ${heard.size} / ${kana.length} 인식됨`
-            : `듣는 중. ${heard.size} / ${kana.length} 인식됨`;
+      ? "마이크 꺼짐"
+      : state === "unsupported" || state === "denied"
+        ? "마이크를 쓸 수 없어"
+        : state === "off"
+          ? `마이크 껐어. ${heard.size} / ${kana.length} 인식됨`
+          : `듣는 중. ${heard.size} / ${kana.length} 인식됨`;
 
   return (
     <>
@@ -161,13 +166,15 @@ export function KanaCheck({ kana, preview, next }: { kana: Kana[]; preview: bool
       </Status>
       <Grow />
       {state === "idle" ? (
-        <Button onClick={startMic}>읽기 시작</Button>
+        <Button disabled={pending} onClick={startMic}>
+          읽기 시작
+        </Button>
       ) : (
-        <Button disabled={pending} onClick={() => finish(false)}>
-          {supported ? "다 읽었어" : "카드로"}
+        <Button disabled={pending || state === "unsupported" || state === "denied"} onClick={() => finish(false)}>
+          다 읽었어
         </Button>
       )}
-      <Ghost onClick={() => finish(true)}>못 읽겠어, 가나부터 시작할래</Ghost>
+      <Ghost onClick={() => !pending && finish(true)}>못 읽겠어</Ghost>
     </>
   );
 }

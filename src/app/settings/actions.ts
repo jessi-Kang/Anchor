@@ -2,14 +2,15 @@
 
 import { redirect } from "next/navigation";
 import { auth, requireUser } from "@/lib/auth/server";
-import { disableLanguage } from "@/lib/db/settings";
+import { disableLanguage, enableLanguages } from "@/lib/db/settings";
 import { isLang } from "@/lib/languages";
 
-/** 설정 "언어 끄기". 자료·카드는 남는다. 다시 켜면 이어서. */
-export async function turnOffLanguage(lang: string) {
+/** 설정 언어 행 탭: 켜져 있으면 끄고, 꺼져 있으면 켠다. 자료·카드는 남는다. */
+export async function toggleLanguage(lang: string, on: boolean) {
   if (!isLang(lang)) throw new Error("bad lang");
   const user = await requireUser();
-  await disableLanguage(user.id, lang);
+  if (on) await enableLanguages(user.id, [lang]);
+  else await disableLanguage(user.id, lang);
 }
 
 /** 로그아웃 → 로그인 화면 */

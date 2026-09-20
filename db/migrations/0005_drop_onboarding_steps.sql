@@ -5,7 +5,7 @@
 -- 지우는 것: languages[lang].purposes, steps, kana_module.
 --
 -- kana 는 옛 형태 {recognized,total,passed,supported,checked_at} 에 status 가 없다.
--- passed=true → 'passed', kana_module=true → 'locked', 그 외 → 'recheck' 로 바꿔 새 형태에 맞춘다.
+-- passed=true → 'passed', kana_module=true → 'module', 그 외 → 'recheck' 로 바꿔 새 형태에 맞춘다.
 -- 멱등: 두 번 실행해도 결과가 같다.
 
 UPDATE users
@@ -19,7 +19,7 @@ SET settings = (settings - 'steps'::text - 'kana_module'::text)
        ((settings->'kana') - 'passed'::text) || jsonb_build_object(
          'status',
          CASE WHEN coalesce((settings->'kana'->>'passed')::boolean, false) THEN 'passed'
-              WHEN coalesce((settings->>'kana_module')::boolean, false) THEN 'locked'
+              WHEN coalesce((settings->>'kana_module')::boolean, false) THEN 'module'
               ELSE 'recheck' END))
      ELSE '{}'::jsonb END
 WHERE settings ? 'steps' OR settings ? 'kana_module'

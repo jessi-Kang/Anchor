@@ -7,14 +7,15 @@ import { inputProgress, nextCandidates } from "@/lib/cards/progress";
 import { enabledLanguages, homeRedirect, inputPath, LANG_LABEL } from "@/lib/languages";
 import { eulReul } from "@/lib/ko";
 import { isDesignPreview } from "@/lib/design-preview";
-import { Screen, Space, Title, Lead, Card, Label, Row, Pill, Status, Grow, Button, Ghost } from "@/components/ui";
+import { Screen, Space, Title, Lead, Card, Label, Status, Grow, Button, Ghost } from "@/components/ui";
+import { HomeRows } from "./home-rows";
 
 export const dynamic = "force-dynamic";
 
 /**
- * `/today` — F01 홈. 문구·뼈대는 design/screens/F01.html. docs/FLOW.md 1장 9:
- * 자료 행(한자 n개 · 남은 카드) + 다음 카드 이유 한 줄 + "자료 넣기" / 설정.
- * 빈 상태는 "첫 자료 넣기" 버튼 하나. 리다이렉트는 켠 언어가 0개일 때뿐 (→ 언어 고르기).
+ * `/today` — F01 홈. 뼈대는 design/screens/F01.html, 규칙은 docs/FLOW.md 1′장:
+ * 라벨 "오늘", 자료 행(제목 · "한자 4개 · 남은 카드 3", 시간 없음) + 다음 카드 이유 한 줄 + "자료 넣기" / 설정.
+ * 남은 카드가 있는 행은 "이어서" 알약, 탭 → F04. 빈 상태는 "첫 자료 넣기" 버튼 하나. 리다이렉트는 켠 언어가 0개일 때뿐.
  */
 export default async function TodayPage({ searchParams }: { searchParams: Promise<{ fixed?: string }> }) {
   const { fixed } = await searchParams;
@@ -29,10 +30,14 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <Lead>내가 읽고 들은 것에서만 뽑아. 커리큘럼은 없어.</Lead>
         <Space h={22} />
         <Card>
-          <Label>인풋</Label>
-          <Row title="日経 기사" sub="한자 4개" right={<Pill on>15분</Pill>} />
-          <Row title="수업 슬라이드" sub="어근 2개" right={<Pill>6분</Pill>} />
-          <Row title="어제 못 한 말" sub="1개" right={<Pill>5분</Pill>} />
+          <Label>오늘</Label>
+          <HomeRows
+            rows={[
+              { id: "a", title: "日経 기사", sub: "한자 4개 · 남은 카드 3", next: "協" },
+              { id: "b", title: "수업 슬라이드", sub: "어근 2개", next: null },
+              { id: "c", title: "어제 못 한 말", sub: "1개", next: null },
+            ]}
+          />
         </Card>
         <Grow />
         <Button href="/inputs/new">자료 넣기</Button>
@@ -58,10 +63,6 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <Space h={6} />
         <Lead>내가 읽고 들은 것에서만 뽑아. 커리큘럼은 없어.</Lead>
         <Space h={22} />
-        <Card>
-          <Label>인풋</Label>
-          <Row title="아직 없어" sub={`${langs.map((l) => LANG_LABEL[l]).join(" · ")} 자료를 넣으면 여기서 시작돼`} />
-        </Card>
         <Grow />
         <Button href={inputPath(langs[0])}>첫 자료 넣기</Button>
         <Ghost href="/settings">설정</Ghost>
@@ -92,26 +93,22 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       <Lead>내가 읽고 들은 것에서만 뽑아. 커리큘럼은 없어.</Lead>
       <Space h={22} />
       <Card>
-        <Label>인풋</Label>
-        {rows.map(({ input, kanji, remaining, next }) => {
-          const sub =
-            input.lang !== "ja"
-              ? `${LANG_LABEL[input.lang]} · 뽑기는 다음 단계`
-              : kanji === 0
-                ? "아직 안 뽑았어"
-                : remaining > 0
-                  ? `한자 ${kanji}개 · 남은 카드 ${remaining}`
-                  : `한자 ${kanji}개 · 다 봤어`;
-          return (
-            <Row
-              key={input.id}
-              href={`/inputs/${input.id}`}
-              title={input.title ?? input.body.slice(0, 20)}
-              sub={sub}
-              right={remaining > 0 ? <Pill on>{next ? "이어서" : "이어서"}</Pill> : undefined}
-            />
-          );
-        })}
+        <Label>오늘</Label>
+        <HomeRows
+          rows={rows.map(({ input, kanji, remaining, next }) => ({
+            id: input.id,
+            title: input.title ?? input.body.slice(0, 20),
+            sub:
+              input.lang !== "ja"
+                ? `${LANG_LABEL[input.lang]} · 뽑기는 다음 단계`
+                : kanji === 0
+                  ? "아직 안 뽑았어"
+                  : remaining > 0
+                    ? `한자 ${kanji}개 · 남은 카드 ${remaining}`
+                    : `한자 ${kanji}개 · 다 봤어`,
+            next: remaining > 0 ? (next?.kanji ?? null) : null,
+          }))}
+        />
       </Card>
       {reason && (
         <>

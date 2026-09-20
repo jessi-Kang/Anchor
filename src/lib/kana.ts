@@ -21,14 +21,13 @@ const RECHECK_AFTER_MS = 24 * 60 * 60 * 1000;
 
 /**
  * 일본어 첫 카드 직전 게이트 (docs/FLOW.md 1장 4′).
- *  ask     아직 확인 안 했거나, recheck 뒤 하루가 지났다 → O03 으로
- *  pass    통과했거나, recheck 한 지 하루 안 → 카드로
- *  locked  "못 읽겠어" → 한자 카드 잠금 (가나 모듈 v2 예고)
+ *  ask   아직 확인 안 했거나, recheck 뒤 하루가 지났다 → O03 으로
+ *  pass  통과했거나, "못 읽겠어"(module: 예고 1장을 이미 봤다), recheck 한 지 하루 안 → 카드로
+ * 가나를 못 읽어도 카드를 잠그지 않는다: 읽기는 F10 에서 소리로 들려준다 (FLOW 4장).
  */
-export function kanaGate(s: UserSettings, now = Date.now()): "ask" | "pass" | "locked" {
+export function kanaGate(s: UserSettings, now = Date.now()): "ask" | "pass" {
   const k = s.kana;
   if (!k) return "ask";
-  if (k.status === "locked") return "locked";
-  if (k.status === "passed") return "pass";
+  if (k.status === "passed" || k.status === "module") return "pass";
   return now - Date.parse(k.checked_at) > RECHECK_AFTER_MS ? "ask" : "pass";
 }

@@ -46,7 +46,6 @@ export async function startCard(inputId: string, kanji: string) {
   }
 
   const { settings } = await getSettings(user.id);
-  const gate = kanaGate(settings);
-  if (gate === "ask" || gate === "locked") redirect(`/onboarding/kana?next=${encodeURIComponent(`/cards/${cardId}`)}`);
+  if (kanaGate(settings) === "ask") redirect(`/onboarding/kana?next=${encodeURIComponent(`/cards/${cardId}`)}`);
   redirect(`/cards/${cardId}`);
 }

@@ -4,7 +4,8 @@ import { getSettings } from "@/lib/db/settings";
 import { KANA_SET, kanaGate } from "@/lib/kana";
 import { enabledLanguages, homeRedirect } from "@/lib/languages";
 import { isDesignPreview } from "@/lib/design-preview";
-import { Screen, Space, Title, Lead, Grow, Button, Ghost } from "@/components/ui";
+import { Screen, Space, Title, Lead } from "@/components/ui";
+import { nowKST } from "@/components/card-bits";
 import { KanaCheck } from "./kana-check";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +15,9 @@ function safeNext(next: string | undefined): string {
 }
 
 /**
- * `/onboarding/kana?next=` — O03 가나 30초. 일본어 첫 카드 직전에 한 번만 (docs/FLOW.md 1장 4′).
- * - 이미 확인했으면(passed, 또는 recheck 한 지 하루 안) 묻지 않고 next 로.
- * - "못 읽겠어"(locked)면 가나 모듈(v2) 예고 1장. 한자 카드는 잠긴다. retry=1 로 다시 읽어볼 수 있다.
- * - 마이크는 "읽기 시작"을 누른 뒤에만 켠다 (kana-check.tsx).
+ * `/onboarding/kana?next=` — O03 가나 30초. 일본어 첫 카드 직전에 한 번만 (docs/FLOW.md 1장 4′). 문구는 O03.html.
+ * 이미 확인했으면(passed·module, 또는 recheck 한 지 하루 안) 묻지 않고 next 로.
+ * 마이크는 "읽기 시작"을 누른 뒤에만 켠다 (O03 → O03a, kana-check.tsx). retry=1 은 다시 읽어보기.
  */
 export default async function KanaPage({ searchParams }: { searchParams: Promise<{ fixed?: string; next?: string; retry?: string }> }) {
   const { fixed, next: rawNext, retry } = await searchParams;
@@ -31,25 +31,11 @@ export default async function KanaPage({ searchParams }: { searchParams: Promise
     const home = homeRedirect(settings);
     if (home) redirect(home);
     if (!enabledLanguages(settings).includes("ja")) redirect("/today");
-    const gate = kanaGate(settings);
-    if (gate === "pass") redirect(next);
-    if (gate === "locked" && retry !== "1") {
-      return (
-        <Screen where="가나 읽기" up="/today">
-          <Grow />
-          <Title>가나부터 시작할 차례야</Title>
-          <Space h={6} />
-          <Lead>가나 모듈은 다음 판에 와. 그때까지 한자 카드는 잠겨 있어. 자료는 그대로 남아.</Lead>
-          <Grow />
-          <Button href="/today">홈으로</Button>
-          <Ghost href={`/onboarding/kana?retry=1&next=${encodeURIComponent(next)}`}>다시 읽어볼래</Ghost>
-        </Screen>
-      );
-    }
+    if (kanaGate(settings) === "pass" && retry !== "1") redirect(next);
   }
 
   return (
-    <Screen where="가나 읽기" up="/today" fixed={fixed === "1"}>
+    <Screen where="가나" up="/today" aside={preview ? "오전 8:43" : nowKST()} fixed={fixed === "1"}>
       <Space h={24} />
       <Title>
         이 여섯 개를

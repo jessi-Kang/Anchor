@@ -11,9 +11,9 @@ import { JudgeRows, type JudgeItem } from "./judge-rows";
 export const dynamic = "force-dynamic";
 
 /**
- * `/inputs/[id]` — F03 뽑기. 문구·뼈대는 design/screens/F03.html.
+ * `/inputs/[id]` — F03 뽑기. 문구·뼈대는 design/screens/F03.html (알아로 표시한 뒤는 F03a.html).
  * 자료의 한자를 두 묶음으로: "아는 소리에서 시작"(한국어 한자어 앵커가 있음) / "발판 없음".
- * 여기가 "아는 것" 수집 자리: 한자마다 알아/몰라 한 탭 → user_node_state (docs/FLOW.md 1장 4).
+ * 여기가 "아는 것" 수집 자리: 한자마다 알아/몰라 선택 칩 한 탭 → user_node_state (docs/FLOW.md 1장 4).
  * 상단 라벨 → 홈. 영어·스페인어 자료는 다음 단계(못 한 말 루프)라 자료만 저장됐다고 알린다.
  */
 export default async function InputPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ fixed?: string }> }) {
@@ -30,11 +30,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
     return (
       <Screen where="이 기사에서" up="/today" aside="오전 8:42" fixed={fixed === "1"}>
         <Space h={28} />
-        <Title lg>모르는 한자 4개</Title>
-        <Space h={6} />
-        <Lead>아는 소리로 시작할 수 있는 것부터. 나머지는 나중에.</Lead>
-        <Space h={22} />
-        <JudgeRows inputId="preview" anchored={anchored} bare={bare} />
+        <JudgeRows inputId="preview" anchored={anchored} bare={bare} empty={false} />
       </Screen>
     );
   }
@@ -80,17 +76,12 @@ export default async function InputPage({ params, searchParams }: { params: Prom
   });
   const anchored = items.filter((i) => i.anchor);
   const bare = items.filter((i) => !i.anchor);
-  const unknown = items.filter((i) => i.known !== true).length;
   const where = input.meta.example ? "이 기사에서" : input.title ? `${input.title.slice(0, 12)}에서` : "이 자료에서";
 
   return (
     <Screen where={where} up="/today" aside={`한자 ${found.length}개`}>
       <Space h={28} />
-      <Title lg>{unknown > 0 ? `모르는 한자 ${unknown}개` : "다 아는 한자야"}</Title>
-      <Space h={6} />
-      <Lead>{found.length > 0 ? "아는 소리로 시작할 수 있는 것부터. 나머지는 나중에." : "이 자료엔 한자가 없어. 다른 자료를 넣어 봐."}</Lead>
-      <Space h={22} />
-      <JudgeRows inputId={input.id} anchored={anchored} bare={bare} />
+      <JudgeRows inputId={input.id} anchored={anchored} bare={bare} empty={found.length === 0} />
     </Screen>
   );
 }

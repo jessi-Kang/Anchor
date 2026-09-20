@@ -24,7 +24,7 @@ export function LanguagePicker({ enabled, initial = [] }: { enabled: Lang3[]; in
           const want = picked.includes(l);
           const pill = on || want ? <Pill on>켜짐</Pill> : <Pill>꺼짐</Pill>;
           return on ? (
-            <Row key={l} title={LANG_LABEL[l]} sub={LANG_START[l]} right={pill} />
+            <Row key={l} title={LANG_LABEL[l]} sub="이미 켜져 있어" right={pill} />
           ) : (
             <Row key={l} title={LANG_LABEL[l]} sub={LANG_START[l]} right={pill} onClick={() => toggle(l)} pressed={want} />
           );

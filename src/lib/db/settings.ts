@@ -6,14 +6,15 @@ import { withUser } from "@/lib/db";
  *  - kana: 가나 6개 읽기 결과 (O03, 일본어 첫 카드 직전 1회). status 가 판단 결과:
  *      passed   마이크가 기준 이상 인식 → 다시 묻지 않는다
  *      recheck  미지원·거부·기준 미달 → 카드는 열되 "다음에 다시 확인" (자기 보고로 통과시키지 않음)
- *      locked   "못 읽겠어" → 가나 모듈(v2) 예고, 한자 카드 잠금
+ *      module   "못 읽겠어" → 가나 모듈(v2) 예고 1장 뒤 그대로 카드로. 카드를 잠그지 않는다 (docs/FLOW.md 4장).
+ *               가나 모듈이 생기면 이 사용자부터 태운다.
  * 준비 단계(상황·씨앗·단계 상태)는 2026-09-20 폐기 (docs/FLOW.md 5장). 마이그레이션 0005 가 옛 키를 지운다.
  * settings 는 jsonb 라 `||` 가 얕은 병합이다. languages 안쪽을 고칠 때는 아래 헬퍼만 쓴다.
  */
 
 export type Lang3 = "en" | "ja" | "es";
 export type LangState = { enabled_at: string };
-export type KanaStatus = "passed" | "recheck" | "locked";
+export type KanaStatus = "passed" | "recheck" | "module";
 export type KanaResult = {
   status: KanaStatus;
   recognized: number;
