@@ -2,21 +2,19 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { getOnboardingState, saveKanaResult } from "@/lib/db/onboarding";
-import { KANA_PASS } from "@/lib/onboarding-options";
-import { nextPath } from "@/lib/onboarding-flow";
+import { saveKanaResult } from "@/lib/db/settings";
+import { KANA_PASS } from "@/lib/kana";
 
+/**
+ * O03 결과 저장. 자기 보고로 통과시키지 않는다:
+ *  - 인식 기준 이상 → passed
+ *  - 미지원·거부·기준 미달 → recheck ("다음에 다시 확인", 카드는 연다)
+ *  - "못 읽겠어" → locked (가나 모듈 v2 예고, 한자 카드 잠금)
+ */
 export async function submitKana(input: { recognized: number; total: number; supported: boolean; kanaModule: boolean }) {
   const user = await requireUser();
   const recognized = Math.max(0, Math.min(input.total, Math.floor(input.recognized)));
-  // 인식이 불가능한 브라우저면 본인이 "다 읽었어"를 누른 것을 통과로 본다.
-  const passed = !input.kanaModule && (input.supported ? recognized >= KANA_PASS : true);
-  await saveKanaResult(
-    user.id,
-    { recognized, total: input.total, passed, supported: input.supported, checked_at: new Date().toISOString() },
-    // 못 읽겠다고 했거나, 인식이 됐는데 기준 미달이면 가나 모듈(v2) 대상
-    !passed,
-  );
-  const state = await getOnboardingState(user.id);
-  redirect(nextPath(state.settings, "ja", "kana"));
+  const status = input.kanaModule ? "locked" : input.supported && recognized >= KANA_PASS ? "passed" : "recheck";
+  await saveKanaResult(user.id, { status, recognized, total: input.total, supported: input.supported, checked_at: new Date().toISOString() });
+  redirect("/today");
 }

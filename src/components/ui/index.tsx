@@ -10,15 +10,22 @@ import s from "./ui.module.css";
 
 const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(" ");
 
-/** 화면 뼈대. `where` 가 상단 왼쪽 "지금 어디", `aside` 가 오른쪽(시간 등). */
+/**
+ * 화면 뼈대. `where` 가 상단 왼쪽 "지금 어디", `aside` 가 오른쪽(시간 등).
+ * `up` 을 주면 라벨이 한 단계 위로 가는 링크가 된다 (카드 → 자료, 자료 → 홈, 설정 → 홈. FLOW 4장:
+ * 뒤로 갈 길이 없는 화면은 만들지 않는다, 어느 화면에서도 홈까지 2탭). 없으면 로그인·첫 언어 고르기처럼 위가 없는 화면.
+ */
 export function Screen({
   where,
+  up,
   aside,
   progress,
   fixed,
   children,
 }: {
   where: string;
+  /** 한 단계 위 경로 */
+  up?: string;
   aside?: ReactNode;
   /** 카드 모드 진행 막대: [완료 칸 수, 전체 칸 수] */
   progress?: [number, number];
@@ -29,7 +36,13 @@ export function Screen({
   return (
     <main className={cx(s.screen, fixed && s.screenFixed)}>
       <div className={s.topBar}>
-        <span>{where}</span>
+        {up ? (
+          <Link href={up} className={s.topUp}>
+            {where}
+          </Link>
+        ) : (
+          <span>{where}</span>
+        )}
         <span>{aside}</span>
       </div>
       {progress && (
@@ -198,30 +211,7 @@ export function GoogleMark() {
   );
 }
 
-/* ── 온보딩에서 추가된 뼈대 ─────────────────────────────────────────────────── */
-
-/** 목록 카드 안의 묶음: 제목 + 내용 (O02 언어별 칩) */
-export function Group({ title, children }: { title: ReactNode; children: ReactNode }) {
-  return (
-    <div className={s.group}>
-      <span className={s.groupTitle}>{title}</span>
-      {children}
-    </div>
-  );
-}
-
-export function Chips({ children }: { children: ReactNode }) {
-  return <div className={s.chips}>{children}</div>;
-}
-
-/** 선택 칩. 켜지면 배경 틴트. */
-export function Chip({ children, on, onClick }: { children: ReactNode; on?: boolean; onClick?: () => void }) {
-  return (
-    <button type="button" className={cx(s.chip, on && s.chipOn)} aria-pressed={on} onClick={onClick}>
-      {children}
-    </button>
-  );
-}
+/* ── 가나·판정·상태 뼈대 ───────────────────────────────────────────────────── */
 
 export function Tiles({ children }: { children: ReactNode }) {
   return <div className={s.tiles}>{children}</div>;

@@ -31,6 +31,14 @@
   font-weight: 500;
   color: var(--color-text3);
 }
+/* 상단 라벨이 한 단계 위 링크일 때. 모양은 같고, 탭 영역만 44px 로 넓힌다 */
+.topUp {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -15px 0;
+  color: inherit;
+}
 
 .progress {
   display: flex;
@@ -177,44 +185,7 @@
   cursor: pointer;
 }
 
-/* ── 온보딩에서 추가된 뼈대 ─────────────────────────────────────────────────── */
-
-/* 목록 카드 안의 묶음 (O02 언어별 칩 묶음) */
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--color-line);
-}
-.groupTitle {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--color-text1);
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.chip {
-  font-size: var(--font-size-body);
-  font-weight: 500;
-  padding: 10px 14px;
-  border-radius: var(--radius-pill);
-  background: var(--color-card);
-  color: var(--color-text1);
-  border: 1px solid var(--color-line);
-  font-family: inherit;
-  cursor: pointer;
-  line-height: normal;
-}
-.chipOn {
-  background: var(--color-tint);
-  color: var(--color-accent-dark);
-  border-color: var(--color-tint);
-}
+/* ── 가나·판정·상태 뼈대 ───────────────────────────────────────────────────── */
 
 /* 3열 타일 (O03 가나) */
 .tiles {
@@ -286,61 +257,10 @@
   width: auto;
 }
 
-/* 뒤집는 카드 (O04) */
-.flip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 0;
-  text-align: center;
-  cursor: pointer;
-  user-select: none;
-}
-.flipWord {
-  font-size: 40px;
-  font-weight: 700;
-  color: var(--color-text1);
-}
-.flipHint {
-  font-size: var(--font-size-body);
-  color: var(--color-text3);
-}
-.flipDef {
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 1.5;
-  color: var(--color-text1);
-}
-.flipExample {
-  font-size: var(--font-size-body);
-  line-height: 1.6;
-  color: var(--color-text2);
-}
-
 .logoMark {
   display: block;
   width: 72px;
   height: 72px;
-}
-
-/* 씨앗 카드 앞면이 한자일 때 (44~132px 범위, 여기선 84px) */
-.flipKanji {
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
-  font-size: 84px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--color-text1);
-}
-/* 한국어 앵커 한 줄: 설명이 아니라 아는 소리를 부르는 용도라 배경 틴트로 표시 */
-.flipAnchor {
-  font-size: var(--font-size-label);
-  font-weight: 500;
-  padding: 5px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--color-tint);
-  color: var(--color-accent-dark);
 }
 
 /* 행이 링크·버튼일 때: 모양은 같은 행, 색·정렬만 물려받는다 */
