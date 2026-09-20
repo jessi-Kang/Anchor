@@ -37,6 +37,7 @@ flowchart TD
 | `/graph` | F11 | 앵커 그래프, 다음 카드 이유, 필터 |
 | `/talk` | F13 | 못 한 말 한 줄 입력 |
 | `/talk/[id]` | F14 | 덩어리 + 음성 루프 |
-| `/settings` | — | 홈으로, 언어 켜기·끄기, 언어 추가, 계정(이메일), 로그아웃, 음성 보관 기간(기준값은 `docs/SPEC.md` 6.6), 전체 내보내기(JSON), 계정 삭제(확인 1장). 항목별 공개·목소리 선택은 해당 기능이 생길 때 |
+| `/settings` | — | 홈으로, 언어 켜기·끄기, 언어 추가, 계정(이메일), 로그아웃, 음성 보관 기간(기준값은 `docs/SPEC.md` 6.6), 전체 내보내기(JSON), 계정 삭제 행 → `/settings/delete`. 항목별 공개·목소리 선택은 해당 기능이 생길 때 |
+| `/settings/delete` | — | 계정 삭제 확인 1장. "삭제"를 입력해야 지우는 링크가 켜진다. 문구와 버튼 배치는 `docs/FLOW.md` 1′ |
 
-API 경계(초안): `/api/inputs` (생성·추출), `/api/cards` (생성·추측 기록), `/api/graph/next` (다음 카드), `/api/talk` (덩어리 생성), `/api/tts`, `/api/pitch` (브라우저 처리가 기본, 서버는 저장만), `/api/export`, `/api/account/delete`.
+API 경계: `/api/inputs`(생성·추출), `/api/cards`(생성·추측 기록), `/api/graph/next`(다음 카드), `/api/talk`(덩어리 생성), `/api/tts`, `/api/recordings`(피치는 브라우저에서 뽑고 서버는 저장만 한다), `/api/export`, `/api/account/delete`, `/api/auth/[...path]`, `/api/health`, `/api/cron/backup` · `/api/cron/voice`. 어디까지 만들어졌는지는 `docs/STATUS.md`.
