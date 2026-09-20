@@ -92,14 +92,15 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 │   └── logo/            확정 로고 A안 (alternatives/는 탈락안, 제품에 쓰지 않음)
 ├── prompts/kickoff.md   구현 시작 프롬프트 (단계별 진행 순서)
 ├── src/
-│   ├── app/             Next.js App Router (페이지, /api/*)
+│   ├── app/             Next.js App Router (페이지, /api/*, tokens.css)
+│   ├── components/ui/   공통 뼈대: Screen·Card·Label·Row·Pill·Button·Ghost
 │   ├── lib/auth/        Neon Auth 서버·클라이언트 인스턴스
 │   ├── lib/db/          withUser() 트랜잭션 헬퍼 (RLS 컨텍스트)
 │   └── proxy.ts         라우트 보호 미들웨어
 ├── db/
 │   ├── migrations/      SQL 마이그레이션 (0001 스키마·역할, 0002 RLS)
 │   └── recovery/        복구 시 역할·RLS 재적용
-├── scripts/             migrate.ts, backup/neon-snapshot.ts
+├── scripts/             migrate.ts, backup/neon-snapshot.ts, design/tokens-to-css.ts·check-screen.ts
 └── .github/workflows/   backup.yml (매일 pg_dump → 외부 S3)
 ```
 
@@ -167,6 +168,8 @@ pnpm dev                           # http://localhost:3000
 ```bash
 pnpm typecheck && pnpm lint && pnpm build   # 커밋 전
 pnpm db:migrate:status                       # 마이그레이션 상태
+pnpm design:tokens                           # design/tokens.json → src/app/tokens.css
+pnpm design:check O01 http://localhost:3000/?fixed=1   # 참고 HTML 과 픽셀 비교 (.design-check/)
 curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_forced 가 true 여야 한다)
 ```
 
@@ -180,8 +183,8 @@ curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_fo
 | 단계 | 상태 |
 | --- | --- |
 | 1. 골격: Next.js + Neon Auth(Google) + 스키마·RLS 마이그레이션 + 내보내기·삭제 엔드포인트 + 백업(스냅샷·pg_dump) | 완료 (Neon 프로젝트 연결 전) |
-| 2. 디자인 토큰 → CSS 변수, 공통 레이아웃, O01 픽셀 재현 | 다음 |
-| 3. 온보딩 O01–O04 | |
+| 2. 디자인 토큰 → CSS 변수(`pnpm design:tokens`), 공통 레이아웃 컴포넌트, O01 픽셀 재현(`pnpm design:check`) | 완료 |
+| 3. 온보딩 O01–O04 | 다음 |
 | 4. 일본어 발견 카드 F04 → Scene1–5 → F11 | |
 | 5. 영어 대화 루프 F13–F14 | |
 
