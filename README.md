@@ -92,13 +92,14 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 │   └── logo/            확정 로고 A안 (alternatives/는 탈락안, 제품에 쓰지 않음)
 ├── prompts/kickoff.md   구현 시작 프롬프트 (단계별 진행 순서)
 ├── src/
-│   ├── app/             Next.js App Router (페이지, /api/*, tokens.css)
+│   ├── app/             Next.js App Router (페이지, /api/*, tokens.css, onboarding/)
 │   ├── components/ui/   공통 뼈대: Screen·Card·Label·Row·Pill·Button·Ghost
 │   ├── lib/auth/        Neon Auth 서버·클라이언트 인스턴스
 │   ├── lib/db/          withUser() 트랜잭션 헬퍼 (RLS 컨텍스트)
 │   └── proxy.ts         라우트 보호 미들웨어
 ├── db/
 │   ├── migrations/      SQL 마이그레이션 (0001 스키마·역할, 0002 RLS)
+│   ├── seed/            공용 참조 노드 (en-seed.json: 영어 씨앗 40장)
 │   └── recovery/        복구 시 역할·RLS 재적용
 ├── scripts/             migrate.ts, backup/neon-snapshot.ts, design/tokens-to-css.ts·check-screen.ts
 └── .github/workflows/   backup.yml (매일 pg_dump → 외부 S3)
@@ -152,6 +153,7 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 pnpm install
 cp .env.example .env.local        # 값 채우기 (아래 표)
 pnpm db:migrate                    # DATABASE_URL_ADMIN 로 스키마 + RLS 적용
+pnpm db:seed                       # 공용 참조 노드 적재 (지금은 O04 영어 씨앗 40장)
 pnpm dev                           # http://localhost:3000
 ```
 
@@ -170,6 +172,7 @@ pnpm typecheck && pnpm lint && pnpm build   # 커밋 전
 pnpm db:migrate:status                       # 마이그레이션 상태
 pnpm design:tokens                           # design/tokens.json → src/app/tokens.css
 pnpm design:check O01 http://localhost:3000/?fixed=1   # 참고 HTML 과 픽셀 비교 (.design-check/)
+# 로그인이 필요한 화면을 찍을 땐 서버를 ANCHOR_DESIGN_PREVIEW=1 로 띄운다 (예시 데이터, 로컬 전용)
 curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_forced 가 true 여야 한다)
 ```
 
@@ -184,8 +187,8 @@ curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_fo
 | --- | --- |
 | 1. 골격: Next.js + Neon Auth(Google) + 스키마·RLS 마이그레이션 + 내보내기·삭제 엔드포인트 + 백업(스냅샷·pg_dump) | 완료 (Neon 프로젝트 연결 전) |
 | 2. 디자인 토큰 → CSS 변수(`pnpm design:tokens`), 공통 레이아웃 컴포넌트, O01 픽셀 재현(`pnpm design:check`) | 완료 |
-| 3. 온보딩 O01–O04 | 다음 |
-| 4. 일본어 발견 카드 F04 → Scene1–5 → F11 | |
+| 3. 온보딩 O02–O04: 상황 고르기, 가나 6개 마이크 인식(Web Speech API), 영어 씨앗 40장 → `user_node_state` | 완료 |
+| 4. 일본어 발견 카드 F04 → Scene1–5 → F11 | 다음 |
 | 5. 영어 대화 루프 F13–F14 | |
 
 ## 작업 방식

@@ -157,3 +157,69 @@ export function GoogleMark() {
     </svg>
   );
 }
+
+/* ── 온보딩에서 추가된 뼈대 ─────────────────────────────────────────────────── */
+
+/** 목록 카드 안의 묶음: 제목 + 내용 (O02 언어별 칩) */
+export function Group({ title, children }: { title: ReactNode; children: ReactNode }) {
+  return (
+    <div className={s.group}>
+      <span className={s.groupTitle}>{title}</span>
+      {children}
+    </div>
+  );
+}
+
+export function Chips({ children }: { children: ReactNode }) {
+  return <div className={s.chips}>{children}</div>;
+}
+
+/** 선택 칩. 켜지면 배경 틴트. */
+export function Chip({ children, on, onClick }: { children: ReactNode; on?: boolean; onClick?: () => void }) {
+  return (
+    <button type="button" className={cx(s.chip, on && s.chipOn)} aria-pressed={on} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+export function Tiles({ children }: { children: ReactNode }) {
+  return <div className={s.tiles}>{children}</div>;
+}
+
+/** 92px 정사각 타일 (가나·한자 표시). 일본어 폰트. */
+export function Tile({ children, on, lang = "ja" }: { children: ReactNode; on?: boolean; lang?: string }) {
+  return (
+    <div className={cx(s.tile, on && s.tileOn)} lang={lang}>
+      {children}
+    </div>
+  );
+}
+
+/** 상태 카드: 점 + 한 줄 (+ 오른쪽 Pill) */
+export function Status({ children, right, dot }: { children: ReactNode; right?: ReactNode; dot?: "on" | "off" }) {
+  return (
+    <div className={s.status}>
+      <div className={s.statusRow}>
+        <span className={s.statusText}>
+          {dot && <span className={cx(s.dot, dot === "off" && s.dotOff)} aria-hidden />}
+          <span>{children}</span>
+        </span>
+        {right}
+      </div>
+    </div>
+  );
+}
+
+/** 버튼 두 개 나란히. 왼쪽은 outline, 오른쪽이 주 버튼. */
+export function ButtonRow({ children }: { children: ReactNode }) {
+  return <div className={s.buttonRow}>{children}</div>;
+}
+
+/** 확정 로고 A안 마크 (design/logo/anchor-mark.svg). 새로 그리지 않는다. */
+export function LogoMark({ size = 72 }: { size?: number }) {
+  // eslint-disable-next-line @next/next/no-img-element -- 정적 SVG, 최적화 불필요
+  return <img src="/logo/anchor-mark.svg" alt="" width={size} height={size} className={s.logoMark} style={{ width: size, height: size }} />;
+}
+
+export const uiStyles = s;

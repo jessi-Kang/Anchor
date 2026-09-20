@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { ensureUser } from "@/lib/db/users";
+import { getSettings } from "@/lib/db/onboarding";
 import { Screen, Space, Title, Lead, Card, Label, Row, Pill, Grow, Button, Ghost } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,8 @@ export default async function TodayPage() {
   const user = await currentUser();
   if (!user) redirect("/");
   await ensureUser(user);
+  const { onboarded_at } = await getSettings(user.id);
+  if (!onboarded_at) redirect("/onboarding/purpose");
 
   const now = new Date().toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
 
