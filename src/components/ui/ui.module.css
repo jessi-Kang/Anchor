@@ -678,8 +678,8 @@ a.row,
   color: var(--color-text1);
 }
 
-/* F12 아래 칸 (design/screens/F12.html). "재만남" 알약은 뗐다 — 알약은 상태 어휘 자리이지 화면
-   이름표가 아니고, 여기가 어디인지는 상단 라벨이 이미 말한다. */
+/* F12 아래 칸 (design/screens/F12.html). 말 두 줄만 세로로 쌓는다 — 알약이 들어가는 자리가 아니다
+   (docs/FLOW.md 4장 알약 규칙). */
 .metFoot {
   display: flex;
   flex-direction: column;
