@@ -1,4 +1,5 @@
 import type { InputRow } from "@/lib/db/inputs";
+import { withParticle } from "@/lib/ko";
 
 /**
  * 자료를 화면에서 부르는 이름. **부르는 자리는 여기 하나다** (docs/FLOW.md 4장).
@@ -29,4 +30,15 @@ export function inputName(input: NamedInput): string {
 /** 문장 안에서 출처를 대는 자리 ("아침 기사에서"). 이름과 조사가 갈라지지 않게 같이 둔다. */
 export function inputFrom(input: NamedInput): string {
   return `${inputName(input)}에서`;
+}
+
+/**
+ * 이름 뒤에 로/으로가 붙는 자리 ("아침 기사로", "회의록으로"). 뒤에 오는 말은 화면이 붙인다.
+ *
+ * 이름이 고정 문자열이던 때는 "아침 기사로" 하나로 됐지만, 이름이 변수가 되면 조사가 갈린다.
+ * 소리는 넘기지 않는다 — 자료 제목은 한자·가나·한글이 다 오고 읽는 소리를 알 길이 없다.
+ * 글자로 떨어지면 한글 제목은 맞고("회의록으로"), 일본어 제목은 "로" 로 간다(예전과 같다).
+ */
+export function inputTo(input: NamedInput): string {
+  return withParticle({ text: inputName(input), sound: null }, "로으로");
 }
