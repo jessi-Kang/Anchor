@@ -43,7 +43,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
 
   if (input.lang !== "ja") {
     return (
-      <Screen where={input.title ?? "자료"} up="/today" aside={LANG_LABEL[input.lang]}>
+      <Screen where={input.title ?? "자료"} up="/today" aside={nowKST()}>
         <Space h={28} />
         <Title lg>자료는 저장됐어</Title>
         <Space h={6} />

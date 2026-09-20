@@ -7,6 +7,7 @@ import { EXAMPLE_INPUT } from "@/lib/example-input";
 import { enabledLanguages, homeRedirect, isLang, LANG_LABEL } from "@/lib/languages";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Title, Lead, Status } from "@/components/ui";
+import { nowKST } from "@/components/card-bits";
 import { PasteForm } from "./paste-form";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,8 @@ export default async function NewInputPage({ searchParams }: { searchParams: Pro
   }
 
   return (
-    <Screen where="자료 넣기" up="/today" aside={LANG_LABEL[lang]} fixed={fixed === "1"}>
+    // 상단 오른쪽은 어느 화면에서나 시각이다. 화면이 무엇에 대한 것인지는 왼쪽 라벨이 진다.
+    <Screen where={`${LANG_LABEL[lang]} 자료 넣기`} up="/today" aside={isDesignPreview() ? "오전 8:40" : nowKST()} fixed={fixed === "1"}>
       <Space h={28} />
       <Title lg>무엇이든 붙여넣어</Title>
       <Space h={6} />
