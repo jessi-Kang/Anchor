@@ -4,7 +4,7 @@
 
 기능이 예쁜지, 코드가 깔끔한지는 여기서 보지 않는다. 보는 것은 셋이다. 데이터를 잃지 않는가, 남에게 새지 않는가, 지운다고 한 것이 실제로 지워지는가.
 
-점검 시각: 2026-09-20. 대상: `main` (`405a0c5`) 과 프로덕션 배포.
+점검 시각: 2026-09-20. 대상: `main` (`31feba8`) 과 프로덕션 배포(마이그레이션 `0006`).
 
 2장의 판정 중 `src/**` 를 근거로 한 것은 개발이 F02~F11 을 올리기 전의 코드를 읽고 매긴 것이다. 새로 들어온 코드는 아직 보지 않았다.
 
@@ -92,20 +92,20 @@
 | # | 판정 | 근거 |
 | --- | --- | --- |
 | A1 | 확인함 | `inputs`·`nodes`·`edges`·`user_node_state`·`cards`·`chunks`·`recordings`·`encounters` 전부 `REFERENCES users(id) ON DELETE CASCADE` |
-| A2 | 확인함 | 프로덕션 `/api/health` 200, `rls_all_enabled: true`, 표 10개 모두 `rowsecurity: true` |
-| A3 | 확인함 | 같은 응답의 `db_role: anchor_app`, `role_bypasses_rls: false`. 역할은 `0001` 이 `NOBYPASSRLS` 로 만든다 |
-| A4 | **확인 못 함** | `0002` 의 모든 정책이 `TO anchor_app` 이고 `app.current_user_id()` 와 비교한다. 여기까지는 파일을 읽어 확인했다. 정책이 실제로 남의 행을 막는지는 두 계정으로 돌려야 하고, 아직 돌리지 못했다 (4장) |
+| A2 | 확인함 | 프로덕션 `/api/health` 200, `rls_all_enabled: true`, `node_cards` 를 포함한 표 11개 모두 `rowsecurity: true` |
+| A3 | 확인함 | 같은 응답의 `db_role: anchor_app`, `role_bypasses_rls: false`. 역할은 `0001` 이 `NOBYPASSRLS` 로 만든다. 소유자 역할은 `BYPASSRLS` 를 가지고 `anchor_app` 에 ADMIN 도 가지므로 언제든 앱 역할이 될 수 있다. 격리는 소유자를 막는 것이 아니라 앱이 소유자 연결을 쓰지 않는 것(A7)으로 선다 |
+| A4 | 확인함 | 부록 스크립트를 임시 브랜치에서 두 계정으로 돌렸다(2026-09-20, `0005` 기준). 14단계 전부 기대값과 같다. 컨텍스트 없이 0행, A 는 A 만, B 의 행은 id 를 알아도 0행, B 를 고치거나 지우면 0행, B 소유로 INSERT 는 `42501`, 삭제 원장 읽기는 `permission denied`, 공용 노드는 읽히고 만들 수는 없다 |
 | A5 | 확인함 | `withoutUser()` 를 쓰는 곳은 `/api/health` 하나다. 나머지 사용자 데이터 경로는 전부 `withUser()` |
-| A6 | 확인함 | `node_cards` 만 `USING (true)` 를 쓰고 그것은 SELECT 전용이다. INSERT·UPDATE 는 `nodes.user_id IS NULL` 인 공용 노드로 제한된다. 그 표는 카드 문안만 담고 사용자 자료를 담지 않는다 |
+| A6 | 확인함 | `node_cards` 만 `USING (true)` 를 쓰고 그것은 SELECT 전용이다. INSERT·UPDATE 는 `nodes.user_id IS NULL` 인 공용 노드로 제한된다. 그 표는 카드 문안만 담고 사용자 자료를 담지 않는다. 정책 파일을 읽어 확인한 것이고 돌려 보지는 않았다 (4장) |
 | A7 | 확인함 | `src/lib/env.ts` 는 `ANCHOR_DATABASE_URL` 만 읽는다. `DATABASE_URL` 을 읽는 런타임 코드는 `/api/cron/backup` 뿐이고, 그것은 백업이라 소유자 연결이 필요하다 |
 | B1 | 확인함 | `.gitignore` 의 `.env*` + `!.env.example`. 추적되는 env 파일은 `.env.example` 하나 |
 | B2 | 확인함 | 값이 있는 줄은 자리표시자와 공개된 voice_id 뿐. 이 파일의 모든 과거 버전도 같다 |
 | B3 | 확인함 | 전 커밋 검색에서 연결 문자열·API 키 형태 0건. `.env` 가 커밋된 적 없다 |
 | B4 | 확인함 | `NEXT_PUBLIC_` 0건. 클라이언트 컴포넌트가 `@/lib/db/onboarding` 에서 가져오는 것은 `import type` 뿐이라 번들에서 지워진다 |
-| B5 | **못 지킴** | `/api/health` 의 예외 경로가 인증 없이 드라이버 오류 문구를 돌려준다 (3장 N2). `405a0c5` 기준 그대로다 |
+| B5 | **못 지킴** | `/api/health` 의 예외 경로가 인증 없이 드라이버 오류 문구를 돌려준다 (3장 N2) |
 | B6 | 확인함 | 커밋 메시지 전문 검색에서 0건 |
 | C1 | 확인함 | `requireUser()` 로 401, `confirm: "삭제"` 아니면 400. 미들웨어가 `/api/account/*` 도 막는다 |
-| C2 | 확인함 | A1 의 FK 목록에 빠진 사용자 표가 없다. CASCADE 는 참조 무결성 동작이라 RLS 와 무관하게 돈다 |
+| C2 | 확인함 | A1 의 FK 목록에 빠진 사용자 표가 없다. 실제로 한 계정을 지워 그 계정의 `inputs`·`cards`·개인 노드가 0이 되는 것을 확인했고, 같은 순간 다른 계정의 행은 그대로였다. CASCADE 가 계정 경계를 넘지 않는다 |
 | C3 | 확인함 | `account_deletions` 는 `users` 를 참조하지 않는다. 원장 INSERT 와 `users` DELETE 가 같은 트랜잭션이고 INSERT 가 먼저다 |
 | C4 | **확인 못 함** | 코드 경로는 있다. 첫 백업이 2026-09-20 이라 35일 만료 삭제는 아직 한 번도 돌지 않았다. 2026-10-25 이후에 실제 파일 목록으로 확인한다 |
 | C5 | 확인함 | 삭제 요청 뒤의 백업에는 그 계정이 없다. 마지막 사본은 요청 직전 백업이고 `requested_at` 보다 이르다. 원장 표시 시각(`requested_at` + 보존 기간)이 그보다 늦다 |
@@ -118,7 +118,7 @@
 | E2 | 확인함 | 프로덕션에서 헤더 없이 호출하면 403 |
 | E3 | 확인함 | 두 층 모두 토큰을 뺀다. 매일 JSON 백업은 매핑 컬럼만 뜨고, `pg_dump` 는 `--exclude-table-data='neon_auth.account'` 로 그 표의 행을 뺀다 |
 | E4 | 확인함 | `db/recovery/reapply-roles-and-rls.sql` 이 역할·권한·`0002`·`0003` 을 다시 적용한다 |
-| E5 | 확인함 | `main` 이 `0006` 까지 담고 프로덕션은 `0005` 다. `main` 이 앞서므로 `main` 을 체크아웃한 복구가 프로덕션 스키마를 빠짐없이 다시 만든다 |
+| E5 | 확인함 | `main` 과 프로덕션이 둘 다 `0006` 이다. `main` 을 체크아웃한 복구가 프로덕션 스키마를 그대로 다시 만든다 |
 | E6 | **못 지킴** | 백업은 `neon_auth.user`·`account` 를 담지만 복원 스크립트는 `public.*` 만 넣는다 (3장 L2) |
 | E7 | **확인 못 함** | `docs/BACKUP.md` 의 리허설 표가 비어 있다. 백업에서 실제로 복구된 적이 없다 (3장 L3) |
 | F1 | **확인 못 함** | 로그인 시작이 내려주는 쿠키는 `__Secure-` 접두사에 `HttpOnly; Secure; SameSite=Lax; Path=/` 를 모두 갖는다. 로그인을 마친 뒤의 세션 쿠키는 실제 Google 로그인이 있어야 본다 |
@@ -210,8 +210,8 @@ WITH CHECK (user_id = app.current_user_id()
 ## 4. 다음에 볼 것
 
 - `main` 에 없는 것은 보지 않았다. 개발 브랜치의 `0006`·Claude API 호출(D1~D4)은 P0 가 끝나면 본다.
-- RLS 가 실제로 남의 행을 막는지(A4)는 두 계정으로 돌려 봐야 확인이 끝난다. 임시 브랜치 `sec-rls-check` 는 만들어 뒀고 프로덕션과 같은 스키마(`0005`)다. **보안 세션의 환경에서는 이 검증을 할 수 없다.** 네 경로가 다 막힌다: Neon MCP 의 SQL 실행(읽기 포함)은 승인 거부, `psql` 은 이 컨테이너가 HTTPS 만 내보내고 5432 가 막혀서 불가, 연결 문자열을 명령에 싣는 것과 환경에서 자격증명을 찾는 것은 가드레일이 막는다. 도구 선택의 문제가 아니라 환경의 성질이라 허용 목록을 고쳐도 열리지 않는다.
-  - 그래서 부록의 스크립트를 **DB 에 닿는 다른 세션이나 사람이 돌린다.** 결과를 받아 이 문서의 A4 를 갱신하는 것이 보안 세션의 몫이다.
+- **`node_cards`(`0006`)의 정책은 돌려 보지 않았다.** A4 검증은 `0005` 시점의 브랜치에서 돌았고 그때 그 표가 없었다. 지금은 프로덕션에 있다. 정책을 읽어 확인한 것이 전부이므로, 다음 검증 때 공용 노드로만 쓰이는지를 단계로 넣는다.
+- 보안 세션의 환경에서는 DB 에 닿을 수 없다. 네 경로가 서로 다른 층에서 막힌다: Neon MCP 의 SQL 실행(읽기 포함)은 승인 거부, `psql` 은 이 컨테이너가 HTTPS 만 내보내고 5432 가 막혀서 불가, 연결 문자열을 명령에 싣는 것과 환경에서 자격증명을 찾는 것은 가드레일이 막는다. 허용 목록을 고쳐도 열리지 않는다. **검증은 DB 에 닿는 세션이 돌리고, 출력을 받아 판정하는 것이 보안 세션의 몫이다.**
   - 그 브랜치에서 확인된 것: 소유자 역할 `neondb_owner` 는 `BYPASSRLS` 가 **있다**. 앱이 소유자 연결을 쓰면 RLS 가 통째로 무력화된다는 뜻이고, A7 이 지켜져야 하는 이유다. `anchor_app` 은 `BYPASSRLS`·`SUPERUSER` 둘 다 없다.
 - C4(보존 기간 만료 삭제)는 2026-10-25 이후에 스토어의 실제 파일 목록으로 확인한다.
 
@@ -220,6 +220,8 @@ WITH CHECK (user_id = app.current_user_id()
 **임시 브랜치에서만 돌린다.** 테스트 계정을 만들고 지운다. 프로덕션 브랜치에 돌리지 않는다.
 
 `anchor_app` 연결로 돌린다. 소유자 연결(`neondb_owner`)은 `BYPASSRLS` 가 있어 아무것도 검증하지 못한다. 기대값이 하나라도 어긋나면 그것이 "샘" 이다.
+
+`anchor_app` 자격 증명이 없으면 소유자 연결에서 `SET LOCAL ROLE anchor_app` 으로 돌려도 된다. RLS 정책 적용·`BYPASSRLS`·테이블 권한은 모두 `current_user` 로 평가되고 `SET ROLE` 이 그것을 바꾼다. `session_user` 가 소유자로 남는 것은 이 셋 중 어디에도 쓰이지 않는다. 시작 전에 `current_user`·`rolbypassrls` 를 찍어 `anchor_app`·`false` 인지 확인한다.
 
 ```sql
 \set ON_ERROR_STOP off
