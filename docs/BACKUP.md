@@ -6,7 +6,7 @@
 | --- | --- | --- | --- | --- |
 | 1. PITR | Neon 히스토리(instant restore) | Neon 안 | 상시 | 무료 플랜은 **6시간 고정**. 유료로 올리면 7일 이상으로 늘린다 |
 | 2. 배포 전 스냅샷 | Neon 브랜치 스냅샷 | Neon 안 | 프로덕션 빌드마다 (`scripts/backup/neon-snapshot.ts`, `NEON_API_KEY` 있을 때) | 14일. 플랜 제한으로 실패하면 경고만 |
-| 3. 매일 JSON 백업 | 전체 테이블 + 로그인 계정 매핑을 gzip JSON 으로 | **Neon 밖** Vercel Blob 비공개 스토어 `anchor-backups` (`/api/cron/backup`, Vercel cron) | 매일 03:17 KST | 35일 (`BACKUP_RETENTION_DAYS`) |
+| 3. 매일 JSON 백업 | 전체 테이블 + 로그인 계정 매핑(OAuth 토큰 제외)을 gzip JSON 으로 | **Neon 밖** Vercel Blob 비공개 스토어 `anchor-backups` (`/api/cron/backup`, Vercel cron) | 매일 03:17 KST | 35일 (`BACKUP_RETENTION_DAYS`) |
 | (선택) pg_dump | 원본 형식 덤프 | S3 호환 스토리지 (`.github/workflows/backup.yml`) | GitHub Actions | 외부 스토리지 계정(카드)이 있을 때만 |
 
 1·2는 Neon 장애나 계정 문제에 함께 사라질 수 있다. 3이 그 경우의 사본이다. 무료 플랜에서 1이 6시간뿐이라 3이 더 중요하다.
@@ -18,7 +18,7 @@
 - [x] Vercel Blob 스토어 `anchor-backups`(비공개, 싱가포르) 생성, `BLOB_READ_WRITE_TOKEN` 주입됨
 - [x] `CRON_SECRET`, `BACKUP_RETENTION_DAYS` 프로덕션 환경 변수
 - [x] `vercel.json` crons: `/api/cron/backup` 매일 18:17 UTC
-- [ ] 첫 배포 뒤 한 번 수동 호출해 `ok: true` 와 `counts` 확인 (아래)
+- [x] 첫 배포 뒤 한 번 수동 호출해 `ok: true` 와 `counts` 확인 (아래) — 2026-09-20 19:46 KST, 200
 - [ ] 아래 복구 리허설을 한 번 수행하고 날짜를 기록
 
 수동 확인 (터미널, CRON_SECRET 은 Vercel 환경 변수에서):
