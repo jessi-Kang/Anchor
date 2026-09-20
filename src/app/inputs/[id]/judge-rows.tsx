@@ -33,7 +33,7 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
 
   const set = (nodeId: string, v: boolean) => {
     setKnown((k) => ({ ...k, [nodeId]: v }));
-    start(() => judge(nodeId, v));
+    start(() => judge(nodeId, inputId, v));
   };
 
   const row = (i: JudgeItem) => (
