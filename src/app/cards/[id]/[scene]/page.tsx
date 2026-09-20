@@ -64,7 +64,6 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   let p: CardPayload = PREVIEW;
   let where = "카드 1 / 4";
   let guess = "힘을 합친다";
-  let verdict = "거의 맞음";
   // 착지 낱말을 거르는 기준. 참고 화면과 같은 상태로 둔다: 力 은 만났고 妥 는 아직이라
   // 協力 만 남는다 (design/screens/Scene5.html).
   let met = new Set(["力"]);
@@ -85,7 +84,6 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
     // 자료가 아니라 계정 전체를 본다 — 다른 기사에서 이미 푼 글자도 만난 글자다 (lib/db/kanji.ts).
     met = await judgedKanji(user.id);
     guess = card.guess ?? "";
-    verdict = (card.payload as CardPayload & { verdict?: string }).verdict ?? "";
   }
 
   const up = `/cards/${id}`;
@@ -178,12 +176,18 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
             {p.reading}
           </div>
           <h1 className={s.answer}>{p.answer}</h1>
+          {/*
+            **판정 글자를 내지 않는다.** Scene3 이 "틀려도 돼. 떠오르는 대로." 라고 해 놓고 여기서
+            "다름" 을 붙이면 약속하고 어기는 것이다. 색을 안 쓰고 빨간 줄을 안 그어도 글자가 이미
+            판정이고, 영어 축(F14)은 같은 행동에 아무 판정도 안 낸다. 정답과 내 추측을 나란히 놓고 끝낸다.
+            기록은 남는다 — 추측 정답률은 검증 항목이라(docs/SPEC.md 9장) 저장은 그대로 하고
+            화면에서만 뺀다. 재는 것과 보여 주는 것은 다르다.
+          */}
           {guess && (
             <Card tint style={{ padding: "12px 16px" }}>
               <div className={s.compare}>
                 <span className={s.compareKey}>내 추측</span>
                 <span className={s.compareGuess}>{guess}</span>
-                {verdict && <span className={s.compareVerdict}>{verdict}</span>}
               </div>
             </Card>
           )}
