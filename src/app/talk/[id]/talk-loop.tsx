@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { PitchLoop } from "@/components/pitch-loop";
+import type { PitchPoint } from "@/lib/db/recordings";
 
 /**
  * F14 음성 루프. 루프 자체는 F10(한자 카드)과 같아서 PitchLoop 이 한다.
@@ -14,12 +15,14 @@ export function TalkLoop({
   preview,
   startAttempt,
   nativeVoice,
+  startPrev,
 }: {
   chunkId: string;
   text: string;
   preview: boolean;
   startAttempt: number;
   nativeVoice: boolean;
+  startPrev: PitchPoint[] | null;
 }) {
   const router = useRouter();
   return (
@@ -30,6 +33,7 @@ export function TalkLoop({
       preview={preview}
       startAttempt={startAttempt}
       nativeVoice={nativeVoice}
+      startPrev={startPrev}
       doneLabel="됐어"
       firstNote="먼저 듣고, 그대로 따라 말해봐."
       onDone={() => {

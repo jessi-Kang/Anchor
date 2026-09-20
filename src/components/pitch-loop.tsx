@@ -33,6 +33,7 @@ export function PitchLoop({
   firstNote,
   startAttempt,
   nativeVoice,
+  startPrev,
 }: {
   target: { card: string } | { chunk: string };
   text: string;
@@ -49,9 +50,17 @@ export function PitchLoop({
    * 없으면 F14a: 원어민 검정 선 없이 **내 소리끼리 회차를 겹쳐** 본다. 값이 채워지면 그 순간부터 F14 다.
    */
   nativeVoice?: boolean;
+  /**
+   * 쌓여 있던 마지막 회차의 곡선 (DB 에서 읽어 온다). 원어민 음성이 없을 때 겹칠 상대다 —
+   * 이게 없으면 화면을 다시 연 사람의 첫 녹음은 겹칠 것이 없다 (`lib/db/recordings.ts`).
+   */
+  startPrev?: Point[] | null;
 }) {
   const [native, setNative] = useState<Point[] | null>(() => (preview ? demoCurve(0) : null));
-  const [mine, setMine] = useState<Point[] | null>(() => (preview ? demoCurve(1) : null));
+  // 쌓여 있던 마지막 곡선은 **`mine`** 에 넣는다. `prevMine` 에 넣으면 범례가 그걸 "나, N-1회차" 라고
+  // 부르는데 실제로는 N회차 곡선이다 — 화면이 곡선에 틀린 회차를 붙이게 된다. 다시 녹음하면 이게
+  // prevMine 으로 밀려나면서 그때 비로소 N-1 이 된다.
+  const [mine, setMine] = useState<Point[] | null>(() => (preview ? demoCurve(1) : (startPrev ?? null)));
   // 원어민 소리가 없을 때 겹칠 **직전 회차** 곡선. 있을 때는 안 쓴다.
   const [prevMine, setPrevMine] = useState<Point[] | null>(() => (preview && nativeVoice === false ? demoCurve(0) : null));
   const [attempt, setAttempt] = useState(preview ? 3 : startAttempt);
