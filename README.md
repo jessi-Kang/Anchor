@@ -98,11 +98,11 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 │   ├── lib/db/          withUser() 트랜잭션 헬퍼 (RLS 컨텍스트)
 │   └── proxy.ts         라우트 보호 미들웨어
 ├── db/
-│   ├── migrations/      SQL 마이그레이션 (0001 스키마·역할, 0002 RLS)
+│   ├── migrations/      SQL 마이그레이션 (0001 스키마·역할, 0002 RLS, 0003 소유자 읽기)
 │   ├── seed/            공용 참조 노드 (en-seed.json 영어 씨앗 40장, ja-seed.json 한자 씨앗 40장)
 │   └── recovery/        복구 시 역할·RLS 재적용
 ├── scripts/             migrate.ts, backup/neon-snapshot.ts, design/tokens-to-css.ts·check-screen.ts
-└── .github/workflows/   backup.yml (매일 pg_dump → 외부 S3)
+└── .github/workflows/   backup.yml (선택: pg_dump → 외부 S3)
 ```
 
 ## 화면 흐름
@@ -173,7 +173,7 @@ pnpm dev                           # http://localhost:3000
 | `NEON_AUTH_BASE_URL` | Neon 콘솔 → Auth → Configuration 의 Auth URL. Google 제공자를 켜 둔다 |
 | `NEON_AUTH_COOKIE_SECRET` | `openssl rand -base64 32` |
 | `NEON_API_KEY` / `NEON_PROJECT_ID` / `NEON_BRANCH_ID` | 배포 전 스냅샷 (프로덕션만) |
-| `BACKUP_S3_*` | 매일 pg_dump 를 올릴 Neon 밖 스토리지 (GitHub Secrets) |
+| `CRON_SECRET` · `BLOB_READ_WRITE_TOKEN` | 매일 JSON 백업 (`/api/cron/backup` → Vercel Blob). Blob 토큰은 Vercel 이 주입 |
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm build   # 커밋 전
@@ -193,7 +193,7 @@ curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_fo
 
 | 단계 | 상태 |
 | --- | --- |
-| 1. 골격: Next.js + Neon Auth(Google) + 스키마·RLS 마이그레이션 + 내보내기·삭제 엔드포인트 + 백업(스냅샷·pg_dump) | 완료, 배포됨 |
+| 1. 골격: Next.js + Neon Auth(Google) + 스키마·RLS 마이그레이션 + 내보내기·삭제 엔드포인트 + 매일 백업(Vercel cron → Blob) | 완료, 배포됨 |
 | 2. 디자인 토큰 → CSS 변수(`pnpm design:tokens`), 공통 레이아웃 컴포넌트, O01 픽셀 재현(`pnpm design:check`) | 완료 |
 | 3. 온보딩 O02–O05: 상황 고르기, 가나 6개 마이크 인식(Web Speech API), 한자 씨앗 40장, 영어 씨앗 40장 → `user_node_state`. 언어는 하나씩 켜고 필요한 단계만 | 완료 |
 | 4. 일본어 발견 카드 F04 → Scene1–5 → F11 | 다음 |

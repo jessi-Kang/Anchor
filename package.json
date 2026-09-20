@@ -14,11 +14,13 @@
     "vercel-build": "tsx scripts/backup/neon-snapshot.ts --pre-deploy && next build",
     "design:tokens": "tsx scripts/design/tokens-to-css.ts",
     "design:check": "tsx scripts/design/check-screen.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "backup:restore": "tsx scripts/backup/restore-json.ts"
   },
   "dependencies": {
     "@neondatabase/auth": "0.5.0-beta",
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/blob": "^2.8.0",
     "next": "16.3.5",
     "pg": "^8",
     "react": "19.2.8",

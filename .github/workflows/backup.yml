@@ -1,4 +1,5 @@
-# 매일 pg_dump 를 Neon 밖의 S3 호환 스토리지로. (CLAUDE.md 데이터 원칙: PITR + 매일 스냅샷을 별도 스토리지에)
+# (선택) 매일 pg_dump 를 S3 호환 스토리지로. 기본 백업은 /api/cron/backup(Vercel Blob)이며, 이 워크플로는
+# 외부 스토리지 계정과 아래 Secrets 가 있을 때만 켠다. 없으면 실행이 실패하고 무시해도 된다.
 # Secrets: DATABASE_URL_ADMIN, BACKUP_S3_BUCKET, BACKUP_S3_ENDPOINT, BACKUP_S3_REGION,
 #          BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY
 # Variables (선택): BACKUP_RETENTION_DAYS (기본 35)

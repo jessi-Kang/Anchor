@@ -4,7 +4,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/health — DB 연결과 RLS 상태 확인. 인증 불필요, 사용자 데이터 노출 없음.
- * `rls_all_forced` 가 false 면 배포를 멈춘다.
+ * `rls_all_enabled` 가 false 이거나 `role_bypasses_rls` 가 true 면 배포를 멈춘다.
+ * (0003 이후 FORCE 는 걸지 않는다: 소유자 연결은 백업을 위해 전체를 읽어야 한다. 앱 역할의 격리는 ENABLE + 정책으로 유지된다.)
  */
 export async function GET() {
   try {
@@ -24,14 +25,14 @@ export async function GET() {
       return { role: role[0], tables, latest_migration: mig[0]?.name ?? null };
     });
 
-    const rlsAllForced = result.tables.every((t) => t.rowsecurity && t.forcerowsecurity);
-    const ok = rlsAllForced && !result.role.bypass;
+    const rlsAllEnabled = result.tables.every((t) => t.rowsecurity);
+    const ok = rlsAllEnabled && !result.role.bypass && result.role.current_user === "anchor_app";
     return Response.json(
       {
         ok,
         db_role: result.role.current_user,
         role_bypasses_rls: result.role.bypass,
-        rls_all_forced: rlsAllForced,
+        rls_all_enabled: rlsAllEnabled,
         tables: result.tables,
         latest_migration: result.latest_migration,
       },

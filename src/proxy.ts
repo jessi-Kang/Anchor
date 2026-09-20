@@ -23,6 +23,6 @@ export const config = {
     "/graph/:path*",
     "/talk/:path*",
     "/settings/:path*",
-    "/api/((?!auth|health).*)",
+    "/api/((?!auth|health|cron).*)",
   ],
 };

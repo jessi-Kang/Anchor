@@ -4,19 +4,30 @@
 
 | 층 | 무엇 | 어디 | 주기 | 보존 |
 | --- | --- | --- | --- | --- |
-| 1. PITR | Neon 히스토리(instant restore) | Neon 안 | 상시 | **7일 이상**으로 설정 (프로젝트 → Settings → History retention). 기본 6시간은 부족하다 |
-| 2. 배포 전 스냅샷 | Neon 브랜치 스냅샷 | Neon 안 | 프로덕션 빌드마다 (`scripts/backup/neon-snapshot.ts`) | 14일 (`SNAPSHOT_RETENTION_DAYS`) |
-| 3. 매일 pg_dump | 전체 덤프(-Fc) + sha256 | **Neon 밖** S3 호환 스토리지 (`.github/workflows/backup.yml`) | 매일 03:17 KST | 35일 (`BACKUP_RETENTION_DAYS`) |
+| 1. PITR | Neon 히스토리(instant restore) | Neon 안 | 상시 | 무료 플랜은 **6시간 고정**. 유료로 올리면 7일 이상으로 늘린다 |
+| 2. 배포 전 스냅샷 | Neon 브랜치 스냅샷 | Neon 안 | 프로덕션 빌드마다 (`scripts/backup/neon-snapshot.ts`, `NEON_API_KEY` 있을 때) | 14일. 플랜 제한으로 실패하면 경고만 |
+| 3. 매일 JSON 백업 | 전체 테이블 + 로그인 계정 매핑을 gzip JSON 으로 | **Neon 밖** Vercel Blob 비공개 스토어 `anchor-backups` (`/api/cron/backup`, Vercel cron) | 매일 03:17 KST | 35일 (`BACKUP_RETENTION_DAYS`) |
+| (선택) pg_dump | 원본 형식 덤프 | S3 호환 스토리지 (`.github/workflows/backup.yml`) | GitHub Actions | 외부 스토리지 계정(카드)이 있을 때만 |
 
-1·2는 Neon 장애나 계정 문제에 함께 사라질 수 있다. 3이 그 경우의 유일한 사본이다.
+1·2는 Neon 장애나 계정 문제에 함께 사라질 수 있다. 3이 그 경우의 사본이다. 무료 플랜에서 1이 6시간뿐이라 3이 더 중요하다.
 
-## 설정 체크리스트 (첫 배포 전)
+3이 pg_dump 가 아니라 JSON 인 이유: 서버리스에는 pg_dump 가 없고, 외부 스토리지(R2 등)는 카드 등록이 필요했다. Vercel Blob 은 이미 결제 중인 Vercel 안에 있어 추가 계정이 없고, Neon 과는 다른 회사·다른 저장소다. 데이터 양이 작은 MVP 에서는 테이블별 JSON 으로 충분하며, 복구는 `pnpm backup:restore` 로 한다.
 
-- [ ] Neon 프로젝트 History retention ≥ 7일
-- [ ] Vercel 환경 변수: `NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_BRANCH_ID` (프로덕션만)
-- [ ] GitHub Secrets: `DATABASE_URL_ADMIN`, `BACKUP_S3_*` 5개. 버킷은 Neon과 다른 제공자(예: Cloudflare R2, Backblaze B2, AWS S3)
-- [ ] `nightly-backup` 워크플로를 `workflow_dispatch` 로 한 번 수동 실행해 객체가 올라가는지 확인
+## 설정 체크리스트
+
+- [x] Vercel Blob 스토어 `anchor-backups`(비공개, 싱가포르) 생성, `BLOB_READ_WRITE_TOKEN` 주입됨
+- [x] `CRON_SECRET`, `BACKUP_RETENTION_DAYS` 프로덕션 환경 변수
+- [x] `vercel.json` crons: `/api/cron/backup` 매일 18:17 UTC
+- [ ] 첫 배포 뒤 한 번 수동 호출해 `ok: true` 와 `counts` 확인 (아래)
 - [ ] 아래 복구 리허설을 한 번 수행하고 날짜를 기록
+
+수동 확인 (터미널, CRON_SECRET 은 Vercel 환경 변수에서):
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://anchor-jessikang.vercel.app/api/cron/backup
+```
+
+파일 보기: https://vercel.com/jessikang/anchor/stores → `anchor-backups` → `daily/`.
 
 ## 복구 절차
 
@@ -28,36 +39,33 @@ Neon 콘솔 → Branches → 프로덕션 브랜치 → Restore → 시각 선�
 
 Neon 콘솔 → Snapshots → `pre-deploy-<시각>-<커밋>` → Restore. 그다음 해당 커밋으로 Vercel 롤백.
 
-### C. Neon 밖 덤프에서 (최악)
+### C. Neon 밖 JSON 백업에서 (최악)
 
 ```bash
-# 1. 덤프 내려받기 + 검증
-aws s3 cp s3://$BUCKET/anchor/daily/anchor-<STAMP>.dump .
-aws s3 cp s3://$BUCKET/anchor/daily/anchor-<STAMP>.dump.sha256 .
-sha256sum -c anchor-<STAMP>.dump.sha256
+# 1. 파일 내려받기: https://vercel.com/jessikang/anchor/stores → anchor-backups → daily/ → 원하는 날짜의 .json.gz
 
-# 2. 새 Neon 프로젝트(또는 빈 브랜치)에 복원
-pg_restore --no-owner --no-privileges -d "$NEW_DATABASE_URL_ADMIN" anchor-<STAMP>.dump
+# 2. 새 Neon 프로젝트(또는 빈 브랜치)에 스키마 만들기 (역할·RLS 포함)
+DATABASE_URL_ADMIN=<새 DB 소유자 연결> ANCHOR_APP_PASSWORD=<앱 비밀번호> pnpm db:migrate
 
-# 3. 앱 역할·권한·RLS 는 덤프에 포함되지 않는다(--no-privileges). 마이그레이션 러너로 재적용:
-#    schema_migrations 가 덤프에 있으므로 0001/0002 는 "이미 적용"으로 뜬다. 역할과 GRANT/POLICY 만 다시 만든다:
-psql "$NEW_DATABASE_URL_ADMIN" -v ON_ERROR_STOP=1 -f db/recovery/reapply-roles-and-rls.sql   # (아래 참고)
+# 3. 행 복원. 삭제 원장에 있는 계정은 자동으로 빼고 넣는다.
+DATABASE_URL_ADMIN=<새 DB 소유자 연결> pnpm backup:restore anchor-<STAMP>.json.gz
 
-# 4. 삭제 원장 재적용: 덤프 이후 삭제를 요청한 계정은 복원본에서도 지운다
-psql "$NEW_DATABASE_URL_ADMIN" -c "DELETE FROM users WHERE id IN (SELECT user_id FROM account_deletions)"
+# 4. Neon Auth: 새 브랜치의 Auth 를 켜고 Google 제공자 확인. 백업 안의 neon_auth.user/account 는
+#    같은 Google 계정이 같은 user_id 로 이어지게 하는 참고 자료다 (Neon Auth 콘솔에서 사용자를 다시 만들 때 id 를 맞춘다).
 
-# 5. /api/health 가 rls_all_forced=true, role_bypasses_rls=false 를 돌려주는지 확인 후 ANCHOR_DATABASE_URL 교체
+# 5. /api/health 가 rls_all_enabled=true, role_bypasses_rls=false, db_role=anchor_app 를 돌려주는지 확인 후
+#    Vercel 의 ANCHOR_DATABASE_URL 을 새 DB 로 교체
 ```
 
-`db/recovery/reapply-roles-and-rls.sql` 은 0001 의 역할 생성 블록과 GRANT, 0002 전체를 이어붙인 파일이다. 0002 가 바뀌면 함께 갱신한다.
+(선택) pg_dump 덤프가 있으면 `pg_restore --no-owner --no-privileges` 뒤 `db/recovery/reapply-roles-and-rls.sql` 을 적용한다.
 
 ## 계정 삭제와 백업
 
 계정 삭제(`POST /api/account/delete`)는 즉시 CASCADE 로 지우고 `account_deletions` 에 기록한다. 이미 만들어진 덤프 파일 속 사본은 수정할 수 없으므로:
 
-- 보존 기간(35일)이 지나면 `nightly-backup` 이 파일을 지우고 `backups_purged_at` 을 채운다. 그 시점에 사본이 완전히 사라진다.
+- 보존 기간(35일)이 지나면 `/api/cron/backup` 이 파일을 지우고 `backups_purged_at` 을 채운다. 그 시점에 사본이 완전히 사라진다.
 - 그 사이 복구를 하면 절차 C-4 로 해당 계정을 다시 지운다.
-- Neon PITR/스냅샷 안의 사본은 각각 7일/14일 후 사라진다.
+- Neon PITR/스냅샷 안의 사본은 각각 6시간(무료 플랜)/14일 후 사라진다.
 
 사용자에게는 "삭제 후 최대 35일 안에 백업 사본까지 사라진다"고 명시한다.
 
