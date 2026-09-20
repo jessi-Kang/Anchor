@@ -4,7 +4,8 @@
  *   pnpm vercel-build                    빌드 전에 --pre-deploy 로 실행
  *
  * --pre-deploy 모드: NEON_API_KEY / NEON_PROJECT_ID / NEON_BRANCH_ID 중 하나라도 없거나
- * 프로덕션 빌드(VERCEL_ENV=production)가 아니면 건너뛴다. 프로덕션에서 스냅샷 실패는 빌드 실패다.
+ * 프로덕션 빌드(VERCEL_ENV=production)가 아니면 건너뛴다.
+ * 스냅샷 API 가 실패하면(무료 플랜 제한 등) 경고만 남기고 빌드는 계속한다. SNAPSHOT_REQUIRED=1 이면 빌드를 멈춘다.
  *
  * API: POST /api/v2/projects/{project_id}/branches/{branch_id}/snapshot?name=&expires_at=
  */
@@ -43,7 +44,12 @@ async function main() {
     headers: { Authorization: `Bearer ${NEON_API_KEY}`, Accept: "application/json" },
   });
   if (!res.ok) {
-    throw new Error(`[snapshot] 실패 ${res.status}: ${await res.text()}`);
+    const msg = `[snapshot] 실패 ${res.status}: ${await res.text()}`;
+    if (preDeploy && process.env.SNAPSHOT_REQUIRED !== "1") {
+      console.warn(msg + " → 경고만 남기고 빌드 계속 (SNAPSHOT_REQUIRED=1 이면 중단)");
+      return;
+    }
+    throw new Error(msg);
   }
   const body = (await res.json()) as { snapshot?: { id?: string } };
   console.log(`[snapshot] 생성됨 ${name} (id=${body.snapshot?.id ?? "?"}, 만료 ${expiresAt})`);
