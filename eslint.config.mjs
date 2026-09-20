@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 에이전트 스킬 번들(impeccable 등)은 앱 코드가 아니라 린트 대상에서 뺀다.
+    ".claude/**",
   ]),
 ]);
 
