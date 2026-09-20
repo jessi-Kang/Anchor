@@ -11,7 +11,7 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | 이름 | 하는 일 | 이 세션만 고치는 곳 | 브랜치 | 세션 ID |
 | --- | --- | --- | --- | --- |
 | **Anchor · PM (조율)** | 결정·우선순위·통합 순서·완결 판정. 코드/디자인/기획 문서를 직접 고치지 않는다 | `docs/TEAM.md` | `claude/affectionate-brahmagupta-947f48` | `session_01QPJ4i1hJ5zENanv7ykjp1t` |
-| **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도, 제품 원칙 | `CLAUDE.md` · `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` | `claude/create-readme-vibelog-9c5xnb` | `session_01GLHC1ArhYJTqPuDysDoSWt` |
+| **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도, 제품 원칙 | `CLAUDE.md` · `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` | (세션 생성 시 할당) | `session_01YJ3vydkSn54KDcf69rC6Vp` |
 | **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | (세션 생성 시 할당) | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
 | **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_019gYCLNic9TA9jvmQikfhfk` |
@@ -19,6 +19,8 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | ~~Anchor · 버그픽스~~ | 개발로 통합, 종료. 브랜치만 남긴다 | — | `claude/gallant-clarke-qt36ez` | `session_01ANSrRXJkcbqr7SwicPUVpM` |
 
 모든 세션에 `anchor` 태그가 붙어 있다. 명단을 다시 볼 때는 `list_sessions(tags=["anchor"])`.
+
+**세션은 승인 없이 도구를 쓸 수 있는 모드로 띄운다.** plan 모드 세션은 도구를 쓸 때마다 사람의 승인을 기다리므로 Jessi 의 손을 붙잡는다. 권한 모드는 만든 뒤에 바꿀 수 없으니, 잘못 떴으면 같은 역할을 새 세션으로 세우고 옛 세션은 멈춘다. 브랜치에 main 에 없는 커밋이 없는지 먼저 확인한다.
 
 보내는 길:
 - QA 가 찾은 것 → 코드 결함은 **개발**, 기획 문제는 **PM**. QA 가 두 곳에 같은 건을 보내지 않는다.
