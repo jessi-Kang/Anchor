@@ -15,15 +15,30 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | `claude/docs-status-7t3m1a` | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
 | **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_019gYCLNic9TA9jvmQikfhfk` |
+| **Anchor · 보안** | 데이터 원칙이 코드와 DB 에서 실제로 성립하는지 확인한다. **코드를 고치지 않는다** | `docs/SECURITY.md` | `claude/security-audit-1mrnbe` | `session_01MRNbEc9RPrR5vsdK3chLWR` |
 | **Anchor · QA** | 검증 플로우를 만들고, 돌려 보고, 판정한다. **코드를 고치지 않는다** | `docs/QA.md` | `claude/optimistic-hopper-kaafdu` | `session_01QxSgxQRsFT1grCVZrxTEhi` |
 | ~~Anchor · 버그픽스~~ | 개발로 통합, 종료. 고친 것이 없어 브랜치도 버린다 | — | — | `session_01ANSrRXJkcbqr7SwicPUVpM` |
 
-모든 세션에 `anchor` 태그가 붙어 있다. 명단을 다시 볼 때는 `list_sessions(tags=["anchor"])`.
+### 묶음
+
+일하는 세션은 모두 `anchor` 태그를 달고, 그 아래 네 묶음으로 나뉜다. 묶음은 소유 구조와 같다 — 기준을 쓰는 쪽, 만드는 쪽, 보는 쪽, 조율.
+
+| 묶음 | 태그 | 누가 | 무엇을 소유하는가 |
+| --- | --- | --- | --- |
+| 조율 | `anchor-lead` | PM | 결정과 전달. 산출물을 직접 만들지 않는다 |
+| 기준 | `anchor-spec` | 기획 · 문서 | 문서. 무엇을 만들지와 지금 무엇이 참인지를 쓴다 |
+| 제작 | `anchor-build` | 디자인 · 개발 | 화면과 코드. 기준 문서를 그대로 옮긴다 |
+| 검증 | `anchor-verify` | QA · 보안 | 읽기 전용. 만든 것이 기준과 맞는지 본다 |
+
+끝난 세션은 `anchor` 를 떼고 `anchor-closed` 를 단다. 명단에 섞이지 않게 하려는 것이고, 기록은 남는다.
+
+묶음이 넷인 이유는 **같은 묶음 안에서는 파일이 겹치지 않고, 다른 묶음끼리는 반드시 PM 을 거치기 때문**이다. 제작이 기준을 고치거나 검증이 코드를 고치면 그 자리에서 충돌한다.
 
 **세션은 승인 없이 도구를 쓸 수 있는 모드로 띄운다.** plan 모드 세션은 도구를 쓸 때마다 사람의 승인을 기다리므로 Jessi 의 손을 붙잡는다. 권한 모드는 만든 뒤에 바꿀 수 없으니, 잘못 떴으면 같은 역할을 새 세션으로 세우고 옛 세션은 멈춘다. 브랜치에 main 에 없는 커밋이 없는지 먼저 확인한다.
 
 보내는 길:
 - QA 가 찾은 것 → 코드 결함은 **개발**, 기획 문제는 **PM**. QA 가 두 곳에 같은 건을 보내지 않는다.
+- 보안이 찾은 것 → 전부 **PM**. 등급이 "샘"(남의 데이터가 보이거나 비밀값이 나간다)이면 다른 모든 일보다 먼저 고친다.
 - 디자인이 화면 순서·화면 추가/삭제·문구 의도를 바꾸고 싶으면 → **PM**. PM 이 결정하고 **기획**이 `docs/FLOW.md` 에 반영한 뒤 **개발**에 알린다.
 - 개발이 기획 문서와 다르게 만들어야 할 이유를 찾으면 → **PM**. 혼자 판단해서 문서와 다르게 만들지 않는다.
 - 문서에서 문체·중복·사실 불일치를 발견하면 → **문서**. 기준 문서(SPEC·FLOW·SITEMAP)에 대한 것이면 문서 세션이 고치지 않고 **PM** 에게 목록으로 보낸다.
@@ -123,5 +138,6 @@ Jessi 가 결정할 것은 돈이 들거나(유료 플랜·외부 계정), 제�
 | API 키 | `ANTHROPIC_API_KEY` · `ELEVENLABS_API_KEY` 는 Jessi 가 Vercel 에 직접 넣는다. 키 값은 채팅·커밋·문서 어디에도 쓰지 않는다 |
 | 가나를 못 읽을 때 | 한자 카드를 잠그지 않는다. 예고 1장을 보이고 그대로 카드로 보낸다. 읽기는 F10 에서 소리로 들려준다 |
 | PITR 기간이 적힌 곳 | `docs/BACKUP.md` 한 곳. 다른 문서는 숫자를 쓰지 않고 이 문서를 가리킨다 |
+| 마이그레이션 순서 | 마이그레이션은 **프로덕션에 적용하기 전에 `main` 에 들어간다.** 프로덕션 스키마가 `main` 보다 앞서면, `main` 을 체크아웃해 복구했을 때 없는 표가 생기고 백업 안의 행이 들어갈 곳을 잃는다 |
 | 스키마 변경 | `db/migrations/` 의 SQL 파일로만 한다. MCP 로 프로덕션 DB 에 직접 DDL 을 치지 않는다. 복구(`docs/BACKUP.md` 절차 C)가 `pnpm db:migrate` 로 스키마를 다시 만드는 전제 위에 서 있어, 파일에 없는 테이블은 복구하면 행째로 사라진다. 조회(SELECT)는 MCP 로 해도 된다 |
 | 만드는 순서 | `docs/TEAM.md` 4장이 정한다. `docs/SPEC.md` 9장은 무엇을 검증하는가를 정하고 순서를 정하지 않는다 |
