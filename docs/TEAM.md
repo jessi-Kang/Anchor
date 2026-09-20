@@ -14,7 +14,7 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도, 제품 원칙 | `CLAUDE.md` · `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` | (세션 생성 시 할당) | `session_01YJ3vydkSn54KDcf69rC6Vp` |
 | **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | `claude/docs-status-7t3m1a` | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
-| **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_019gYCLNic9TA9jvmQikfhfk` |
+| **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_01JXYTj8AuVoomHGMVQjEB6R` |
 | **Anchor · 보안** | 데이터 원칙이 코드와 DB 에서 실제로 성립하는지 확인한다. **코드를 고치지 않는다** | `docs/SECURITY.md` | `claude/security-audit-1mrnbe` | `session_01MRNbEc9RPrR5vsdK3chLWR` |
 | **Anchor · QA** | 검증 플로우를 만들고, 돌려 보고, 판정한다. **코드를 고치지 않는다** | `docs/QA.md` | `claude/optimistic-hopper-kaafdu` | `session_01QxSgxQRsFT1grCVZrxTEhi` |
 | ~~Anchor · 버그픽스~~ | 개발로 통합, 종료. 고친 것이 없어 브랜치도 버린다 | — | — | `session_01ANSrRXJkcbqr7SwicPUVpM` |
@@ -139,5 +139,6 @@ Jessi 가 결정할 것은 돈이 들거나(유료 플랜·외부 계정), 제�
 | 가나를 못 읽을 때 | 한자 카드를 잠그지 않는다. 예고 1장을 보이고 그대로 카드로 보낸다. 읽기는 F10 에서 소리로 들려준다 |
 | PITR 기간이 적힌 곳 | `docs/BACKUP.md` 한 곳. 다른 문서는 숫자를 쓰지 않고 이 문서를 가리킨다 |
 | 마이그레이션 순서 | 마이그레이션은 **프로덕션에 적용하기 전에 `main` 에 들어간다.** 프로덕션 스키마가 `main` 보다 앞서면, `main` 을 체크아웃해 복구했을 때 없는 표가 생기고 백업 안의 행이 들어갈 곳을 잃는다 |
+| DB 작업 도구 | 모든 세션이 **Bash 로 한다**: `psql`·`pnpm db:migrate`·`tsx` 스크립트·`curl`. Neon MCP(`mcp__Neon__*`)는 쓰지 않는다. MCP 는 허용 목록에 없는 도구가 나올 때마다 사람에게 승인창을 띄우는데, 세션마다 무엇이 빠졌는지 맞추는 것보다 한 경로로 통일하는 쪽이 사람 손을 덜 붙잡는다 |
 | 스키마 변경 | `db/migrations/` 의 SQL 파일로만 한다. MCP 로 프로덕션 DB 에 직접 DDL 을 치지 않는다. 복구(`docs/BACKUP.md` 절차 C)가 `pnpm db:migrate` 로 스키마를 다시 만드는 전제 위에 서 있어, 파일에 없는 테이블은 복구하면 행째로 사라진다. 조회(SELECT)는 MCP 로 해도 된다 |
 | 만드는 순서 | `docs/TEAM.md` 4장이 정한다. `docs/SPEC.md` 9장은 무엇을 검증하는가를 정하고 순서를 정하지 않는다 |
