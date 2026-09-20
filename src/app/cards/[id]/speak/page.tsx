@@ -53,7 +53,7 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
         </div>
       </Card>
       <Space h={16} />
-      <SpeakLoop cardId={id} text={word} preview={preview} startAttempt={loop.startAttempt} startPrev={loop.startPrev} />
+      <SpeakLoop cardId={id} text={word} preview={preview} startAttempt={loop.startAttempt} startPrev={loop.startPrev} nativeVoice={loop.nativeVoice} />
     </Screen>
   );
 }
