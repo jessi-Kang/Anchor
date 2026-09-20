@@ -89,6 +89,27 @@ export async function getPartNames(chars: string[]): Promise<Map<string, string>
   });
 }
 
+/**
+ * 이 계정이 **판정으로 만난** 한자 전부 (자료를 가리지 않는다).
+ *
+ * `inputProgress` 의 `anchors` 는 그 자료에 나온 한자만 담는다 — 재만남(F12)은 그 자료의 본문만
+ * 칠하니 그걸로 충분하지만, 착지 낱말(Scene5·F10)은 자료 밖의 낱말을 낸다. 자료 안만 보면 다른
+ * 기사에서 이미 푼 글자를 아직 안 만난 것으로 치고 멀쩡한 낱말을 지운다.
+ *
+ * `isJudged` 와 같은 기준이다 — 씨앗·추론으로 켜진 것은 사용자가 만난 적이 없다.
+ */
+export async function judgedKanji(userId: string): Promise<Set<string>> {
+  return withUser(userId, async (tx) => {
+    const { rows } = await tx.query<{ key: string }>(
+      `SELECT n.key FROM user_node_state s JOIN nodes n ON n.id = s.node_id
+        WHERE s.user_id = $1 AND s.knows_meaning AND s.source IN ('input', 'card')
+          AND n.kind = 'kanji'`,
+      [userId],
+    );
+    return new Set(rows.map((r) => r.key));
+  });
+}
+
 export async function getKanjiStates(userId: string, nodeIds: string[]): Promise<Map<string, KanjiState>> {
   if (nodeIds.length === 0) return new Map();
   return withUser(userId, async (tx) => {

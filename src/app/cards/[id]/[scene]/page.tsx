@@ -1,7 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { getCard, type CardPayload } from "@/lib/db/cards";
+import { judgedKanji } from "@/lib/db/kanji";
 import { cardContext } from "@/lib/cards/progress";
+import { landingWords } from "@/lib/cards/landing";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Label, Lead, Card, Grow, Button, Ghost, Mark, Ja, rubyKanji, uiStyles as s } from "@/components/ui";
 import { withParticle } from "@/lib/ko";
@@ -63,6 +65,9 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   let where = "카드 1 / 4";
   let guess = "힘을 합친다";
   let verdict = "거의 맞음";
+  // 착지 낱말을 거르는 기준. 참고 화면과 같은 상태로 둔다: 力 은 만났고 妥 는 아직이라
+  // 協力 만 남는다 (design/screens/Scene5.html).
+  let met = new Set(["力"]);
 
   if (!preview) {
     const user = await currentUser();
@@ -77,6 +82,8 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
     const ctx = await cardContext(user.id, card);
     p = card.payload;
     where = ctx.where;
+    // 자료가 아니라 계정 전체를 본다 — 다른 기사에서 이미 푼 글자도 만난 글자다 (lib/db/kanji.ts).
+    met = await judgedKanji(user.id);
     guess = card.guess ?? "";
     verdict = (card.payload as CardPayload & { verdict?: string }).verdict ?? "";
   }
@@ -194,7 +201,7 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
       <Label as="h1">이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.hook.mark }, "이가")} 들어 있어</Label>
       <Space h={10} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {(p.landing.length ? p.landing : [{ word: p.kanji, reading: p.reading, ko: p.hook.word }]).map((w) => (
+        {landingWords(p, met).map((w) => (
           <Card key={w.word}>
             <div className={s.landing}>
               <div className={s.landingWord}>
