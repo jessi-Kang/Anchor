@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
 import { getInput } from "@/lib/db/inputs";
 import { getKanjiNodes, getPartNames, judgeKanji } from "@/lib/db/kanji";
+import { recordEncounter } from "@/lib/db/encounters";
 import { createCard, findOpenCard, type CardPart, type CardPayload } from "@/lib/db/cards";
 import { getSettings } from "@/lib/db/settings";
 import { getCardContent } from "@/lib/kanji/card-content";
@@ -11,10 +12,18 @@ import { findWordWith } from "@/lib/kanji/extract";
 import { getFurigana } from "@/lib/kanji/furigana";
 import { kanaGate } from "@/lib/kana";
 
-/** F03 "알아 / 몰라" 한 탭 */
-export async function judge(nodeId: string, knows: boolean) {
+/**
+ * F03 "알아 / 몰라" 한 탭. 두 군데에 적는다.
+ *
+ * `user_node_state` 는 **지금 상태**라 덮어쓴다 — 이력이 없다. `encounters` 는 **일어난 일**이라
+ * 쌓인다. 통과 기준의 "재만남 인식률" 은 쌓인 쪽에서만 나오고, 지나간 날은 나중에 못 채운다
+ * (lib/db/encounters.ts).
+ */
+export async function judge(nodeId: string, inputId: string, knows: boolean) {
   const user = await requireUser();
   await judgeKanji(user.id, nodeId, knows);
+  // 기록이 실패해도 판정은 이미 남았다 — 화면을 멈춰 세우지 않는다.
+  await recordEncounter(user.id, nodeId, inputId, knows).catch((e) => console.error("[encounters] 기록 실패", e));
 }
 
 /**
