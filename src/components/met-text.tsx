@@ -65,11 +65,22 @@ export function MetText({
     const runChars = Array.from(run.text);
     const allMet = runChars.every((ch) => met.has(ch));
     const reading = allMet ? readings?.[i] : undefined;
-    const glyphs = runChars.map((ch, j) => (
-      <span key={j} className={met.has(ch) ? s.metSeen : undefined}>
-        {ch}
-      </span>
-    ));
+    // 판정은 글자마다, **그리는 것은 붙어 있는 만큼 한 덩어리로.** 글자마다 틴트 상자를 씌우면
+    // 상자마다 좌우 여백이 들어가 協 力 사이에 흰 틈이 생기고, 한 낱말이 두 조각으로 보인다.
+    // 갈리는 자리(妥協)는 여전히 갈린다 — 이어 붙이는 것은 같은 판정이 잇따를 때뿐이다.
+    const glyphs = runChars
+      .reduce<{ seen: boolean; text: string }[]>((out, ch) => {
+        const seen = met.has(ch);
+        const last = out[out.length - 1];
+        if (last && last.seen === seen) last.text += ch;
+        else out.push({ seen, text: ch });
+        return out;
+      }, [])
+      .map((g, j) => (
+        <span key={j} className={g.seen ? s.metSeen : undefined}>
+          {g.text}
+        </span>
+      ));
     // 셋을 가른다. 만난 덩어리인데 읽기가 없으면 **빈칸을 달지 않는다** — 빈칸은 "아직 못 푼 것" 이라는
     // 뜻이라, 이미 만난 글자에 달면 화면이 거짓을 말한다. 읽기가 없으면 아무것도 안 단다.
     if (!allMet) out.push(<Ruby key={`r${i}`}>{glyphs}</Ruby>);
