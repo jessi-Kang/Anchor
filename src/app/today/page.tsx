@@ -114,6 +114,10 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     }),
   );
   const nextRow = rows.find((r) => r.next);
+  // 카드 큐가 비면 홈 대신 하루 끝(F15) (docs/FLOW.md 1′장 56행). 자료는 있는데 볼 카드가 하나도
+  // 없는 상태다 — 그때 홈은 "다음 카드 이유" 를 댈 것이 없어 할 말이 없는 화면이 된다.
+  const japanese = rows.filter((r) => r.input.lang === "ja");
+  if (japanese.length > 0 && japanese.every((r) => r.remaining === 0)) redirect("/today/done");
   // 아는 것 → 다음 것, 한 문장. 아는 것을 앞에 둔다 (docs/FLOW.md 4장). 두 줄로 늘리지 않는다.
   // 주어 자리에는 **판정된** 것만 온다(`via`). 부를 발판이 없으면 억지로 붙이지 말고 자료를 댄다.
   // 괄호로 앵커 단어를 보여 주지 않는다 — 아직 안 푼 카드의 정답을 미리 까는 꼴이라 원칙 1 위반이다.
