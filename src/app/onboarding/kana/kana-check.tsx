@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Tiles, Tile, Space, Status, Pill, Grow, Button, Ghost } from "@/components/ui";
+import { Tiles, Tile, Space, Status, Grow, Button, Ghost, TextAction } from "@/components/ui";
 import { submitKana } from "./actions";
 
 type Kana = { glyph: string; say: string };
@@ -148,18 +148,16 @@ export function KanaCheck({ kana, preview, next, from }: { kana: Kana[]; preview
       <Status
         dot={state === "listening" ? "on" : "off"}
         right={
-          state === "listening" && !preview ? (
-            <button
-              type="button"
+          // 미리보기에서도 낸다 — 참고 화면(O03a)에 있는 것이라, 안 내면 픽셀 비교가 늘 어긋난다.
+          state === "listening" ? (
+            <TextAction
               onClick={() => {
                 stopMic();
                 setState("off");
               }}
-              style={{ background: "none", border: 0, padding: 0, font: "inherit", cursor: "pointer" }}
-              aria-label="마이크 끄기"
             >
-              <Pill on>마이크 끄기</Pill>
-            </button>
+              마이크 끄기
+            </TextAction>
           ) : undefined
         }
       >
