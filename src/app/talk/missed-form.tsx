@@ -5,7 +5,7 @@ import { Space, Button, uiStyles as s } from "@/components/ui";
 import { submitMissed } from "./actions";
 
 /**
- * F13 입력. 한국어 한 줄 하나 + 주 버튼 하나.
+ * F13 입력. 한국어 한 줄 하나 + 주 버튼 하나. 주 버튼은 F17(추측)로 간다 — 영어는 그 다음 화면이 준다.
  * 빈 칸이 F13, 쓴 뒤가 F13a 다 (design/screens). 빈 줄이면 주 버튼이 꺼져 있고,
  * 그동안 여기서 나가는 길은 위 라벨(홈)뿐이다.
  */
@@ -26,7 +26,7 @@ export function MissedForm({ preview }: { preview: boolean }) {
       />
       <Space h={12} />
       <Button disabled={pending || line.trim().length === 0} onClick={() => !preview && start(() => submitMissed(line))}>
-        {pending ? "영어로 옮기는 중" : "영어로 어떻게 말하지"}
+        {pending ? "여는 중" : "내가 먼저 해 볼게"}
       </Button>
     </>
   );

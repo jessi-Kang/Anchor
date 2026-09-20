@@ -6,6 +6,14 @@ import { Card, Label, Lead, Space, Grow, Button, ButtonRow, Ghost, uiStyles as s
 type Point = { t: number; f0: number };
 
 /**
+ * 원어민 음성이 없을 때의 한 줄. **수치를 내지 않는다** — 내 소리끼리의 일치도는 정확도가 아니라
+ * 일관성이라, 같은 발음을 다섯 번 똑같이 틀려도 그 숫자는 올라간다 (design/SCREENS.md).
+ */
+const NO_NATIVE_NOTE = "아직 견줄 원어민 소리가 없어. 지금은 내 소리끼리 겹쳐 봐.";
+
+const legendAria = (noNative: boolean) => (noNative ? "내 억양 곡선 두 회차" : "원어민과 내 억양 곡선");
+
+/**
  * 듣기 → 따라 말하기 → 곡선. 한자 카드(F10)와 대화 덩어리(F14)가 같은 루프를 쓴다.
  * (곡선 비교는 다음 단계: 지금은 내 곡선만, 원어민 곡선은 TTS 오디오가 있을 때)
  * - 듣기: /api/tts (ElevenLabs). 204 면 브라우저 음성으로. 재생한 오디오에서 피치를 뽑아 "원어민" 곡선으로 쓴다.
@@ -24,6 +32,7 @@ export function PitchLoop({
   onDone,
   firstNote,
   startAttempt,
+  nativeVoice,
 }: {
   target: { card: string } | { chunk: string };
   text: string;
@@ -35,12 +44,20 @@ export function PitchLoop({
   firstNote: string;
   /** 이미 쌓인 녹음 수. 범례의 회차는 화면 상태가 아니라 DB 의 사실이다 (docs/FLOW.md 1′장) */
   startAttempt: number;
+  /**
+   * 이 언어의 원어민 음성이 있는가 (서버가 `lib/tts-voice.ts` 로 판단해 내려 준다).
+   * 없으면 F14a: 원어민 검정 선 없이 **내 소리끼리 회차를 겹쳐** 본다. 값이 채워지면 그 순간부터 F14 다.
+   */
+  nativeVoice?: boolean;
 }) {
   const [native, setNative] = useState<Point[] | null>(() => (preview ? demoCurve(0) : null));
   const [mine, setMine] = useState<Point[] | null>(() => (preview ? demoCurve(1) : null));
+  // 원어민 소리가 없을 때 겹칠 **직전 회차** 곡선. 있을 때는 안 쓴다.
+  const [prevMine, setPrevMine] = useState<Point[] | null>(() => (preview && nativeVoice === false ? demoCurve(0) : null));
   const [attempt, setAttempt] = useState(preview ? 3 : startAttempt);
   const [state, setState] = useState<"idle" | "playing" | "recording" | "saving">("idle");
-  const [note, setNote] = useState<string>(firstNote);
+  const noNative = nativeVoice === false;
+  const [note, setNote] = useState<string>(noNative ? NO_NATIVE_NOTE : firstNote);
   const ctxRef = useRef<AudioContext | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -73,7 +90,7 @@ export function PitchLoop({
           window.speechSynthesis.cancel();
           window.speechSynthesis.speak(u);
         });
-        setNote("브라우저 음성이야. 목소리 키를 넣으면 원어민 곡선도 보여.");
+        setNote(noNative ? NO_NATIVE_NOTE : "브라우저 음성이야. 목소리 키를 넣으면 원어민 곡선도 보여.");
       }
     } catch (e) {
       console.error(e);
@@ -115,7 +132,10 @@ export function PitchLoop({
       const ctx = audioCtx();
       const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
       const curve = pitchTrack(audio.getChannelData(0), audio.sampleRate);
-      setMine(curve);
+      setMine((prev) => {
+        setPrevMine(prev);
+        return curve;
+      });
       setAttempt((a) => a + 1);
       const form = new FormData();
       if ("card" in target) form.set("card_id", target.card);
@@ -137,12 +157,25 @@ export function PitchLoop({
     <>
       <Card>
         <Label>억양 비교</Label>
-        <Curves native={native} mine={mine} />
+        <Curves native={noNative ? prevMine : native} mine={mine} label={legendAria(noNative)} />
+        {/*
+          범례는 늘 있다 (CLAUDE.md). 원어민 소리가 없으면 검정 선은 **원어민이 아니라 직전 회차**다 —
+          같은 선을 두고 이름만 바꾸면 거짓말이 되므로, 그릴 것이 없으면 그 항목 자체를 안 낸다.
+        */}
         <div className={s.legend}>
-          <span className={s.legendItem}>
-            <span className={s.legendLine} style={{ background: "var(--curve-native)" }} />
-            원어민
-          </span>
+          {noNative ? (
+            prevMine && (
+              <span className={s.legendItem}>
+                <span className={s.legendLine} style={{ background: "var(--curve-native)" }} />
+                나, {Math.max(1, attempt - 1)}회차
+              </span>
+            )
+          ) : (
+            <span className={s.legendItem}>
+              <span className={s.legendLine} style={{ background: "var(--curve-native)" }} />
+              원어민
+            </span>
+          )}
           <span className={s.legendItem}>
             <span className={s.legendLine} style={{ background: "var(--curve-me)" }} />
             나{attempt > 0 ? `, ${attempt}회차` : ""}
@@ -174,7 +207,7 @@ export function PitchLoop({
 }
 
 /** 두 곡선. 범례는 항상 (CLAUDE.md). 데이터가 없으면 축만. */
-function Curves({ native, mine }: { native: Point[] | null; mine: Point[] | null }) {
+function Curves({ native, mine, label }: { native: Point[] | null; mine: Point[] | null; label: string }) {
   const W = 316;
   const H = 100;
   const path = (pts: Point[] | null) => {
@@ -195,7 +228,7 @@ function Curves({ native, mine }: { native: Point[] | null; mine: Point[] | null
       .join(" ");
   };
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="원어민과 내 억양 곡선" style={{ maxWidth: "100%" }}>
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} style={{ maxWidth: "100%" }}>
       <path d={path(native)} fill="none" stroke="var(--curve-native)" strokeWidth={4} strokeLinecap="round" />
       <path d={path(mine)} fill="none" stroke="var(--curve-me)" strokeWidth={4} strokeLinecap="round" strokeDasharray="8 7" />
     </svg>

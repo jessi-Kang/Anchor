@@ -1,10 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
-import { getChunk, type ChunkRow } from "@/lib/db/chunks";
+import { getChunk, hasEnglish, type ChunkRow } from "@/lib/db/chunks";
 import { countRecordings } from "@/lib/db/recordings";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Card, Label, Mark, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
+import { hasNativeVoice } from "@/lib/tts-voice";
 import { TalkLoop } from "./talk-loop";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ const PREVIEW: ChunkRow = {
   situation: "이건 다음 스프린트로 미루죠",
   text: "Let's push this to the next sprint.",
   attitude: "제안",
-  meta: { chunk: "push this to" },
+  meta: { chunk: "push this to", guess: "Let's move this to next week." },
   created_at: "",
 };
 
@@ -43,10 +44,10 @@ export default async function TalkChunkPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ fixed?: string }>;
+  searchParams: Promise<{ fixed?: string; native?: string }>;
 }) {
   const { id } = await params;
-  const { fixed } = await searchParams;
+  const { fixed, native } = await searchParams;
   const preview = isDesignPreview();
   let chunk = PREVIEW;
   // 회차는 쌓인 사실이다. 화면을 다시 열어도 이어서 센다 (docs/FLOW.md 1′장, docs/SPEC.md 9장).
@@ -57,11 +58,18 @@ export default async function TalkChunkPage({
     if (!user) redirect("/");
     const row = await getChunk(user.id, id);
     if (!row) notFound();
+    // 영어 문장이 아직 없으면 추측을 안 거친 것이다. F17 로 돌려보낸다 — 여기서 만들어 주면
+    // 추측 화면을 건너뛰는 길이 생긴다 (docs/FLOW.md 1′장: F13 → F17 → F14).
+    if (!hasEnglish(row)) redirect(`/talk/${id}/guess`);
     chunk = row;
     startAttempt = await countRecordings(user.id, { chunk: row.id });
   }
 
   const highlight = chunk.meta.chunk ?? chunk.text;
+  // 원어민 음성이 있는지는 서버만 안다. 값이 채워지면 코드를 안 고쳐도 그 순간부터 F14 로 바뀐다.
+  // 디자인 미리보기에서만 `?native=0` 으로 F14a(원어민 소리 없음)를 띄운다 — 참고 화면이 둘이라
+  // 둘 다 눈으로 견줄 수 있어야 한다. 실제 화면은 이 파라미터를 보지 않는다.
+  const nativeVoice = preview ? native !== "0" : hasNativeVoice("en");
 
   return (
     <Screen where="못 한 말" up="/talk" aside={preview ? "오후 7:11" : nowKST()} fixed={fixed === "1"}>
@@ -71,14 +79,33 @@ export default async function TalkChunkPage({
         <div className={s.talkSituation}>{chunk.situation}</div>
       </Card>
       <Space h={10} />
+      {/*
+        내 추측과 영어 문장을 **나란히**. 채점하지 않는다 — 정오·점수·빨간 줄·취소선이 없고,
+        두 줄의 크기·굵기·색이 같다(`s.talkLine` 하나를 같이 쓴다). 나란히 놓는 것 자체가 비교이고,
+        거기에 판정을 얹는 순간 교정 화면이 된다 (docs/FLOW.md 4장, design/SCREENS.md).
+        추측이 없는 행(이 화면이 생기기 전에 만든 것)은 아랫줄만 나온다.
+      */}
       <Card>
-        <Label>영어로는 이 덩어리 하나로</Label>
-        <h1 className={s.source} lang="en">
-          {markChunk(chunk.text, highlight)}
-        </h1>
+        {chunk.meta.guess && (
+          <>
+            <div className={s.talkPair}>
+              <Label>내가 쓴 것</Label>
+              <p className={s.talkLine} lang="en">
+                {chunk.meta.guess}
+              </p>
+            </div>
+            <div className={s.talkDivider} />
+          </>
+        )}
+        <div className={s.talkPair}>
+          <Label>이 말</Label>
+          <h1 className={s.talkLine} lang="en">
+            {markChunk(chunk.text, highlight)}
+          </h1>
+        </div>
       </Card>
       <Space h={16} />
-      <TalkLoop chunkId={chunk.id} text={highlight} preview={preview} startAttempt={startAttempt} />
+      <TalkLoop chunkId={chunk.id} text={highlight} preview={preview} startAttempt={startAttempt} nativeVoice={nativeVoice} />
     </Screen>
   );
 }

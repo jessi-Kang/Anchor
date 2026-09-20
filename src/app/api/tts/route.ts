@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth/server";
+import { hasNativeVoice } from "@/lib/tts-voice";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,8 @@ export async function GET(req: Request) {
   const key = process.env.ELEVENLABS_API_KEY;
   const mine = url.searchParams.get("voice") === "mine";
   const lang = url.searchParams.get("lang") === "en" ? "en" : "ja";
-  const perLang = lang === "en" ? process.env.ELEVENLABS_VOICE_ID_EN : process.env.ELEVENLABS_VOICE_ID_JA;
+  // 204 를 주는 조건은 화면이 "원어민 소리가 없다" 고 말하는 조건과 같아야 한다 → lib/tts-voice.ts
+  const perLang = hasNativeVoice(lang) ? (lang === "en" ? process.env.ELEVENLABS_VOICE_ID_EN : process.env.ELEVENLABS_VOICE_ID_JA) : undefined;
   // voice=mine 일 때만 Jessi 목소리 클론을 쓴다. 그 밖에는 언어 음성이 없으면 **소리를 주지 않는다**(204).
   // 클론으로 대신 떨어지면 화면이 그 곡선을 "원어민"이라고 부르게 된다 — 내 목소리와 내 목소리를 겹쳐
   // 놓고 비교하는 꼴이라 루프가 무의미해진다. 없는 것을 없다고 말하는 쪽이 맞다(브라우저 음성으로 듣고,

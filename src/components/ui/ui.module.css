@@ -630,3 +630,30 @@ a.row,
   line-height: 1.5;
   color: var(--color-text1);
 }
+
+/*
+ * F14 "내가 쓴 것" / "이 말" 두 줄 (design/screens/F14.html).
+ * **크기·굵기·색이 같다.** 내 추측을 작게 하거나 흐리게 하면 그게 곧 "틀렸다" 는 표시가 된다
+ * (design/SCREENS.md "추측을 채점하지 않는다"). 영어 쪽 틴트는 그 안의 말을 가리키는 것이지
+ * 정답 표시가 아니다. 그래서 한 클래스를 두 줄이 같이 쓴다 — 갈라 두면 언젠가 한쪽만 바뀐다.
+ */
+.talkLine {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--color-text1);
+}
+
+/* 두 줄 사이 1px. 나누는 선이지 위아래에 값을 매기는 선이 아니다. */
+.talkDivider {
+  height: 1px;
+  background: var(--color-line);
+}
+
+.talkPair {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
