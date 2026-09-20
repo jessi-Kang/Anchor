@@ -1,0 +1,6 @@
+{
+  "name": "Anchor",
+  "status": "building",
+  "stack": ["Next.js", "TypeScript", "Neon Postgres", "Neon Auth", "Vercel", "Claude API", "ElevenLabs"],
+  "hide": false
+}

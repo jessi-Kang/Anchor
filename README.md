@@ -91,7 +91,16 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 │   ├── screenshots/     위 화면의 PNG
 │   └── logo/            확정 로고 A안 (alternatives/는 탈락안, 제품에 쓰지 않음)
 ├── prompts/kickoff.md   구현 시작 프롬프트 (단계별 진행 순서)
-└── apps/ …              (구현이 진행되면서 추가)
+├── src/
+│   ├── app/             Next.js App Router (페이지, /api/*)
+│   ├── lib/auth/        Neon Auth 서버·클라이언트 인스턴스
+│   ├── lib/db/          withUser() 트랜잭션 헬퍼 (RLS 컨텍스트)
+│   └── proxy.ts         라우트 보호 미들웨어
+├── db/
+│   ├── migrations/      SQL 마이그레이션 (0001 스키마·역할, 0002 RLS)
+│   └── recovery/        복구 시 역할·RLS 재적용
+├── scripts/             migrate.ts, backup/neon-snapshot.ts
+└── .github/workflows/   backup.yml (매일 pg_dump → 외부 S3)
 ```
 
 ## 화면 흐름
@@ -138,7 +147,43 @@ Jessi에게 "초급/중급/고급"을 묻는 UI가 생기면 버그다.
 
 ## 개발
 
-구현 코드가 추가되면 이 절에 로컬 실행·환경 변수·마이그레이션 방법을 채운다. 현재는 기획 산출물(문서·디자인)만 있다.
+```bash
+pnpm install
+cp .env.example .env.local        # 값 채우기 (아래 표)
+pnpm db:migrate                    # DATABASE_URL_ADMIN 로 스키마 + RLS 적용
+pnpm dev                           # http://localhost:3000
+```
+
+| 변수 | 무엇 |
+| --- | --- |
+| `DATABASE_URL` | 앱 런타임 연결. 마이그레이션이 만드는 `anchor_app` 역할 (RLS 우회 불가) |
+| `DATABASE_URL_ADMIN` | 마이그레이션·백업 전용. 테이블 소유자 |
+| `ANCHOR_APP_PASSWORD` | 0001 마이그레이션이 `anchor_app` 을 만들 때 쓰는 비밀번호 |
+| `NEON_AUTH_BASE_URL` | Neon 콘솔 → Auth → Configuration 의 Auth URL. Google 제공자를 켜 둔다 |
+| `NEON_AUTH_COOKIE_SECRET` | `openssl rand -base64 32` |
+| `NEON_API_KEY` / `NEON_PROJECT_ID` / `NEON_BRANCH_ID` | 배포 전 스냅샷 (프로덕션만) |
+| `BACKUP_S3_*` | 매일 pg_dump 를 올릴 Neon 밖 스토리지 (GitHub Secrets) |
+
+```bash
+pnpm typecheck && pnpm lint && pnpm build   # 커밋 전
+pnpm db:migrate:status                       # 마이그레이션 상태
+curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_forced 가 true 여야 한다)
+```
+
+### 데이터 접근 규칙
+
+- 사용자 데이터 쿼리는 전부 `withUser(userId, tx => …)` 안에서. 트랜잭션마다 `app.user_id` 를 SET LOCAL 하고 RLS 정책이 그 사용자 행만 허용한다. 자세한 건 [db/README.md](./db/README.md).
+- 내보내기 `GET /api/export`, 계정 삭제 `POST /api/account/delete`. 백업·복구 절차는 [docs/BACKUP.md](./docs/BACKUP.md).
+
+### 구현 상태
+
+| 단계 | 상태 |
+| --- | --- |
+| 1. 골격: Next.js + Neon Auth(Google) + 스키마·RLS 마이그레이션 + 내보내기·삭제 엔드포인트 + 백업(스냅샷·pg_dump) | 완료 (Neon 프로젝트 연결 전) |
+| 2. 디자인 토큰 → CSS 변수, 공통 레이아웃, O01 픽셀 재현 | 다음 |
+| 3. 온보딩 O01–O04 | |
+| 4. 일본어 발견 카드 F04 → Scene1–5 → F11 | |
+| 5. 영어 대화 루프 F13–F14 | |
 
 ## 작업 방식
 
