@@ -2,13 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
 import { getInput, saveInputReadings } from "@/lib/db/inputs";
 import { inputProgress, freshKanji } from "@/lib/cards/progress";
+import { withParticle } from "@/lib/ko";
 import { kanjiRuns } from "@/lib/kanji/extract";
 import { getFurigana } from "@/lib/kanji/furigana";
 import { isDesignPreview } from "@/lib/design-preview";
 import { inputName } from "@/lib/input-name";
-import { Screen, Space, Card, Label, Grow, Button, Pill, uiStyles as s } from "@/components/ui";
+import { Screen, Space, Card, Label, Grow, Button, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
-import { MetText } from "@/components/met-text";
+import { MetText, runStates } from "@/components/met-text";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ const PREVIEW = {
   // 참고 화면과 같은 상태: 協力 은 만났고 基·妥 는 아직이다 (design/screens/F12.html).
   met: new Set(["協", "力"]),
   fresh: ["妥"],
+  sounds: new Map([["妥", "타"], ["協", "협"], ["力", "력"], ["基", "기"]]),
 };
 
 /**
@@ -47,6 +49,7 @@ export default async function ReadPage({
   let met = PREVIEW.met;
   let fresh = PREVIEW.fresh;
   let readings: string[] | undefined;
+  let sounds = PREVIEW.sounds;
 
   if (!preview) {
     const user = await currentUser();
@@ -61,6 +64,7 @@ export default async function ReadPage({
     body = input.body;
     met = prog.anchors;
     fresh = freshKanji(prog);
+    sounds = new Map(prog.nodes.map((n) => [n.key, n.meta.ko_sound ?? ""]));
 
     // 읽기는 한 번만 만들고 자료에 굳힌다. 사전 음이 아니라 이 문장에서 실제로 읽히는 소리다 —
     // 같은 이유로 F04 도 그렇게 한다(車 는 次世代の車 에서 "くるま" 다).
@@ -74,6 +78,16 @@ export default async function ReadPage({
     }
   }
 
+  // 읽기·한국어 낱말·아래 한 줄이 모두 이 한 계산에서 나온다.
+  const runs = runStates(body, met);
+  const mixed = runs.find((r) => r.met.length > 0 && r.fresh.length > 0) ?? null;
+  // 한국어 낱말은 **위 한 줄이 짚은 그 낱말**의 것이다. 딴 낱말을 끌어와 붙이지 않는다.
+  // 글자마다의 한국 한자음을 이어 만들고(妥協 → 타 + 협), 소리를 하나라도 모르면 만들지 않는다.
+  // 짚은 낱말은 만난 글자와 아직인 글자가 섞인 것이라 `allMet` 이 거짓이다 — 그래서 지금은 늘
+  // 가려진다. 규칙을 여기 한 줄로 두는 이유는, 나중에 조건이 바뀌어도 읽기와 같은 값을 보게 하려는 것이다.
+  const korean =
+    mixed && mixed.allMet && mixed.chars.every((c) => sounds.get(c)) ? mixed.chars.map((c) => sounds.get(c)).join("") : null;
+
   return (
     <Screen where={name} up={`/inputs/${id}`} aside={preview ? "점심 12:37" : nowKST()} fixed={fixed === "1"}>
       <Space h={20} />
@@ -86,26 +100,32 @@ export default async function ReadPage({
         </div>
       </Card>
       <Grow />
-      {fresh.length > 0 && (
-        <>
+      <div className={s.metFoot}>
+        {/*
+          이미 만난 글자를 짚어 주는 한 줄. 한 낱말 안에 만난 것과 아직인 것이 같이 있는 자리를 고른다 —
+          "妥協, 협은 방금 봤지" 가 이 화면이 하려는 말 그대로다.
+        */}
+        {mixed && (
+          <span className={s.metFootWord}>
+            {mixed.text}, {withParticle({ text: sounds.get(mixed.met[0]) ?? mixed.met[0], sound: null }, "은는")} 방금 봤지
+          </span>
+        )}
+        <span className={s.metFootLine}>
           {/*
-            개수 한 줄 (docs/FLOW.md 1′장 F12 행). **진한 것만 센다** — 틴트는 새로 배울 것이 아니다.
-            참고 화면은 이 위에 "妥協, 협은 방금 봤지" 한 줄이 더 있는데, 그건 임의의 한자어를
-            한국어로 뭐라고 읽는지("타협")를 알아야 지어진다. 믿을 값이 없어 짓지 않았다 — 기획에 물었다.
+            **한국어 낱말은 그 낱말의 한자를 전부 만났을 때만 보인다.** 읽기를 가리는 것과 같은 판단이고
+            (`allMet`), 같은 값에서 나온다. 妥 카드의 후킹이 "타협의 타" 라서, 미리 보여 주면 읽기는
+            가려 놓고 다음 카드의 앵커를 주는 꼴이 된다.
+            개수는 셋으로 갈린다 — 0개 / 1개 / 여럿. 0개일 때도 블록을 숨기지 않는다.
           */}
-          <div className={s.metFoot}>
-            <span className={s.metFootLine}>
-              {/*
-                하나면 이름을 부르고("새로 배울 건 妥 하나뿐"), 여럿이면 개수만 센다. 전부 늘어놓으면
-                열아홉 자가 한 줄에 깔려 읽히지 않는다 — FLOW 가 "개수 한 줄" 이라고 한 이유다.
-              */}
-              {fresh.length === 1 ? `새로 배울 건 ${fresh[0]} 하나뿐.` : `새로 배울 건 ${fresh.length}개.`}
-            </span>
-            <Pill on>재만남</Pill>
-          </div>
-          <Space h={12} />
-        </>
-      )}
+          {korean && `${korean}. `}
+          {fresh.length === 0
+            ? "새로 배울 건 없어. 다 만난 글자야."
+            : fresh.length === 1
+              ? `새로 배울 건 ${fresh[0]} 하나뿐.`
+              : `새로 배울 건 ${fresh.length}개.`}
+        </span>
+      </div>
+      <Space h={12} />
       <Button href="/today">읽기 끝</Button>
     </Screen>
   );

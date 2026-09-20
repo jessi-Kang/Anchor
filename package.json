@@ -15,6 +15,7 @@
     "design:tokens": "tsx scripts/design/tokens-to-css.ts",
     "design:check": "tsx scripts/design/check-screen.ts",
     "design:lint": "tsx scripts/design/lint-screens.ts",
+    "design:diff": "tsx scripts/design/diff-screens.ts",
     "db:seed": "tsx scripts/seed.ts",
     "backup:restore": "tsx scripts/backup/restore-json.ts",
     "kanji:build": "tsx scripts/kanji/build-kanjidic.ts"

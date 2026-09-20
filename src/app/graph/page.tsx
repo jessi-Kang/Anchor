@@ -106,8 +106,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
   // 방금 켠 한자는 가운데에 따로 서므로 뺀다.
   const known = [...ctx.anchors].filter((k) => k !== p.kanji);
   const via = cands.find((c) => c.via)?.via ?? null;
-  // 괄호로 앵커 단어를 보여 주면 아직 안 푼 카드의 정답을 미리 까는 꼴이다 (원칙 1).
-  // F03 은 거기서 판정하니까 "支 · 지출의 지" 가 괜찮지만, 그래프는 판정하는 자리가 아니다.
+  // 한자만 낸다. 앵커 단어는 판정하는 자리에서만 붙인다 (docs/FLOW.md 4장).
   const candText = cands.map((c) => c.kanji).join("·");
   const last = cands[cands.length - 1];
   const candSubject = { text: candText, sound: last?.koSound ?? null };

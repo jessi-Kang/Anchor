@@ -51,7 +51,7 @@ export async function inputProgress(userId: string, input: InputRow): Promise<In
 }
 
 /**
- * 아직 안 만난 한자 — 재만남(F12)이 진하게 보여 주는 것, 하루 끝(F15)이 "대기" 로 세는 것.
+ * 아직 안 만난 한자 — 재만남(F12)이 진하게 보여 주는 것, 하루 끝(F15)이 "또 만날 글자" 로 세는 것.
  * **두 화면이 같은 자리를 본다.** 따로 세면 F12 에서 하나로 보이는데 F15 는 둘이라고 말하게 된다.
  */
 export function freshKanji(prog: InputProgress): string[] {

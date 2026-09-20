@@ -183,8 +183,10 @@ pnpm dev                           # http://localhost:3000
 pnpm typecheck && pnpm lint && pnpm build   # 커밋 전
 pnpm db:migrate:status                       # 마이그레이션 상태
 pnpm design:tokens                           # design/tokens.json → src/app/tokens.css
-pnpm design:check O01 http://localhost:3000/?fixed=1   # 참고 HTML 과 픽셀 비교 (.design-check/)
-# 로그인이 필요한 화면을 찍을 땐 서버를 ANCHOR_DESIGN_PREVIEW=1 로 띄운다 (예시 데이터, 로컬 전용)
+pnpm design:check O01 http://localhost:3000/?fixed=1   # 한 화면만 참고 HTML 과 픽셀 비교 (.design-check/)
+pnpm design:diff                             # 매핑된 화면을 전부 훑어 차이가 큰 순서로 세운다 (판정 아님)
+# 둘 다 서버를 ANCHOR_DESIGN_PREVIEW=1 로 띄워야 로그인 없이 찍힌다 (예시 데이터, 로컬 전용)
+# 결과를 읽는 법(정상인 차이 셋)은 design/SCREENS.md "참고와 구현의 차이 훑기".
 curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_enabled 가 true, role_bypasses_rls 가 false 여야 한다)
 ```
 
