@@ -19,7 +19,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
       <Grow />
       <div className={s.hero}>
         <LogoMark size={72} />
-        <div className={s.wordmark}>Anchor</div>
+        <h1 className={s.wordmark}>Anchor</h1>
         <div className={s.tagline}>
           내가 읽고 들은 것에서 시작하는
           <br />

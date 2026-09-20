@@ -61,6 +61,7 @@
 }
 
 .title {
+  margin: 0;
   font-size: var(--font-size-title);
   font-weight: 700;
   line-height: 1.35;
@@ -166,9 +167,16 @@
   cursor: pointer;
   text-decoration: none;
 }
+/* 아직 누를 수 없는 주 버튼. 검정에 투명도를 주면 토큰에 없는 회색이 나오고 비활성인지도 흐리다.
+   참고 화면(F02.html)처럼 선 색 배경 + T3 글자로 (design/screens). */
 .button:disabled {
-  opacity: 0.6;
+  background: var(--color-line);
+  color: var(--color-text3);
   cursor: default;
+}
+.buttonOutline:disabled {
+  background: var(--color-card);
+  color: var(--color-text3);
 }
 .buttonOutline {
   background: var(--color-card);
@@ -176,6 +184,16 @@
   border: 1px solid var(--color-line);
 }
 
+/* 아직 켜지지 않은 회색 링크 자리 (삭제 확인: "삭제"를 입력해야 켜진다). 자리를 지켜 레이아웃이 튀지 않게. */
+.ghostOff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--button-ghost-height);
+  font-size: var(--font-size-body);
+  font-weight: 500;
+  color: var(--color-text3);
+}
 .ghost {
   display: flex;
   align-items: center;
@@ -302,7 +320,8 @@ a.row,
 /* F02 붙여넣기 상자. 참고 HTML 의 "붙여넣은 글" 본문(일본어 16px, 줄간 1.8)과 같은 글자로 */
 .paste {
   width: 100%;
-  min-height: 176px;
+  /* 참고 F02.html 의 글 상자 높이. 카드가 화면을 먹지 않게 작게 두고 필요하면 늘린다 */
+  min-height: 58px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -381,6 +400,7 @@ a.row,
 
 /* 출처 문장 30px (F04) */
 .source {
+  margin: 0;
   font-family: var(--font-jp), "Noto Sans JP", sans-serif;
   font-size: 30px;
   font-weight: 700;
@@ -390,6 +410,7 @@ a.row,
 
 /* 24px 굵은 제목 (Scene1·2 질문) */
 .ask {
+  margin: 0;
   font-size: 24px;
   font-weight: 700;
   line-height: 1.35;
@@ -484,6 +505,7 @@ a.row,
   line-height: 1;
 }
 .answer {
+  margin: 0;
   font-size: 26px;
   font-weight: 700;
   line-height: 1.35;
@@ -546,6 +568,7 @@ a.row,
   gap: 8px;
 }
 .speakBig {
+  margin: 0;
   font-family: var(--font-jp), "Noto Sans JP", sans-serif;
   font-size: 56px;
   font-weight: 700;
@@ -579,4 +602,23 @@ a.row,
   height: 12px;
   border-radius: 50%;
   box-sizing: border-box;
+}
+
+/* ── よみがな ───────────────────────────────────────────────────────────────
+   한자 위 읽기. 아직 가리는 자리는 점선 빈칸이고, 폭은 글자 크기에만 비례한다
+   (읽기 글자 수를 따르지 않는다 — docs/FLOW.md 4장, design/screens/F04.html). */
+.rt {
+  font-size: 0.5em;
+  font-weight: 500;
+  color: var(--color-text2);
+}
+.rtBlank {
+  line-height: 1;
+}
+.rtBlankMark {
+  display: inline-block;
+  width: 1.7em;
+  height: 0.5em;
+  border-bottom: 2px dashed var(--color-text3);
+  vertical-align: middle;
 }

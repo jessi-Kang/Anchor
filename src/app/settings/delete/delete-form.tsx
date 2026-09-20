@@ -2,17 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Lead, Space, Grow, Button, uiStyles as s } from "@/components/ui";
+import { Lead, Space, Grow, Button, Ghost, uiStyles as s } from "@/components/ui";
 
-/** 계정 삭제 확인 1장: "삭제"를 입력해야 진행. POST /api/account/delete → 로그인 화면. */
+/**
+ * 계정 삭제 확인 1장 (docs/FLOW.md 1′장, design/screens/F16a.html).
+ * 검은 주 버튼은 **돌아가는 쪽**("아니, 그만둘래" → 설정, 아무것도 지우지 않는다).
+ * 지우는 것은 그 아래 회색 링크이고, "삭제"를 입력해야 켜진다. POST /api/account/delete → 로그인 화면.
+ */
 export function DeleteForm() {
   const router = useRouter();
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const armed = typed === "삭제";
 
   const run = async () => {
-    if (busy || typed !== "삭제") return;
+    if (busy || !armed) return;
     setBusy(true);
     setError(null);
     const res = await fetch("/api/account/delete", {
@@ -48,9 +53,14 @@ export function DeleteForm() {
         </>
       )}
       <Grow />
-      <Button disabled={busy || typed !== "삭제"} onClick={run}>
-        {busy ? "지우는 중" : "계정 삭제"}
-      </Button>
+      <Button href="/settings">아니, 그만둘래</Button>
+      {armed && !busy ? (
+        <Ghost onClick={run}>지울게</Ghost>
+      ) : (
+        <div className={s.ghostOff} aria-disabled>
+          {busy ? "지우는 중" : "지울게"}
+        </div>
+      )}
     </>
   );
 }

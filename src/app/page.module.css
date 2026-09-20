@@ -6,6 +6,7 @@
   text-align: center;
 }
 .wordmark {
+  margin: 0;
   font-size: var(--font-size-kanji-sm);
   font-weight: 700;
   color: var(--color-text1);

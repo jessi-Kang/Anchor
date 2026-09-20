@@ -26,22 +26,27 @@ export function PasteForm({ lang, example, firstVisit }: { lang: Lang3; example:
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="여기에 붙여넣기"
-          rows={6}
+          rows={2}
           aria-label="붙여넣은 글"
         />
-        {firstVisit && (
-          <Row
-            title="日経 기사 한 문장"
-            sub="붙여넣을 게 없으면 이걸로"
-            right={isExample ? <Pill on>켜짐</Pill> : undefined}
-            pressed={isExample}
-            onClick={() => {
-              setText(example.body);
-              setUsedExample(true);
-            }}
-          />
-        )}
       </Card>
+      {firstVisit && (
+        <>
+          <Space h={10} />
+          <Card tint list>
+            <Row
+              title="日経 기사 한 문장"
+              sub="붙여넣을 게 없으면 이걸로"
+              right={isExample ? <Pill on>켜짐</Pill> : undefined}
+              pressed={isExample}
+              onClick={() => {
+                setText(example.body);
+                setUsedExample(true);
+              }}
+            />
+          </Card>
+        </>
+      )}
       <Space h={12} />
       <Grow />
       <Button disabled={pending || text.trim().length === 0} onClick={() => start(() => submitInput(lang, text, isExample))}>

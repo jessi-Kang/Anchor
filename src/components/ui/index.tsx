@@ -65,8 +65,12 @@ export function Space({ h }: { h: number }) {
   return <div style={{ height: h }} aria-hidden />;
 }
 
-export function Title({ children, lg }: { children: ReactNode; lg?: boolean }) {
-  return <div className={cx(s.title, lg && s.titleLg)}>{children}</div>;
+/**
+ * 화면 제목. 화면마다 하나이고 언제나 h1 이다 (상단 "지금 어디" 라벨은 제목이 아니다).
+ * 한 화면에 제목이 둘 필요하면 `as="h2"` 로 차례를 지킨다.
+ */
+export function Title({ children, lg, as: As = "h1" }: { children: ReactNode; lg?: boolean; as?: "h1" | "h2" }) {
+  return <As className={cx(s.title, lg && s.titleLg)}>{children}</As>;
 }
 
 export function Lead({ children }: { children: ReactNode }) {
@@ -93,8 +97,9 @@ export function Card({
   );
 }
 
-export function Label({ children }: { children: ReactNode }) {
-  return <div className={s.label}>{children}</div>;
+/** 카드 안 작은 라벨. 그 줄이 화면의 제목이기도 하면 `as="h1"` (Scene5). */
+export function Label({ children, as: As = "div" }: { children: ReactNode; as?: "div" | "h1" | "h2" }) {
+  return <As className={s.label}>{children}</As>;
 }
 
 /**
@@ -228,6 +233,28 @@ export function Ja({ children, size = "sm", mark }: { children: ReactNode; size?
     <span lang="ja" className={cx(s.ja, size === "md" && s.jaMd, size === "lg" && s.jaLg, size === "xl" && s.jaXl, mark && s.mark)}>
       {children}
     </span>
+  );
+}
+
+/**
+ * 일본어 한자 한 글자 + よみがな (CLAUDE.md: 일본어 한자에는 항상 ruby).
+ * 읽기를 아직 가리는 자리(그 카드에서 맞혀야 할 한자, F04~Scene3 앞)는 `reading` 없이 쓰면
+ * 점선 빈칸이 뜬다. 빈칸 폭은 글자 크기에만 비례하고 읽기 글자 수를 따르지 않는다 (docs/FLOW.md 4장).
+ */
+export function Ruby({ children, reading }: { children: string; reading?: string }) {
+  return (
+    <ruby lang="ja">
+      {children}
+      <rt className={cx(s.rt, !reading && s.rtBlank)}>{reading ?? <span className={s.rtBlankMark} aria-hidden />}</rt>
+    </ruby>
+  );
+}
+
+/** 일본어 문자열의 한자에만 ruby 를 단다. 가나·가타카나·숫자·영문은 그대로 (CLAUDE.md). */
+const KANJI = /\p{Script=Han}/u;
+export function rubyKanji(text: string, readings?: Record<string, string>) {
+  return [...text].map((ch, i) =>
+    KANJI.test(ch) ? <Ruby key={i} reading={readings?.[ch]}>{ch}</Ruby> : <span key={i}>{ch}</span>,
   );
 }
 

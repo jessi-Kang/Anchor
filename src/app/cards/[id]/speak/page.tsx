@@ -39,9 +39,9 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
       <Space h={28} />
       <Card style={{ padding: "26px 20px" }}>
         <div className={s.speakWord}>
-          <div className={s.speakBig} lang="ja">
+          <h1 className={s.speakBig} lang="ja">
             {word}
-          </div>
+          </h1>
           <div className={s.speakReading} lang="ja">
             {reading}
           </div>
