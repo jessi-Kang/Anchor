@@ -32,8 +32,15 @@ const TABLES = [
   "account_deletions",
 ] as const;
 
-/** 로그인 계정 매핑도 함께 (복구 뒤 같은 Google 계정이 같은 user_id 로 이어지도록) */
-const AUTH_TABLES = ["user", "account"] as const;
+/**
+ * 로그인 계정 매핑도 함께 (복구 뒤 같은 Google 계정이 같은 user_id 로 이어지도록).
+ * account 는 매핑 컬럼만 뜬다. accessToken·refreshToken·idToken·password 는 매핑에 필요 없고,
+ * Google 토큰 사본이 Neon 밖에 35일씩 남아서는 안 된다.
+ */
+const AUTH_TABLES: Record<string, string> = {
+  user: "*",
+  account: '"id", "accountId", "providerId", "userId", "createdAt", "updatedAt"',
+};
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -60,8 +67,8 @@ export async function GET(req: Request) {
         dump[`public.${t}`] = rows;
         counts[t] = rows.length;
       }
-      for (const t of AUTH_TABLES) {
-        const { rows } = await client.query(`SELECT * FROM neon_auth."${t}"`);
+      for (const [t, cols] of Object.entries(AUTH_TABLES)) {
+        const { rows } = await client.query(`SELECT ${cols} FROM neon_auth."${t}"`);
         dump[`neon_auth.${t}`] = rows;
         counts[`neon_auth.${t}`] = rows.length;
       }
