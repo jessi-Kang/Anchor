@@ -15,6 +15,7 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | `claude/docs-status-7t3m1a` | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
 | **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_019gYCLNic9TA9jvmQikfhfk` |
+| **Anchor · 보안** | 데이터 원칙이 코드와 DB 에서 실제로 성립하는지 확인한다. **코드를 고치지 않는다** | `docs/SECURITY.md` | (세션 생성 시 할당) | `session_01MRNbEc9RPrR5vsdK3chLWR` |
 | **Anchor · QA** | 검증 플로우를 만들고, 돌려 보고, 판정한다. **코드를 고치지 않는다** | `docs/QA.md` | `claude/optimistic-hopper-kaafdu` | `session_01QxSgxQRsFT1grCVZrxTEhi` |
 | ~~Anchor · 버그픽스~~ | 개발로 통합, 종료. 고친 것이 없어 브랜치도 버린다 | — | — | `session_01ANSrRXJkcbqr7SwicPUVpM` |
 
@@ -24,6 +25,7 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 
 보내는 길:
 - QA 가 찾은 것 → 코드 결함은 **개발**, 기획 문제는 **PM**. QA 가 두 곳에 같은 건을 보내지 않는다.
+- 보안이 찾은 것 → 전부 **PM**. 등급이 "샘"(남의 데이터가 보이거나 비밀값이 나간다)이면 다른 모든 일보다 먼저 고친다.
 - 디자인이 화면 순서·화면 추가/삭제·문구 의도를 바꾸고 싶으면 → **PM**. PM 이 결정하고 **기획**이 `docs/FLOW.md` 에 반영한 뒤 **개발**에 알린다.
 - 개발이 기획 문서와 다르게 만들어야 할 이유를 찾으면 → **PM**. 혼자 판단해서 문서와 다르게 만들지 않는다.
 - 문서에서 문체·중복·사실 불일치를 발견하면 → **문서**. 기준 문서(SPEC·FLOW·SITEMAP)에 대한 것이면 문서 세션이 고치지 않고 **PM** 에게 목록으로 보낸다.
