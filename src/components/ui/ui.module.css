@@ -663,7 +663,7 @@ a.row,
  * 글자색이 아니라 배경 틴트다 (CLAUDE.md 디자인 시스템 — 글자 세기 3단계는 위계에만 쓴다).
  */
 .metSeen {
-  background: var(--color-accent-bg);
+  background: var(--color-tint);
   border-radius: 6px;
   padding: 0 5px;
   color: var(--color-accent-dark);
@@ -686,7 +686,7 @@ a.row,
   gap: 12px;
   padding: 16px 18px;
   border-radius: 18px;
-  background: #f1f4f9;
+  background: var(--color-tint2);
   border: 1px solid var(--color-line);
 }
 
