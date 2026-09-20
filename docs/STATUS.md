@@ -51,7 +51,7 @@
 | 마이그레이션 | `db/migrations/` 에 0001 스키마·역할, 0002 RLS, 0003 소유자 읽기, 0004 `users.settings` 구조 변경. 프로덕션은 0004 까지 적용됨 |
 | RLS | 10개 테이블 전부 `ENABLE` + `anchor_app` 정책. `FORCE` 는 0003 이 해제한다(소유자 연결이 백업을 위해 전체를 읽는다) |
 | 프로덕션 확인 | `GET /api/health` → `ok:true`, `db_role: anchor_app`, `role_bypasses_rls: false`, `rls_all_enabled: true` |
-| 백업 1층 PITR | Neon 히스토리. 무료 플랜이라 6시간 |
+| 백업 1층 PITR | Neon 히스토리. 상시. 보존 기간은 `docs/BACKUP.md` |
 | 백업 2층 배포 전 스냅샷 | `pnpm vercel-build` 가 `scripts/backup/neon-snapshot.ts --pre-deploy` 를 먼저 돌린다 |
 | 백업 3층 매일 JSON | `vercel.json` cron 이 매일 18:17 UTC 에 `/api/cron/backup` 호출 → Vercel Blob `anchor-backups`. 보존 35일 |
 | 선택 pg_dump | `.github/workflows/backup.yml`. 외부 S3 Secrets 가 없어 실행되지 않는다 |
