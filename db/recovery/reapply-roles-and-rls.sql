@@ -1,5 +1,5 @@
 -- pg_restore --no-privileges 후 역할·권한·RLS 재적용 (docs/BACKUP.md 절차 C-3)
--- 0001 의 역할/권한 블록 + 0002 전체. 0002 를 바꾸면 이 파일도 같이 바꾼다.
+-- 0001 의 역할/권한 블록 + 0002 전체 + 0003. RLS 마이그레이션을 바꾸면 이 파일도 같이 바꾼다.
 -- 실행 전 :app_password 를 넘긴다:  psql ... -v app_password='...' -f db/recovery/reapply-roles-and-rls.sql
 
 DO $$
@@ -29,3 +29,5 @@ BEGIN
 END $$;
 
 \i db/migrations/0002_rls.sql
+-- 0002 가 FORCE 를 다시 걸므로 0003 으로 풀어야 소유자 연결(매일 백업)이 행을 읽는다
+\i db/migrations/0003_owner_reads_for_backup.sql
