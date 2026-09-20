@@ -11,7 +11,7 @@
  * `data-tap` 을 단다. 처음엔 <a> 의 높이만 재다가 폭 26px 짜리 라벨과 32px 짜리 칩을 통째로
  *놓쳤다. 검사가 못 잡는 규칙은 없는 규칙이다.
  */
-import { readdirSync, existsSync } from "node:fs";
+import { readdirSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright-core";
 
@@ -33,21 +33,25 @@ function findChromium(): string | undefined {
 }
 
 /**
- * 화면에 쓰면 안 되는 내부 용어. 우리끼리 쓰는 말이지 사용자가 배운 적 없는 말이다
- * (`CLAUDE.md` 하지 않는 것 · `design/SCREENS.md`). 픽셀 비교로는 못 잡는 종류라 여기 둔다 —
- * `design:diff` 는 라우트로 부를 수 있는 화면만 보는데 S01~S04 는 일본어 카드와 라우트를
- * 나눠 써서 닿지 않고, 닿는 화면도 낱말 하나 차이는 순위 아래쪽에 묻힌다.
+ * 화면에 쓰면 안 되는 내부 용어. 우리끼리 쓰는 말이지 사용자가 배운 적 없는 말이다.
+ * 픽셀 비교로는 못 잡는 종류라 여기 있다 — `design:diff` 는 라우트로 부를 수 있는 화면만 보는데
+ * S01~S04 는 일본어 카드와 라우트를 나눠 써서 닿지 않고, 닿는 화면도 낱말 하나 차이는 순위 아래에 묻힌다.
+ *
+ * **목록을 여기 베껴 적지 않는다.** `CLAUDE.md` "하지 않는 것"의 내부 용어 줄에서 읽는다 —
+ * 두 벌이 되면 한쪽만 늘어나고, 그때부터 어느 쪽이 규칙인지 알 수 없다.
  */
-const INTERNAL = ["재만남", "씨앗", "노드", "앵커", "그래프에 심는"];
-
-/**
- * "덩어리"도 내부 용어다 — 화면에서는 "이 말"이라고 쓴다(`design/SCREENS.md`).
- * 다만 아래 다섯 장이 아직 옛말을 쓰고 있고 **바꿀 문구를 UX 가 들고 있다.**
- * 고칠 수 없는 것으로 검사를 빨갛게 만들면 QA 가 매 라운드 같은 줄을 넘기게 되고,
- * 그때부터 이 검사 전체가 넘기는 것이 된다. 그래서 여기 있는 동안은 세어서 알려만 준다.
- * **문구가 오면 이 목록을 지운다** — 목록이 비면 "덩어리"도 그냥 INTERNAL 이 된다.
- */
-const CHUNK_PENDING = ["F15", "S01", "S02", "S03", "S04"];
+function internalTerms(): string[] {
+  const md = readFileSync(path.resolve(process.cwd(), "CLAUDE.md"), "utf8");
+  const line = md.match(/^- 내부 용어\((.+?)\)/m);
+  if (!line) throw new Error("CLAUDE.md 에서 내부 용어 줄을 못 찾았다 — 줄이 바뀌었으면 여기도 같이 고친다");
+  return [
+    ...line[1].split("·").map((w) => w.trim()),
+    // CLAUDE.md 줄에 없지만 다른 문서가 화면에서 금지한 말. 그 문서를 적어 둔다.
+    // CLAUDE.md 줄로 올라가면 여기서 지운다.
+    "덩어리", // design/SCREENS.md — 화면에서는 "이 말", 문서에서만 "덩어리"
+    "재만남", // docs/FLOW.md 4장 — 화면 이름을 알약으로도 라벨로도 달지 않는다
+  ];
+}
 
 async function main() {
   const picked = process.argv.slice(2);
@@ -59,7 +63,7 @@ async function main() {
   const browser = await chromium.launch({ executablePath: findChromium() });
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const problems: string[] = [];
-  const pending: string[] = [];
+  const INTERNAL = internalTerms();
 
   for (const id of ids) {
     const page = await ctx.newPage();
@@ -98,14 +102,10 @@ async function main() {
     for (const w of INTERNAL) {
       if (found.text.includes(w)) problems.push(`${id}: 화면에 내부 용어 "${w}" 가 있다`);
     }
-    if (found.text.includes("덩어리")) (CHUNK_PENDING.includes(id) ? pending : problems).push(`${id}: 화면에 내부 용어 "덩어리" 가 있다`);
     await page.close();
   }
 
   await browser.close();
-  if (pending.length) {
-    console.log(`아직 못 고친 것 (${pending.length}장) — 바꿀 문구를 기다리는 중이라 세기만 한다\n${pending.join("\n")}\n`);
-  }
   if (problems.length) {
     console.error(problems.join("\n"));
     process.exit(1);

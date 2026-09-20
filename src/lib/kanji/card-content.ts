@@ -115,34 +115,3 @@ export async function getCardContent(node: KanjiNode, names: Map<string, string>
   }
 }
 
-export type Verdict = "맞음" | "거의 맞음" | "다름";
-
-const VerdictSchema = z.object({ verdict: z.enum(["맞음", "거의 맞음", "다름"]) });
-
-/** Scene4: 추측과 정답 비교. 키가 없으면 겹치는 글자로 어림. 판정은 화면에 한 단어로만 보인다. */
-export async function judgeGuess(guess: string, answer: string, meanings: string[]): Promise<Verdict> {
-  const g = guess.trim();
-  if (!g) return "다름";
-  if (process.env.ANTHROPIC_API_KEY) {
-    try {
-      const client = new Anthropic({ timeout: 15_000, maxRetries: 1 });
-      const res = await client.messages.parse({
-        model: MODEL,
-        max_tokens: 200,
-        system: "한자 뜻 추측을 판정한다. 정답과 뜻이 같으면 맞음, 방향이 같거나 일부만 맞으면 거의 맞음, 아니면 다름. 관대하게, 표현 차이는 무시.",
-        messages: [{ role: "user", content: `정답: ${answer} (${meanings.slice(0, 4).join(", ")})\n추측: ${g}` }],
-        output_config: { format: zodOutputFormat(VerdictSchema) },
-      });
-      if (res.parsed_output) return res.parsed_output.verdict;
-    } catch (e) {
-      console.error("[judge] 판정 실패, 어림으로", e instanceof Error ? e.message : e);
-    }
-  }
-  const norm = (s: string) => s.replace(/[\s.,·]/g, "");
-  const a = norm(answer);
-  const gg = norm(g);
-  if (a === gg) return "맞음";
-  const stems = a.split("").filter((c) => /[가-힣]/.test(c));
-  const hit = stems.filter((c) => gg.includes(c)).length;
-  return hit >= 2 || (stems.length > 0 && hit / stems.length >= 0.5) ? "거의 맞음" : "다름";
-}

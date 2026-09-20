@@ -33,7 +33,7 @@ export function MissedForm({ preview }: { preview: boolean }) {
           draft.clear();
           start(() => submitMissed(line));
         }}>
-        {pending ? "여는 중" : "내가 먼저 해 볼게"}
+        내가 먼저 해 볼게
       </Button>
     </>
   );

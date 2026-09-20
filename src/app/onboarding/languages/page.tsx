@@ -34,7 +34,9 @@ export default async function LanguagesPage({ searchParams }: { searchParams: Pr
   return (
     <Screen where={adding ? "언어 추가" : "언어"} up={adding ? "/today" : undefined} fixed={fixed === "1"}>
       <Space h={24} />
-      <Title>어떤 언어부터 할까?</Title>
+      {/* 첫 방문과 추가 모드는 묻는 것이 다르다. "부터" 는 아무것도 안 켠 사람에게만 맞는 말이라,
+          이미 켠 사람이 보면 처음으로 돌아온 것처럼 읽힌다. */}
+      <Title>{adding ? "어떤 언어를 더 켤까?" : "어떤 언어부터 할까?"}</Title>
       <Space h={6} />
       <Lead>{adding ? "켜고 싶은 언어를 탭해. 끄는 건 설정에서." : "여러 개 골라도 돼. 나머지는 나중에 켜도 돼."}</Lead>
       <Space h={16} />

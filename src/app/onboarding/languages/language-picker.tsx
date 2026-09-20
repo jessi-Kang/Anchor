@@ -23,8 +23,10 @@ export function LanguagePicker({ enabled, initial = [] }: { enabled: Lang3[]; in
           const on = enabled.includes(l);
           const want = picked.includes(l);
           const pill = on || want ? <Pill on>켜짐</Pill> : <Pill>꺼짐</Pill>;
+          // 이미 켠 언어도 부제는 출발점이다. "이미 켜져 있어" 는 옆 알약("켜짐")이 이미 하는 말이라
+          // 한 행에서 같은 말을 두 번 하게 된다.
           return on ? (
-            <Row key={l} title={LANG_LABEL[l]} sub="이미 켜져 있어" right={pill} />
+            <Row key={l} title={LANG_LABEL[l]} sub={LANG_START[l]} right={pill} />
           ) : (
             <Row key={l} title={LANG_LABEL[l]} sub={LANG_START[l]} right={pill} onClick={() => toggle(l)} pressed={want} />
           );
