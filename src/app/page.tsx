@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
-import { Screen, Grow, Space, Card } from "@/components/ui";
+import { Screen, Grow, Space, Card, LogoMark } from "@/components/ui";
 import { GoogleSignIn } from "./google-sign-in";
 import s from "./page.module.css";
 
@@ -16,6 +16,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
     <Screen where="시작" fixed={fixed === "1"}>
       <Grow />
       <div className={s.hero}>
+        <LogoMark size={72} />
         <div className={s.wordmark}>Anchor</div>
         <div className={s.tagline}>
           내가 읽고 들은 것에서 시작하는
