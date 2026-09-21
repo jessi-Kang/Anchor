@@ -28,7 +28,7 @@ export ANCHOR_APP_PASSWORD='<16자 이상>'
 pnpm db:migrate && pnpm db:seed
 ```
 
-**걸리는 자리 넷** — 넷 다 오류 메시지가 원인을 안 말해 준다:
+**걸리는 자리 다섯** — 다섯 다 오류 메시지가 원인을 안 말해 준다:
 
 | 증상 | 까닭 |
 | --- | --- |
@@ -36,6 +36,7 @@ pnpm db:migrate && pnpm db:seed
 | `0001_init.sql: ANCHOR_APP_PASSWORD (16자 이상) 가 필요하다` | 말 그대로 **16자 이상**이어야 한다 |
 | 시험 로그인이 `/` 로 튕김 | `ANCHOR_TEST_LOGIN=1` 만으로는 안 열린다. **`ANCHOR_TEST_USER_ID`** 가 있어야 하고(`src/lib/auth/test-login.ts`, 기본값 없음) 그 id 의 행이 `users` 에 있어야 한다 |
 | `pnpm verify` 가 DB 시험 **5개**만 빨강 | 마이그레이션만 하고 **`pnpm db:seed` 를 안 돌렸다.** 시험이 씨앗 행을 본다 — 코드가 깨진 게 아니다 |
+| `pnpm verify` 가 **`build` 에서** 죽는다: `Failed to collect page data for /api/auth/[...path]` → `환경 변수 NEON_AUTH_BASE_URL 가 설정되지 않았다` | DB 와 **무관하다.** `next build` 가 페이지 데이터를 모으면서 `src/lib/auth/server.ts` 를 평가하는데 그게 모듈 최상단에서 `env.NEON_AUTH_BASE_URL` 을 읽는다. **빌드는 인증 서버에 붙지 않으므로 자리표시 값이면 통과한다** — `NEON_AUTH_BASE_URL=http://localhost:9999/auth`, `NEON_AUTH_COOKIE_SECRET=<32자 이상 아무 값>`. 진짜 값을 찾아다니지 마라 |
 
 그 계정으로 `/today` 가 열리려면 `settings` 가 **중첩된 꼴**이어야 한다 — 평평한
 `{"languages":["ja"]}` 는 안 먹는다(`src/lib/db/settings.ts`):
@@ -46,8 +47,14 @@ UPDATE users SET settings = jsonb_build_object(
 ) WHERE id = '<시험 계정 id>';
 ```
 
-**왜 여기 적나.** 이 셋은 2026-09-21 에 세 세션이 따로 막혔던 자리인데 **답이 쪽지에만
+**왜 여기 적나.** 이것들은 2026-09-21 에 여러 세션이 따로 막혔던 자리인데 **답이 쪽지에만
 있었다.** 쪽지는 세션과 함께 사라지고, 다음 사람은 `db/README.md` 를 연다.
+
+**다섯째 줄은 이 문서 제목과 안 맞아 보인다 — 일부러 여기 둔다.** `db/` 이야기가 아니라
+`pnpm verify` 이야기라서다. 그런데 **막힌 사람은 `pnpm push` 가 빨간 걸 보고 이 문서를
+연다**(`scripts/push.sh` 가 빨강일 때 이 파일을 가리킨다). 맞는 문서에 적어 두고 아무도 안
+여는 것보다, 여는 문서에 적어 두는 쪽이 낫다. 잰 값: 이 컨테이너에는 `.env` 도 환경 변수도
+없었고, 자리표시 두 개만 넣으니 `build` 가 통과했다(2026-09-21).
 
 ### 이력이 얕다 — 「그 커밋 없는데?」 는 십중팔구 이것
 
