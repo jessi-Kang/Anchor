@@ -35,6 +35,9 @@ const ROUTES: Record<string, string> = {
   O03: "/onboarding/kana",
   O03b: "/onboarding/kana/module",
   F04: "/cards/x",
+  // 카드를 못 만든 자리. **주소로 부를 수 있어서** 여기 있다 — 카드 행을 안 만들기로 하면서
+  // `/cards/[id]` 가 될 수 없어 자료 밑에 제 라우트가 생겼고, 주소가 있는 상태는 맞대어 볼 수 있다.
+  F04a: "/inputs/x/no-card",
   Scene1: "/cards/x/1",
   Scene2: "/cards/x/2",
   Scene3: "/cards/x/3",
@@ -61,7 +64,6 @@ const SKIP: Record<string, string> = {
   O02b: "같은 라우트의 다른 상태(언어 추가 모드)",
   O03a: "같은 라우트의 다른 상태(읽는 중)",
   F14a: "같은 라우트의 다른 상태(겨눌 소리 없음)",
-  F04a: "같은 라우트의 다른 상태(카드 문안을 못 만든 자리). 열어 봐야 아는 상태라 URL 로 못 부른다",
   F12a: "같은 라우트의 다른 상태(틴트 덩어리를 탭해 읽기를 연 F12) — 탭 뒤라 URL 로 못 부른다",
   F17a: "같은 라우트의 다른 상태(영어 문장을 못 만들어 추측이 칸에 남은 F17)",
   // F19 는 `/inputs` 로 정해져 위 ROUTES 에 있다 (SKIP 의 "아직 안 정해졌다" 줄은 그래서 뺐다).

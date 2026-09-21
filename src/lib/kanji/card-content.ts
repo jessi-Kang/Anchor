@@ -2,7 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { withoutUser } from "@/lib/db";
-import { iGa, joinWaGwa } from "@/lib/ko";
 import type { CardContent, KanjiNode } from "@/lib/db/kanji";
 
 /**
@@ -10,7 +9,14 @@ import type { CardContent, KanjiNode } from "@/lib/db/kanji";
  *  1. 손으로 적은 것 (db/seed/kanji-cards.json → nodes.meta.card)
  *  2. node_cards 캐시 (이전에 만든 것)
  *  3. Claude API 로 생성 → node_cards 에 저장
- *  4. API 키가 없거나 실패하면 사전 데이터 조합 (fallback). 캐시하지 않는다: 키가 생기면 다시 만들게.
+ *  4. 키가 없거나 실패하면 **null**. 사전 데이터로 그럴듯한 카드를 짓지 않는다.
+ *
+ * **전에는 사전 조합으로 메웠고, 그게 카드를 거짓말쟁이로 만들었다.** 정답 자리에 KANJIDIC 의
+ * 영어 뜻("co-, cooperation")이 떴다 — 한국어 화자에게 한국어로 답하겠다고 해 놓고 영어를 냈다.
+ * 부품 이름이 없으면 질문이 "이 모양이면 무슨 뜻이 될까?" 로 주저앉았고, 그래도 카드는 열렸다.
+ * 못 만든 것과 만든 것이 화면에서 구분되지 않으면 **우리도 얼마나 못 만들고 있는지 셀 수 없다.**
+ * 그래서 못 만들면 **카드를 안 연다** (PM 판정, design/SCREENS.md "못 만들었을 때").
+ * 부르는 쪽(F03)이 그 한자를 묶음으로 빼고 다음으로 갈 수 있는 한자를 가리킨다.
  *
  * 외부 LLM 호출 원칙(CLAUDE.md): 사용자 자료는 보내지 않는다. 보내는 것은 공용 사전 데이터(한자·음독·한국 한자음·뜻·부품)뿐이다.
  * Anthropic API 는 기본적으로 API 입력을 학습에 쓰지 않는다 (소비자 제품과 다름).
@@ -66,49 +72,20 @@ function partsLine(node: KanjiNode, names: Map<string, string>): string {
     .join(" + ");
 }
 
-/** 사전 데이터만으로 만든 문안. 후킹은 아는 단어가 있으면 그것, 없으면 한국 한자음만. */
-export function fallbackContent(node: KanjiNode, names: Map<string, string>): CardContent {
-  const m = node.meta;
-  const sound = m.ko_sound ?? node.key;
-  const word = m.ko_word ?? sound;
-  const uniq = [...new Set(m.parts ?? [])];
-  // **이름이 없으면 그 부품은 없는 것으로 친다.** 글자로 떨어뜨리면 사용자가 답할 수 없는 질문이 된다
-  // ("𠂒와 어진사람이 모이면 무슨 뜻이 될까?"). 남는 게 없으면 아래에서 "이 모양이면" 으로 간다 —
-  // 이미 351자가 가는 길이라 새 화면 상태가 생기지 않는다.
-  const partWords = uniq.flatMap((p) => {
-    const name = names.get(p)?.split(" ")[0];
-    return name ? [name] : [];
-  });
-  // 이음말도 조사다. 앞말의 받침을 따른다 ("열과 힘", "나무와 힘") — src/lib/ko.ts 한 곳에서 고른다.
-  const parts_meaning = partWords.length ? joinWaGwa(partWords) : `${node.key} 한 글자`;
-  const landing = m.example && m.example_reading && m.ko_word ? [{ word: m.example, reading: m.example_reading, ko: m.ko_word }] : [];
-  return {
-    hook: { word, mark: sound },
-    parts_meaning,
-    question: partWords.length ? `${parts_meaning}${iGa(parts_meaning)} 모이면\n무슨 뜻이 될까?` : `이 모양이면\n무슨 뜻이 될까?`,
-    /*
-      **`|| node.key` 를 뺐다.** 뜻이 비면 정답 자리에 그 한자 자체가 떴다 — "무슨 뜻이 될까?"
-      에 "協" 은 답이 아니다. 지금은 `meanings` 가 상용한자 2,136자 전부에 있어서 안 터지는
-      죽은 가지지만, 데이터가 바뀌면 살아난다. 값이 없을 때 **그럴듯한 것을 내놓지 않는다.**
-
-      **이 줄은 아직 영어다.** KANJIDIC 의 `<meaning>` 이라 정답이 "co-, cooperation" 으로 뜬다.
-      같은 파일 위쪽 프롬프트가 "이 한자의 뜻을 **한국어 한 줄로**" 라고 적어 둔 것과 어긋난다.
-      고치는 길은 정해졌다(**못 만들면 카드를 안 연다**, PM 판정) — 다만 문안이 없을 때 화면이
-      뭐라고 할지가 기획에 가 있어서, 그 문구가 오면 이 함수를 부르는 쪽에 게이트가 선다.
-      **여기서 영어만 먼저 빼면 정답 자리가 빈 채로 Scene4 가 뜬다** — 아무도 정한 적 없는 상태다.
-    */
-    answer: (m.meanings ?? []).slice(0, 2).join(", "),
-    landing,
-    pattern: "",
-  };
-}
-
-export async function getCardContent(node: KanjiNode, names: Map<string, string>): Promise<{ content: CardContent; source: "authored" | "claude" | "fallback" }> {
+export async function getCardContent(
+  node: KanjiNode,
+  names: Map<string, string>,
+): Promise<{ content: CardContent; source: "authored" | "claude" } | null> {
   if (node.meta.card) return { content: node.meta.card, source: "authored" };
   const cached = await readCache(node.id).catch(() => null);
   if (cached) return { content: cached.card, source: "claude" };
 
-  if (!process.env.ANTHROPIC_API_KEY) return { content: fallbackContent(node, names), source: "fallback" };
+  // 키가 없는 것도 실패다. 전에는 이 줄이 사전 조합으로 새서, 키 없는 환경에서 만든 카드가
+  // 키 있는 환경에서 만든 카드와 같은 얼굴로 저장됐다.
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn("[card-content] 키가 없어 문안을 못 만든다", node.key);
+    return null;
+  }
   try {
     const client = new Anthropic({ timeout: 25_000, maxRetries: 1 });
     const m = node.meta;
@@ -132,8 +109,7 @@ export async function getCardContent(node: KanjiNode, names: Map<string, string>
     await writeCache(node.id, parsed, MODEL).catch((e) => console.error("[card-content] 캐시 저장 실패", e));
     return { content: parsed, source: "claude" };
   } catch (e) {
-    console.error("[card-content] 생성 실패, 사전 조합으로", e instanceof Error ? e.message : e);
-    return { content: fallbackContent(node, names), source: "fallback" };
+    console.error("[card-content] 생성 실패", e instanceof Error ? e.message : e);
+    return null;
   }
 }
-
