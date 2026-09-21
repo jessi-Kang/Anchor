@@ -76,16 +76,29 @@ export async function getKanjiNodeById(id: string): Promise<KanjiNode | null> {
   });
 }
 
-/** 부품 이름 ("열 십"). radical 노드의 display. */
+/**
+ * 부품을 **부르는 이름**. 두 곳에서 온다:
+ *  1. 부품 노드의 훈 ("열 십") — `parts-ko.json` 에서 온다.
+ *  2. 없으면 **그 글자 자체의 한국 한자음** ("리") — 부품이 그 자체로 한자면 사용자가 이미 아는
+ *     소리가 있다(원칙 2). 使 = 亻 + 吏 의 吏 가 그 경우다.
+ *
+ * 씨앗이 부품을 거르는 기준과 **같은 기준**이어야 한다 (`scripts/kanji/build-kanjidic.ts`).
+ * 여기가 더 좁으면 씨앗이 남긴 부품을 화면이 부를 이름 없이 받게 되고, 그 자리에서 다시
+ * "𠂒와 어진사람" 이 나온다.
+ */
 export async function getPartNames(chars: string[]): Promise<Map<string, string>> {
   if (chars.length === 0) return new Map();
   return withoutUser(async (tx) => {
-    const { rows } = await tx.query<{ key: string; name: string | null }>(
-      `SELECT key, meta->>'ko_name' AS name FROM nodes
-       WHERE user_id IS NULL AND lang = 'ja' AND kind = 'radical' AND key = ANY($1::text[])`,
+    const { rows } = await tx.query<{ key: string; name: string | null; sound: string | null }>(
+      `SELECT key,
+              max(meta->>'ko_name')  FILTER (WHERE kind = 'radical') AS name,
+              max(meta->>'ko_sound') FILTER (WHERE kind = 'kanji')   AS sound
+         FROM nodes
+        WHERE user_id IS NULL AND lang = 'ja' AND kind IN ('radical', 'kanji') AND key = ANY($1::text[])
+        GROUP BY key`,
       [chars],
     );
-    return new Map(rows.filter((r) => r.name).map((r) => [r.key, r.name as string]));
+    return new Map(rows.flatMap((r) => (r.name || r.sound ? [[r.key, (r.name || r.sound) as string] as const] : [])));
   });
 }
 

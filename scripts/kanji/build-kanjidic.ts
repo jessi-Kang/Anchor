@@ -120,10 +120,40 @@ async function main() {
     }
     // 제 자신은 제 부품이 아니다. 衣 를 정자로 되돌리면 衣 = 亠 + 𧘇 → 亠 + 衣 가 되어 카드가
     // 자기 글자를 자기 부품으로 내보인다. 되돌리기가 만든 자리라 되돌린 뒤에 거른다.
-    return out.filter((c) => c !== ch);
+    const kept = out.filter((c) => c !== ch && nameable(c));
+    /*
+      **걸러서 2개 미만이 되면 「부품 없음」으로 보낸다.**
+      지금 부품이 1개인 한자는 사실상 없고(1자), 카드는 "부품 둘" 을 전제로 서 있다. 그냥 거르기만
+      하면 아무도 설계한 적 없는 "부품 하나짜리" 화면이 199자에 생긴다. 「부품 없음」은 이미 146자가
+      가는 길이다 — 한자를 통째로 세우고 "이 모양이면 무슨 뜻이 될까?" 로 묻는다. **새 화면 상태를
+      만들지 않는다.** 이건 오늘 막는 것이고, 부품 하나짜리 문안이 정해지면 그 199자는 그쪽으로 간다.
+    */
+    return kept.length < 2 ? [] : kept;
   };
 
   const chars = xml.split("<character>").slice(1);
+  /*
+    **부를 이름이 있는 부품만 남긴다** (docs/FLOW.md, PM 결정).
+
+    카드가 묻는 것은 "이 부품들이 모이면 무슨 뜻이 될까" 인데, 부를 이름이 없는 부품이 그 문장에
+    서면 "𠂒와 어진사람이 모이면" 이 된다 — 사용자가 답할 수 없는 질문이다. **폰트가 그리느냐와
+    상관없다**: 使 = 亻 + 吏, 足 = 龰 … 처럼 멀쩡히 그려지는 글자도 부를 이름이 없으면 같은 자리다.
+    실제로 이름 없는 부품이 걸린 한자가 263자이고 그중 181자는 BMP 안이라 폰트로는 영영 안 고쳐진다.
+
+    이름은 두 곳에서 온다: `parts-ko.json` 의 훈("열 십"), 아니면 **그 글자 자체의 한국 한자음**
+    (부품이 그 자체로 한자면 사용자가 이미 아는 소리가 있다 — 원칙 2).
+  */
+  const koSound = new Map<string, string>();
+  for (const c of chars) {
+    const lit = /<literal>(.*?)<\/literal>/.exec(c)?.[1];
+    const grade = Number(/<grade>(\d+)<\/grade>/.exec(c)?.[1] ?? 0);
+    const ko = /<reading r_type="korean_h">(.*?)<\/reading>/.exec(c)?.[1];
+    // **우리 씨앗에 든 한자의 소리만 센다.** KANJIDIC 에는 상용한자 밖 글자의 한국 한자음도 있지만,
+    // 그 글자는 우리 그래프에 노드가 없어서 부를 수도 다음 카드가 될 수도 없다 — 이름이 있는 것과 다르다.
+    if (lit && ko && grade >= 1 && grade <= 8) koSound.set(lit, ko);
+  }
+  const nameable = (p: string) => named.has(p) || koSound.has(p);
+
   const items: KanjiOut[] = [];
   for (const c of chars) {
     const lit = /<literal>(.*?)<\/literal>/.exec(c)?.[1];
@@ -139,7 +169,7 @@ async function main() {
   }
   items.sort((a, b) => (a.freq ?? 9999) - (b.freq ?? 9999) || a.grade - b.grade);
   const unnamed = new Map<string, number>();
-  for (const it of items) for (const p of it.parts) if (!named.has(p)) unnamed.set(p, (unnamed.get(p) ?? 0) + 1);
+  for (const it of items) for (const p of it.parts) if (!nameable(p)) unnamed.set(p, (unnamed.get(p) ?? 0) + 1);
   const out = {
     _comment: "scripts/kanji/build-kanjidic.ts 가 KANJIDIC2 + CJKVI IDS 에서 만든다. 손으로 고치지 말 것. 상용한자 2,136자: 음독(히라가나)·훈독·한국 한자음·영어 뜻·부품. 한국어 앵커 단어는 kanji-ko.json, 카드 문안은 kanji-cards.json.",
     source: { kanjidic2: KANJIDIC_URL, ids: IDS_URL, built_at: new Date().toISOString().slice(0, 10) },
