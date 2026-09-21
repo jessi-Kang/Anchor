@@ -53,8 +53,10 @@ export default async function NoCardPage({
 
   return (
     <Screen where={where} up={`/inputs/${id}`} aside={preview ? "점심 12:30" : nowKST()} fixed={fixed === "1"}>
-      <Space h={28} />
-      <Title lg>이 카드는 지금 못 만들었어.</Title>
+      {/* 제목 26 → 앞 여백 24 (design/screens/F04a.html). `lg`(28)는 홈 자리 값이라
+          여기 쓰면 제목이 2px 크고 줄이 4px 아래로 밀린다 — F03·F16 에서 두 번 고친 것과 같다. */}
+      <Space h={24} />
+      <Title>이 카드는 지금 못 만들었어.</Title>
       <Space h={6} />
       <Lead>다른 글자부터 볼래?</Lead>
       <Grow />
