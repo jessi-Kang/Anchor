@@ -12,7 +12,25 @@ import { pitchTrack, type PitchPoint as Point } from "@/lib/pitch/track";
  * **"원어민" 이라고 안 쓴다.** 겨눌 소리는 언어별 음성일 수도 Jessi 목소리 클론일 수도 있어서,
  * 사람을 가리키는 이름은 출처가 바뀌는 순간 사실이 아닌 말이 된다 (`docs/FLOW.md` 1′장 F14 행).
  */
-const NO_TARGET_NOTE = "아직 견줄 소리가 없어.";
+/**
+ * 곡선 옆 한 줄. **겨눌 소리가 없어 곡선이 내 것끼리 겹치는 동안** 서 있는다 (docs/FLOW.md 1′장).
+ *
+ * 뒷문장을 한 번 떨어뜨렸다가 되돌렸다. "원어민" 을 빼면서 같이 잘랐는데, 앞문장만 남으면
+ * **무엇이 없다는 말만 하고 그래서 지금 화면이 무엇인지를 안 말한다.** 검정 선이 직전 회차라는
+ * 것을 말해 주는 게 뒷문장이다.
+ */
+const NO_TARGET_NOTE = "아직 견줄 소리가 없어. 지금은 내 소리끼리 겹쳐 봐.";
+
+/**
+ * 듣기 버튼 옆 한 줄. **방금 누른 듣기에서 소리가 안 났다**는 사실만 말한다.
+ *
+ * 위의 한 줄과 자리가 다른 이유는 **사실이 둘**이기 때문이다 (docs/FLOW.md 1′장). 겨눌 음성이
+ * 없어도 기기 목소리로 소리는 날 수 있어서 둘은 따로 참이 된다. 한 자리에 넣으면 그때 한쪽이
+ * 조용히 사라진다. 낱말도 갈린다 — **들려줄** 소리(재생)와 **견줄** 소리(곡선)는 다른 일이다.
+ *
+ * 방금 한 일의 결과라 **다음 동작에서 사라진다.**
+ */
+const NO_PLAY_NOTE = "지금은 들려줄 소리가 없어.";
 
 const legendAria = (noTarget: boolean) => (noTarget ? "앞 회차와 이번 내 억양 곡선" : "들려준 소리와 내 억양 곡선");
 
@@ -73,11 +91,14 @@ export function PitchLoop({
   const [note, setNote] = useState<string>(noTarget ? NO_TARGET_NOTE : firstNote);
   const ctxRef = useRef<AudioContext | null>(null);
   const [pending, setPending] = useState(false);
+  // 방금 누른 듣기에서 소리가 안 났나. 다음 동작에서 지운다.
+  const [playNote, setPlayNote] = useState(false);
 
   const audioCtx = () => (ctxRef.current ??= new AudioContext());
 
   const listen = async () => {
     if (state !== "idle" || preview) return;
+    setPlayNote(false);
     setState("playing");
     try {
       const res = await fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
@@ -117,15 +138,15 @@ export function PitchLoop({
           window.speechSynthesis.speak(u);
         });
         // 여기로 왔다는 건 목표 발음 음성이 안 왔다는 뜻이다 — `noTarget` 으로 들어왔든 이번에 못 받았든
-        // 화면에 벌어진 일은 같다. 그러니 FLOW 가 정한 그 한 줄을 쓴다. 전에는 "목소리 키를 넣으면"
-        // 이라고 했는데, 그건 Jessi 가 배포에 넣는 환경변수라 읽은 사람이 설정에서 찾을 수 없다.
-        //
-        // **소리가 아예 안 났을 때의 한 줄은 아직 비어 있다.** 폴백 넷(한자 정답·영어 문장·
-        // 후리가나·듣기)이 같은 병이라 기획이 **결을 하나로** 잡는 중이다. 자리마다 다른 말을
-        // 지으면 상태 어휘가 넷 는다. 문구가 오면 아래 `spoke` 가 거짓인 가지에 한 줄 끼운다 —
-        // 그때까지는 **없는 말을 지어내지 않고** 겨눌 소리가 없다는 사실만 말한다.
+        // 곡선에 벌어진 일은 같다. 그러니 FLOW 가 정한 그 한 줄을 곡선 옆에 쓴다. 전에는 "목소리 키를
+        // 넣으면" 이라고 했는데, 그건 Jessi 가 배포에 넣는 환경변수라 읽은 사람이 설정에서 찾을 수 없다.
         setNote(NO_TARGET_NOTE);
-        if (!spoke) console.warn("[tts] 브라우저 음성이 소리를 못 냈다 (목소리 0개이거나 재생 실패)");
+        // 소리가 **아예 안 난 것**은 다른 사실이라 다른 자리에 선다. 기기 목소리로 소리는 났는데
+        // 겨눌 음성만 없는 경우가 있어서, 둘을 한 줄로 합치면 그때 한쪽을 못 말한다.
+        if (!spoke) {
+          setPlayNote(true);
+          console.warn("[tts] 브라우저 음성이 소리를 못 냈다 (목소리 0개이거나 재생 실패)");
+        }
       }
     } catch (e) {
       console.error(e);
@@ -137,6 +158,7 @@ export function PitchLoop({
 
   const speak = async () => {
     if (state !== "idle" || preview) return;
+    setPlayNote(false);
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -240,6 +262,13 @@ export function PitchLoop({
         <Lead>{note}</Lead>
       </Card>
       <Grow />
+      {/* 듣기 버튼 옆. 위의 곡선 옆 한 줄과 **자리가 둘인 이유**는 `NO_PLAY_NOTE` 주석에 있다. */}
+      {playNote && (
+        <>
+          <Lead>{NO_PLAY_NOTE}</Lead>
+          <Space h={8} />
+        </>
+      )}
       <ButtonRow>
         <Button outline disabled={state !== "idle"} onClick={listen}>
           {state === "playing" ? "듣는 중" : "듣기"}
