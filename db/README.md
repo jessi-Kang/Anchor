@@ -23,11 +23,13 @@ pnpm db:migrate:status     # 적용 상태만 출력
 적용한 사람이 여기 커밋을 적는다. 그 뒤부터는 `pnpm seed:parts-sql --since <그 커밋>` 으로 바뀐 것만 찍는다.
 
 ```bash
-pnpm seed:parts-sql --all --out /tmp/parts.sql   # 접속하지 않는다. SQL 만 찍는다
+pnpm seed:parts-sql --all --out db/manual/parts-sync-<날짜>.sql   # 접속하지 않는다. SQL 만 찍는다
 # 받은 사람이 파일을 읽고 돌린다. 1번 질의가 실제로 바뀔 줄 수를 먼저 알려 준다.
 ```
 
 찍어낸 UPDATE 는 `meta->'parts'` 가 **실제로 다른 줄만** 건드린다. 두 번 돌리면 두 번째는 0 줄이다.
+
+`manual/` 은 마이그레이션이 아니다. `pnpm db:migrate` 가 안 본다. 한 번 손으로 돌리고 나면 위 표에 커밋을 적고 파일은 기록으로 남긴다.
 
 ## 두 개의 연결
 
