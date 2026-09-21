@@ -30,6 +30,7 @@ export function JudgeRows({
   );
   const [pending, start] = useTransition();
   const [starting, setStarting] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const isKnown = (i: JudgeItem) => known[i.nodeId] === true;
   const queueA = anchored.filter((i) => !isKnown(i));
@@ -39,6 +40,58 @@ export function JudgeRows({
   // `nextKanji` 와 같은 한 줄이다 (lib/cards/judge-items.ts). 행은 그대로 선다: 판정은 발판 없이도 된다.
   const first = queueA.find((i) => i.hasSound) ?? queueB.find((i) => i.hasSound) ?? null;
   const unknownCount = queueA.length + queueB.length;
+
+  /*
+    **한 화면에 들어갈 만큼만 줄로 내고 나머지는 개수로 접는다** (docs/FLOW.md 1′장 F03).
+
+    자료 한 편의 한자는 스물이 넘는다. 다 세우면 둘째 묶음도 주 버튼도 첫 화면 밖으로 밀리고,
+    **비어서 안 보이는 것과 밀려서 안 보이는 것은 사용자에게 같은 일이다.** 2026-09-21 에
+    Jessi 가 프로덕션에서 여기 갇혔다 — 여섯 줄짜리 화면에서 「協부터」가 아래에 있었다.
+
+    **이 수는 재서 나왔고, 임시다.** `pnpm design:fold` 로 360×650(= Jessi 의 폰에서 실제로
+    보이는 창, `scripts/design/frame.ts`)에서 주 버튼 아래끝을 재면 이렇다:
+
+        6줄 ▼63px 밖   4줄 ▼63px 밖   3줄 ▼42px 밖   2줄 보임(여유 24)
+
+    **두 줄밖에 안 선다.** 행 하나가 94px 이고 창이 650px 인데, 제목·머리줄·묶음 제목 둘·주 버튼이
+    먼저 자리를 먹는다. 두 줄이면 묶음마다 한 줄씩이라 **구조는 보이지만**(그게 이 화면의 조건이다)
+    자료 스무 자 중 둘이다.
+
+    **그게 이 화면을 뽑기에서 맛보기로 바꾸는지는 여기서 정할 일이 아니다.** 막힌 것을 먼저 풀고
+    (Jessi 가 프로덕션에서 갇혀 있었다) 수는 PM·기획과 같이 정한다. 고칠 길이 셋이고 셋 다 근간이다:
+    행을 줄일 것인가 · 화면을 나눌 것인가 · 두 줄짜리 화면으로 둘 것인가.
+
+    **줄 수를 잇달아 치게 하는 것이 목적이 아니다.** 여기서 다 판정하지 않아도 된다: 알아로 고른
+    것은 큐에서 빠지고 몰라·미표시는 남으며 다음 카드는 그래프가 정한다(커리큘럼 없음).
+    스무 줄을 잇달아 알아/몰라로 치게 하면 그 자체가 레벨 테스트의 모양이 된다.
+  */
+  const BUDGET = 2;
+
+  /**
+   * 묶음마다 몇 줄을 낼지. **빈 묶음이 아닌 것에 한 줄씩 먼저 주고** 남는 것을 큰 묶음부터 붓는다 —
+   * 「두 묶음이 한 화면에 같이 보인다」가 이 화면의 조건이라, 한 묶음이 예산을 다 먹으면 안 된다.
+   * 묶음 순서는 안 바꾼다(시작점은 늘 이미 아는 것, 원칙 2).
+   */
+  const budget = (sizes: number[]): number[] => {
+    const take: number[] = sizes.map((n) => (n > 0 ? 1 : 0));
+    let left = BUDGET - take.reduce((a, b) => a + b, 0);
+    while (left > 0) {
+      // 남은 자리가 가장 많은 묶음에 한 줄씩. 다 차면 그만둔다.
+      let best = -1;
+      for (let i = 0; i < sizes.length; i++)
+        if (sizes[i] - take[i] > 0 && (best < 0 || sizes[i] - take[i] > sizes[best] - take[best])) best = i;
+      if (best < 0) break;
+      take[best] += 1;
+      left -= 1;
+    }
+    return take;
+  };
+
+  const [takeA, takeB, takeK] = budget([queueA.length, queueB.length, knownItems.length]);
+  const showA = open ? queueA : queueA.slice(0, takeA);
+  const showB = open ? queueB : queueB.slice(0, takeB);
+  const showK = open ? knownItems : knownItems.slice(0, takeK);
+  const folded = queueA.length + queueB.length + knownItems.length - (showA.length + showB.length + showK.length);
 
   const set = (nodeId: string, v: boolean) => {
     setKnown((k) => ({ ...k, [nodeId]: v }));
@@ -130,7 +183,7 @@ export function JudgeRows({
         <Card group>
           {/* 가르는 축은 낱말이라 "아는 소리에서 시작" 이 아니다 — 소리는 양쪽 다 있다 */}
           <Label>아는 낱말에서 시작</Label>
-          {queueA.map(row)}
+          {showA.map(row)}
         </Card>
       )}
       {queueA.length > 0 && queueB.length > 0 && <Space h={10} />}
@@ -139,7 +192,7 @@ export function JudgeRows({
           {/* "발판" 은 우리끼리 쓰는 말이라 화면에 안 쓴다. 그리고 주어는 사용자가 아니라 앱이다 —
               그 소리를 모르는 게 아니라, 그 글자를 부를 낱말을 우리가 아직 못 골랐다. */}
           <Label>부를 낱말이 아직 없어</Label>
-          {queueB.map(row)}
+          {showB.map(row)}
         </Card>
       )}
       {knownItems.length > 0 && (
@@ -147,7 +200,7 @@ export function JudgeRows({
           {unknownCount > 0 && <Space h={10} />}
           <Card group>
             <Label>아는 것</Label>
-            {knownItems.map(row)}
+            {showK.map(row)}
           </Card>
         </>
       )}
@@ -167,6 +220,22 @@ export function JudgeRows({
 
         "다른 자료를 넣어 봐" 는 안 붙인다. 넣을 자료가 잘못된 게 아니다 (PM 판정).
       */}
+      {/*
+        **펴는 길.** 접은 것은 개수로 말하고 펴는 길을 둔다 (docs/FLOW.md 1′장 F03).
+        숨기는 것이 아니라 접는 것이라, 한 탭이면 전부 선다 — 그 뒤로는 스크롤이 정상이다.
+
+        **아래 "그 밖에 N자" 와 다른 줄이다.** 저쪽은 **우리 표에 없어서 행조차 못 만든** 글자를 세고,
+        이쪽은 **행은 있는데 첫 화면에 안 낸** 글자를 센다. 같은 「그 밖에」로 부르면 두 수가 한 화면에
+        나란히 서서 어느 쪽이 무엇인지 알 길이 없어진다.
+      */}
+      {folded > 0 && (
+        <>
+          <Space h={10} />
+          <Card group>
+            <Row title={`나머지 ${folded}자`} onClick={() => setOpen(true)} />
+          </Card>
+        </>
+      )}
       {found > 0 && found < seen && (
         <>
           <Space h={14} />

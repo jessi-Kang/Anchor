@@ -40,7 +40,7 @@ export function LanguageRows({ enabled }: { enabled: Lang3[] }) {
           <Row
             key={l}
             title={LANG_LABEL[l]}
-            sub={on ? (state.size === 1 ? "켜져 있어. 하나는 켜 둬" : "탭하면 꺼져. 자료는 남아") : LANG_START[l]}
+            sub={on ? (state.size === 1 ? "켜져 있어. 마지막 하나는 끌 수 없어" : "탭하면 꺼짐. 자료는 남아") : LANG_START[l]}
             right={<Pill on={on}>{on ? "켜짐" : "꺼짐"}</Pill>}
             pressed={on}
             onClick={() => tap(l)}

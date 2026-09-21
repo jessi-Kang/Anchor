@@ -21,7 +21,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   // 미리보기는 **참고 화면이 그리는 상태**를 그린다 — 화면이 아니라 붙박이 값이라, 참고와 다른
   // 상태를 들고 있으면 `design:diff` 가 문구 차이도 상태 차이도 똑같이 빨갛게 칠한다.
   // `design/screens/F16.html` 은 **둘 켜짐**(흔한 쪽)을 그린다. 하나만 켜면 「마지막 하나」
-  // 상태가 되어 켜진 행 부제가 `켜져 있어. 하나는 켜 둬` 로 갈린다 — 그 상태는 참고가 없어서
+  // 상태가 되어 켜진 행 부제가 `켜져 있어. 마지막 하나는 끌 수 없어` 로 갈린다 — 그 상태는 참고가 없어서
   // 어차피 못 재고, 문구는 design/SCREENS.md 의 표가 지킨다.
   let active: Lang3[] = ["ja", "es"];
   let retention = 30;
