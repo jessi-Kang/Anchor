@@ -688,13 +688,27 @@ a.row,
   color: var(--color-accent-dark);
 }
 
-/* F12 본문. 줄 간격이 넓은 건 ruby 가 줄 위로 올라가기 때문이다 (design/screens/F12.html). */
+/*
+ * F12 본문. 줄 간격이 넓은 건 ruby 가 줄 위로 올라가기 때문이다 (design/screens/F12.html).
+ * **2.3 은 닫힌 쪽에도 같이 준다** — 닫힌 줄이 낮으면 탭해서 읽기가 붙을 때마다 문단 전체가 밀린다.
+ * 두 상태의 줄높이를 같게 두면 열려도 글자가 제자리에 있다. 보이지 않는 자리라 "표시를 붙이지
+ * 않는다" 와 부딪히지 않는다 (design/SCREENS.md F12 · F12a).
+ */
 .metBody {
   font-family: var(--font-ja);
   font-size: 21px;
   font-weight: 500;
-  line-height: 1.9;
+  line-height: 2.3;
   color: var(--color-text1);
+}
+
+/*
+ * 탭하면 읽기가 열리는 덩어리. **모양을 주지 않는다** — 틴트가 곧 그 자리의 표시다(틴트 = 만난 것 =
+ * 가려진 것 = 탭하면 열린다). 아이콘도 밑줄도 커서 바꾸기도 없다: 붙이는 순간 시험처럼 읽힌다.
+ * 키보드로도 닿아야 해서 role·tabIndex 는 달지만 보이는 것은 그대로다.
+ */
+.metOpenable {
+  cursor: pointer;
 }
 
 /* F12 아래 칸 (design/screens/F12.html). 말 두 줄만 세로로 쌓는다 — 알약이 들어가는 자리가 아니다

@@ -7,9 +7,11 @@ import { kanjiRuns } from "@/lib/kanji/extract";
 import { getFurigana } from "@/lib/kanji/furigana";
 import { isDesignPreview } from "@/lib/design-preview";
 import { inputName } from "@/lib/input-name";
-import { Screen, Space, Card, Label, Grow, Button, uiStyles as s } from "@/components/ui";
+import { Screen, Space, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
-import { MetText, runStates } from "@/components/met-text";
+import { MetText } from "@/components/met-text";
+import { runStates } from "@/lib/kanji/runs";
+import { finishRead } from "@/app/inputs/[id]/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -99,15 +101,20 @@ export default async function ReadPage({
   return (
     <Screen where={name} up={`/inputs/${id}`} aside={preview ? "점심 12:37" : nowKST()} fixed={fixed === "1"}>
       <Space h={20} />
-      <Card>
-        {/* 화면마다 h1 하나 (CLAUDE.md). 상단 "지금 어디" 라벨은 제목이 아니다 — 이 화면의 제목은
-            다시 읽는 그 자료의 이름이다. Scene1~5 가 같은 꼴로 카드 라벨을 h1 으로 쓴다. */}
-        <Label as="h1">{name}</Label>
-        <div className={s.metBody} lang="ja">
-          <MetText body={body} met={met} readings={readings} />
-        </div>
-      </Card>
-      <Grow />
+      {/*
+        본문부터 "읽기 끝" 까지가 한 덩어리다. 어느 덩어리를 열었는지는 브라우저만 알고, 그 값이
+        버튼을 누를 때 한 번에 기록으로 나간다 — 그래서 둘을 한 컴포넌트가 들고 있다.
+        화면을 그냥 떠나면 아무것도 안 적는다. 반쯤 읽은 것을 판정으로 만들지 않는다
+        (docs/MEASURE.md 1장, PM 결정).
+      */}
+      <MetText
+        body={body}
+        name={name}
+        met={met}
+        readings={readings}
+        doneLabel="읽기 끝"
+        onDone={preview ? undefined : finishRead.bind(null, id)}
+      >
       <div className={s.metFoot}>
         {/*
           이미 만난 글자를 짚어 주는 한 줄. 한 낱말 안에 만난 것과 아직인 것이 같이 있는 자리를 고른다 —
@@ -134,8 +141,7 @@ export default async function ReadPage({
               : `새로 배울 건 ${fresh.length}개.`}
         </span>
       </div>
-      <Space h={12} />
-      <Button href="/today">읽기 끝</Button>
+      </MetText>
     </Screen>
   );
 }
