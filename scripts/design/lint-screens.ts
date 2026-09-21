@@ -14,10 +14,13 @@
 import { readdirSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright-core";
+import { FRAME_W, FRAME_H, FRAME_STYLE } from "./frame";
 
 const DIR = path.resolve(process.cwd(), "design/screens");
-const W = 390;
-const H = 844;
+// 틀을 찾는 규칙과 기본 자는 `frame.ts` 한 곳에 있다 — `design:diff` 가 제 값을 따로 들고 있다가
+// 이 검사와 다른 화면을 보고 있었다.
+const W = FRAME_W;
+const H = FRAME_H;
 const TAP_MIN = 44;
 
 function findChromium(): string | undefined {
@@ -83,13 +86,15 @@ async function main() {
     await page.waitForLoadState("networkidle").catch(() => undefined);
     await page.evaluate(() => document.fonts.ready);
 
-    const found = await page.evaluate((tapMin) => {
-      // 화면 틀은 390×844 인 div 다. `body.firstElementChild` 를 쓰다가 <link> 를 집고 있었다 —
+    const found = await page.evaluate(({ tapMin, frameStyle }) => {
+      // 화면 틀은 폭 390px 짜리 div 다(높이는 화면이 선언한다 — 규칙은 `frame.ts`).
+      // `body.firstElementChild` 를 쓰다가 <link> 를 집고 있었다 —
       // 넘침은 documentElement 쪽 조건이 대신 잡아 줘서 표가 안 났고, 본문 글자를 읽으려니 그제야 빈 값이 나왔다.
       // **높이를 박아서 찾지 않는다.** 전에는 `height: 844px` 로 찾았는데, 설정처럼 제 높이를
       // 선언한 화면에서 이 선택자가 **빗나가 body 로 떨어졌다.** body 는 넘치는 일이 없어서
       // 검사가 조용히 통과했다 — 못 찾은 것을 "괜찮다" 로 답한 것이다.
-      const frame = ([...document.querySelectorAll("div")].find((d) => /width:\s*390px/.test(d.getAttribute("style") || "")) ??
+      const frameRe = new RegExp(frameStyle);
+      const frame = ([...document.querySelectorAll("div")].find((d) => frameRe.test(d.getAttribute("style") || "")) ??
         document.body) as HTMLElement;
       const links = [...document.querySelectorAll("a")].filter((a) => !a.href.includes("fonts.g"));
       const tappable = [...document.querySelectorAll("a, button, [role=button], [data-tap]")].filter(
@@ -128,7 +133,7 @@ async function main() {
         hrefs: links.map((a) => a.getAttribute("href") || ""),
         primary: links.filter((a) => /background: #2A2D33/.test(a.getAttribute("style") || "")).length,
       };
-    }, TAP_MIN);
+    }, { tapMin: TAP_MIN, frameStyle: FRAME_STYLE });
 
     if (found.overflow) problems.push(`${id}: 틀(${found.frameH}px)을 넘친다`);
     for (const q of found.squeezed) {
