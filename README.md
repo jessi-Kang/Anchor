@@ -377,7 +377,7 @@ pnpm dev                           # http://localhost:3000
 | `CRON_SECRET` · `BLOB_READ_WRITE_TOKEN` | 매일 JSON 백업 (`/api/cron/backup` → Vercel Blob). Blob 토큰은 Vercel 이 주입 |
 
 ```bash
-pnpm typecheck && pnpm lint && pnpm build   # 커밋 전
+pnpm verify                                  # 커밋 전. typecheck → lint → build → test:db 를 && 로 잇는다
 pnpm db:migrate:status                       # 마이그레이션 상태
 pnpm design:tokens                           # design/tokens.json → src/app/tokens.css
 pnpm design:check O01 http://localhost:3000/?fixed=1   # 한 화면만 참고 HTML 과 픽셀 비교 (.design-check/)
@@ -386,6 +386,17 @@ pnpm design:diff                             # 매핑된 화면을 전부 훑어
 # 결과를 읽는 법(정상인 차이 셋)은 design/SCREENS.md "참고와 구현의 차이 훑기".
 curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_enabled 가 true, role_bypasses_rls 가 false 여야 한다)
 ```
+
+**`pnpm verify` 가 따로 있는 이유는 종료 코드다.** 넷을 손으로 이어 돌리면서 결과를 파이프로 거르면
+(`pnpm test:db | grep "# pass"`) **앞 명령의 종료 코드가 버려진다** — `&&` 나 사람이 보는 것은 `grep` 의
+성공이고, `grep` 은 빨간 줄이 마흔여덟이어도 「pass」라는 글자만 찾으면 성공한다. 그러면 검사가
+「봤고 괜찮다」인지 「안 봤다」인지 구분이 안 된다. **판정은 종료 코드가 하고, 수는 사람이 읽는다.**
+이 구멍에 두 세션이 각각 따로 빠졌다 — 조심으로 막는 자리가 아니라 도구로 막는 자리다.
+
+**「알려진 빨간 시험」 목록은 없다.** 한동안 recordings 키 시험 셋이 늘 빨갰는데 코드 결함이 아니라
+**그 대에 마이그레이션 0008 이 안 올라가 있어서**였다(`client_id` 칸도 `recordings_client_uq` 인덱스도
+없었다). 0008 까지 올린 DB 에 씨앗을 넣으면 72개가 전부 통과한다. 그러니 예외 목록을 두지 않는다 —
+빨간 줄은 **고칠 것이거나 이 대의 DB 가 뒤처졌다는 신호**이지, 선언해 두고 지나갈 것이 아니다.
 
 ### 데이터 접근 규칙
 
