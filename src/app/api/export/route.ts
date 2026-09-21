@@ -1,20 +1,10 @@
 import { requireUser } from "@/lib/auth/server";
 import { withUser } from "@/lib/db";
+// 내보내기 대상 목록과 「왜 어긋나는가」는 한 곳에 있고, `pnpm test:db` 가 스키마와 견준다.
+import { USER_TABLES } from "@/lib/db/export-tables";
 
 export const dynamic = "force-dynamic";
 
-/** 내보내기 대상. 공용 참조 노드/엣지는 사용자 데이터가 아니므로 개인 소유(user_id 있음)만 포함한다. */
-const USER_TABLES = [
-  "users",
-  "inputs",
-  "nodes",
-  "edges",
-  "user_node_state",
-  "cards",
-  "chunks",
-  "recordings",
-  "encounters",
-] as const;
 
 /**
  * GET /api/export — 내 데이터 전체를 JSON 파일 하나로.
