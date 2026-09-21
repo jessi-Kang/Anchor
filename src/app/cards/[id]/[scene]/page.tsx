@@ -6,7 +6,7 @@ import { cardContext } from "@/lib/cards/progress";
 import { landingWords } from "@/lib/cards/landing";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Label, Lead, Card, Grow, Button, Ghost, Mark, Ja, rubyKanji, uiStyles as s } from "@/components/ui";
-import { withParticle } from "@/lib/ko";
+import { iGa, withParticle } from "@/lib/ko";
 import { GuessForm } from "./guess-form";
 import { LandingButtons } from "./landing-buttons";
 
@@ -226,19 +226,32 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
 
   // scene 5
   /*
-    **머리줄을 가르는 축은 「안전한 착지 낱말이 남았나」다** — 「앵커 낱말이 있나」가 아니다.
-    Scene5 는 착지고, 방금 푼 한자를 낱말에 앉히는 것이 카드의 마지막 일이다. 앵커가 없다는 건
-    *시작할 때* 부를 낱말이 없다는 뜻이지 *끝에 앉을* 낱말이 없다는 뜻이 아니라서, `条` 카드라도
-    `件` 을 이미 만났으면 `条件` 이 뜨는 게 맞는 동작이다. 거꾸로 앵커가 있어도 안 만난 글자
-    때문에 다 걸러질 수 있다. 그래서 `landingWords` 가 실제로 무엇을 냈는지를 보고 고른다
-    (design/SCREENS.md "Scene5 는 낱말을 대야 한다").
+    **머리줄은 셋으로 갈린다. 카드에 뜨는 낱말은 어느 쪽이든 그대로다** — 바뀌는 건 h1 뿐이다.
+
+    1. 부를 낱말이 **없는** 카드(둘째 묶음)면 **보여 주기만 한다**: `이 조가 여기 들어 있어`.
+       착지 낱말(条件·条約)은 그대로 서지만 **안다는 말을 뺀다.** 뒤집힘의 정체가 "낱말을 대서" 가
+       아니라 **"앱이 아직 못 골랐다고 해 놓고 사용자가 그 낱말을 안다고 말해서"** 라서다. 그래서
+       착지 낱말이 남았는지가 아니라 **앵커가 있는지**로 가른다 — 디자인이 머리줄 넷을 그려 보고
+       `이미 아는 단어에 条가 들어 있어` 는 착지 낱말이 있어도 뒤집힌다고 답했다
+       (design/SCREENS.md "결 하나를 정하고 세 줄을 거기서 뽑는다" · "뒤집을 수 있나").
+       Scene1 의 `이미 아는 소리` 를 그대로 이어받아 같은 실로 앉는다.
+    2. 앵커는 있는데 **안전한 착지 낱말이 하나도 안 남았으면** 뜨는 것은 그 한자 하나뿐이라
+       "이미 아는 단어에" 가 거짓이 된다. 그때만 `이미 아는 소리에 모양이 생겼어` 다.
+    3. 나머지가 본래의 `이미 아는 단어에 協이 들어 있어`.
   */
   const landing = landingWords(p, met);
   return (
     <Screen {...common}>
       <Grow />
       <Label as="h1">
-        {landing.landed ? <>이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.sound }, "이가")} 들어 있어</> : "이미 아는 소리에 모양이 생겼어"}
+        {!p.anchor ? (
+          // 소리는 한글이라 조사를 글자에서 센다 — `건` 이면 "이 건이 여기 들어 있어" 다.
+          `이 ${p.sound}${iGa(p.sound)} 여기 들어 있어`
+        ) : landing.landed ? (
+          <>이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.sound }, "이가")} 들어 있어</>
+        ) : (
+          "이미 아는 소리에 모양이 생겼어"
+        )}
       </Label>
       <Space h={10} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
