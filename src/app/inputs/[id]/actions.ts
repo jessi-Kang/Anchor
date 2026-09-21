@@ -14,6 +14,15 @@ import { findWordWith } from "@/lib/kanji/extract";
 import { getFurigana } from "@/lib/kanji/furigana";
 import { kanaGate } from "@/lib/kana";
 
+/**
+ * 못 만든 한자를 달고 F04a 로 가는 주소. 같은 글자가 두 번 들어가지 않게 모으고 순서는 그대로 둔다.
+ * 쌓는 이유는 하나다 — F04a 의 "다음 글자" 가 방금 못 만든 글자를 다시 내밀면 제자리를 돈다.
+ */
+function noCard(inputId: string, kanji: string, failed: string[]): string {
+  const all = [...new Set([...failed, kanji])];
+  return `/inputs/${inputId}/no-card?failed=${encodeURIComponent(all.join(","))}`;
+}
+
 /** F03 "알아 / 몰라" 한 탭 */
 export async function judge(nodeId: string, knows: boolean) {
   const user = await requireUser();
@@ -22,9 +31,15 @@ export async function judge(nodeId: string, knows: boolean) {
 
 /**
  * F03 "協부터" → 카드 1장 (있으면 재사용) → 일본어 첫 카드 직전 가나 게이트 → F04.
- * payload 는 여기서 굳힌다: 문안(손·Claude·사전) + 부품 이름 + 출처 문장.
+ * payload 는 여기서 굳힌다: 문안(손·Claude) + 부품 이름 + 출처 문장.
+ *
+ * **문안을 못 만들면 카드를 안 만들고 F04a 로 보낸다** (design/SCREENS.md "못 만들었을 때").
+ * 추측 화면까지 가지 않는다 — 거기 가면 물을 것도 답도 없다.
+ * `failed` 는 이번에 이미 못 만든 한자들이고, 여기서 하나 더 붙어 주소로 따라간다.
+ * **저장하지 않는 이유**: 적어 두면 API 가 한 번 죽은 날의 한자가 영영 갇힌다.
+ * 주소는 화면을 떠나면 사라지므로 다음에 들어오면 다시 해 본다.
  */
-export async function startCard(inputId: string, kanji: string) {
+export async function startCard(inputId: string, kanji: string, failed: string[] = []) {
   const user = await requireUser();
   const input = await getInput(user.id, inputId);
   if (!input) throw new Error("자료가 없다");
@@ -36,10 +51,17 @@ export async function startCard(inputId: string, kanji: string) {
     const names = await getPartNames(node.meta.parts ?? []);
     // 문안과 후리가나는 서로를 안 쓴다. F03 의 "협부터 풀어보기" 한 탭이 두 번 기다리지 않게 같이 띄운다.
     const src = findWordWith(input.body, node.key);
-    const [{ content, source }, readings] = await Promise.all([
+    const [made, readings] = await Promise.all([
       getCardContent(node, names),
       src ? getFurigana(src.sentence) : Promise.resolve(null),
     ]);
+    /*
+      **후리가나가 없는 것은 실패가 아니다.** 그 문장만 ruby 없이 가고 카드는 선다. 문안이 없는
+      것은 다르다 — 질문도 정답도 착지도 그것에서 나오니 카드가 통째로 빌 자리다. 그래서 문안
+      하나만 문지기다. 둘을 같이 막으면 읽기를 못 구한 날 카드가 안 열린다.
+    */
+    if (!made) redirect(noCard(inputId, kanji, failed));
+    const { content, source } = made;
     const counts = new Map<string, number>();
     for (const p of node.meta.parts ?? []) counts.set(p, (counts.get(p) ?? 0) + 1);
     const parts: CardPart[] = [...counts.entries()].map(([ch, count]) => ({ ch, name: names.get(ch) ?? null, count }));
