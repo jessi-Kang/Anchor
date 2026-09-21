@@ -54,10 +54,11 @@ export default async function GuessPage({
         <Label>내가 하려던 말</Label>
         <div className={s.talkSituation}>{situation}</div>
       </Card>
-      <Space h={22} />
+      {/* 카드 → 24 → 제목 26 (design/screens/F17.html · F17a.html, 둘이 같은 값이다). */}
+      <Space h={24} />
       {guess === null ? (
         <>
-          <Title lg>
+          <Title>
             영어로 뭐라고
             <br />할 것 같아?
           </Title>
@@ -77,7 +78,7 @@ export default async function GuessPage({
           칸이 없으면 그 버튼의 뜻이 "문장을 다시 만들어 보기" 하나로 좁혀진다.
         */
         <>
-          <Title lg>
+          <Title>
             지금은 영어를
             <br />못 만들었어.
           </Title>
