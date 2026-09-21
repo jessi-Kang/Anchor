@@ -93,6 +93,27 @@
   padding: 4px 20px;
 }
 /*
+  **묶음 라벨 + 행이 서는 카드 (F03).** 라벨이 위 간격을 지므로 카드 여백은 `4px` 로 얇고,
+  카드 `gap` 은 0 이다 — 라벨의 `padding-top: 14px` 이 그 자리를 대신한다. 행은 `14px` 이다.
+
+  **`.cardList` 를 그대로 못 쓴다.** 저쪽(O02a)의 참고는 같은 `4px 20px` 인데 `gap: 10px` ·
+  행 `16px` 이고 카드 안에 라벨이 없다. 값이 다른 이유는 이 카드가 **라벨을 지기 때문**이라,
+  공유 클래스를 F03 값으로 바꾸면 이미 맞아 있는 O02a 가 어긋난다. 그래서 변형을 하나 둔다.
+
+  값은 전부 `design/screens/F03.html` 에서 읽었다 (카드 `padding: 4px 20px`, gap 없음,
+  라벨 `padding-top: 14px`, 행 `padding: 14px 0`).
+*/
+.cardGroup {
+  padding: 4px 20px;
+  gap: 0;
+}
+.cardGroup > .label {
+  padding-top: 14px;
+}
+.cardGroup > .row {
+  padding: 14px 0;
+}
+/*
   라벨 없이 행만 선 카드 (F15). 라벨이 있으면 그것이 위 간격을 만드는데, 빼면 카드 여백 18 에
   첫 줄의 16 이 더해져 **위가 떠 보인다.** 첫 줄 위와 끝 줄 아래를 지워 카드 여백 18 로
   양쪽을 맞춘다 (design/screens/F15.html 의 `0 0 16px 0` · `16px 0 0 0` 과 같은 값).
@@ -372,10 +393,14 @@ a.row,
   font-weight: 700;
 }
 /* 뽑기(F03) 행의 한자. 행 제목 크기(18px)로 두면 한글 부제와 구별이 안 가고 참고 화면보다 작다.
-   크게 보여 주는 자리가 아니라 목록이므로 44px 이 아니라 30px 이다 (design/screens/F03.html). */
+   크게 보여 주는 자리가 아니라 목록이므로 44px 이 아니라 30px 이다 (design/screens/F03.html).
+
+   **줄높이를 `1` 로 잡으면 글자가 줄상자를 넘는다.** 30px CJK 글자통은 30px 줄상자보다 커서,
+   재 보면 부제 위끝이 한자 아래끝과 **1px 겹쳤다** — 겹침은 아래 이웃이 밀려 올라간 것이라
+   행 높이가 참고보다 짧아지는 대부분이 여기서 나왔다. 참고는 줄높이를 안 적는다(=`normal`). */
 .jaSm {
   font-size: 30px;
-  line-height: 1;
+  line-height: normal;
 }
 .jaMd {
   font-size: var(--font-size-kanji-sm);
@@ -392,9 +417,10 @@ a.row,
 }
 
 /* 행 안의 작은 선택 (알아 / 몰라). 알약과 같은 크기, 누를 수 있다 */
+/* 알아/몰라 칩 두 개 (F03). 사이 간격 6px 은 참고에서 읽은 값이다 (design/screens/F03.html). */
 .choiceRow {
   display: inline-flex;
-  gap: 4px;
+  gap: 6px;
   flex: none;
 }
 .choice {

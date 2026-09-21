@@ -40,7 +40,6 @@ export default async function InputPage({ params, searchParams }: { params: Prom
     const bare: JudgeItem[] = [{ nodeId: "d", kanji: "条", sub: "조", hasWord: false, hasSound: true, known: null }];
     return (
       <Screen where="아침 기사" up="/today" aside="오전 8:42" fixed={fixed === "1"}>
-        <Space h={28} />
         <JudgeRows inputId="preview" anchored={anchored} bare={bare} seen={1} found={1} />
       </Screen>
     );
@@ -75,7 +74,6 @@ export default async function InputPage({ params, searchParams }: { params: Prom
 
   return (
     <Screen where={where} up="/today" aside={nowKST()}>
-      <Space h={28} />
       <JudgeRows inputId={input.id} anchored={anchored} bare={bare} seen={seen.length} found={found.length} />
     </Screen>
   );

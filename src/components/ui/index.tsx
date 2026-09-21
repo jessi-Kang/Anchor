@@ -81,6 +81,7 @@ export function Card({
   children,
   tint,
   list,
+  group,
   flush,
   style,
 }: {
@@ -89,12 +90,14 @@ export function Card({
   tint?: boolean;
   /** 행(Row) 목록용 패딩 */
   list?: boolean;
+  /** 묶음 라벨 + 행이 서는 카드 (F03). 라벨이 위 간격을 지므로 카드 여백·행 여백이 `list` 와 다르다. */
+  group?: boolean;
   /** 라벨 없이 행만 서는 카드. 첫 줄 위·끝 줄 아래를 카드 여백에 맞춰 대칭으로 만든다. */
   flush?: boolean;
   style?: CSSProperties;
 }) {
   return (
-    <section className={cx(s.card, tint && s.cardTint, list && s.cardList, flush && s.cardFlush)} style={style}>
+    <section className={cx(s.card, tint && s.cardTint, list && s.cardList, group && s.cardGroup, flush && s.cardFlush)} style={style}>
       {children}
     </section>
   );

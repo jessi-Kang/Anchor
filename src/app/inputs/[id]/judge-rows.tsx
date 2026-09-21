@@ -77,7 +77,13 @@ export function JudgeRows({
         주어는 사용자가 아니라 앱이다 — 아래 "부를 낱말이 아직 없어" 묶음과 같은 규칙이다.
         자료를 탓하지 않고 못 하는 쪽을 우리로 둔다.
       */}
-      <Title lg>
+      {/*
+        위 간격이 여기 있다. 부르는 쪽(`page.tsx`)이 미리보기와 실제 화면 두 군데서 따로 넣고
+        있었는데, 같은 화면이라 두 값이 갈릴 자리였다. 24 는 참고에서 읽은 값이다
+        (`design/screens/F03.html` 의 `height: 24px` — 24 · 6 · 18 · 10 넷이 이 화면의 세로 간격 전부다).
+      */}
+      <Space h={24} />
+      <Title>
         {seen === 0
           ? "이 자료엔 한자가 없어"
           : found === 0
@@ -106,17 +112,17 @@ export function JudgeRows({
               "하나씩 알아 / 몰라만 골라."
             : "여기서 새로 배울 건 없어. 다른 자료를 넣어 봐."}
       </Lead>
-      <Space h={22} />
+      <Space h={18} />
       {queueA.length > 0 && (
-        <Card>
+        <Card group>
           {/* 가르는 축은 낱말이라 "아는 소리에서 시작" 이 아니다 — 소리는 양쪽 다 있다 */}
           <Label>아는 낱말에서 시작</Label>
           {queueA.map(row)}
         </Card>
       )}
-      {queueA.length > 0 && queueB.length > 0 && <Space h={12} />}
+      {queueA.length > 0 && queueB.length > 0 && <Space h={10} />}
       {queueB.length > 0 && (
-        <Card>
+        <Card group>
           {/* "발판" 은 우리끼리 쓰는 말이라 화면에 안 쓴다. 그리고 주어는 사용자가 아니라 앱이다 —
               그 소리를 모르는 게 아니라, 그 글자를 부를 낱말을 우리가 아직 못 골랐다. */}
           <Label>부를 낱말이 아직 없어</Label>
@@ -125,14 +131,13 @@ export function JudgeRows({
       )}
       {knownItems.length > 0 && (
         <>
-          {unknownCount > 0 && <Space h={12} />}
-          <Card>
+          {unknownCount > 0 && <Space h={10} />}
+          <Card group>
             <Label>아는 것</Label>
             {knownItems.map(row)}
           </Card>
         </>
       )}
-      <Space h={12} />
       <Grow />
       {first ? (
         <Button
