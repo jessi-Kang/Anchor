@@ -128,12 +128,12 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
   return (
     <Screen where={`${ctx.where} 끝`} up={card.input_id ? `/inputs/${card.input_id}` : "/today"} aside={nowKST()}>
       <Space h={28} />
-      <Title lg>{withParticle({ text: p.kanji, sound: p.hook.mark }, "이가")} 켜졌어</Title>
+      <Title lg>{withParticle({ text: p.kanji, sound: p.sound }, "이가")} 켜졌어</Title>
       <Space h={6} />
       <Lead>{lead}</Lead>
       <Space h={18} />
       <Card style={{ padding: "20px 20px" }}>
-        <Graph g={{ center: { text: p.kanji, sound: p.hook.mark }, known: known.slice(0, 2), next: cands.map((c) => ({ text: c.kanji, sound: c.koSound })) }} />
+        <Graph g={{ center: { text: p.kanji, sound: p.sound }, known: known.slice(0, 2), next: cands.map((c) => ({ text: c.kanji, sound: c.koSound })) }} />
         <Legend />
       </Card>
       <Grow />

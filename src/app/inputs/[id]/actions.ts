@@ -56,27 +56,44 @@ export async function startCard(inputId: string, kanji: string, failed: string[]
       src ? getFurigana(src.sentence) : Promise.resolve(null),
     ]);
     /*
-      **후리가나가 없는 것은 실패가 아니다.** 그 문장만 ruby 없이 가고 카드는 선다. 문안이 없는
-      것은 다르다 — 질문도 정답도 착지도 그것에서 나오니 카드가 통째로 빌 자리다. 그래서 문안
-      하나만 문지기다. 둘을 같이 막으면 읽기를 못 구한 날 카드가 안 열린다.
+      **문지기는 둘이다. 카드가 통째로 빌 자리냐로 가른다.**
+
+      하나는 문안이다 — 질문도 정답도 착지도 거기서 나온다. 다른 하나는 **발판**, 곧 이 한자의
+      한국 한자음 하나다. Scene1 이 통째로 그것으로 서고(`이 조, 한자로는 어떤 모양일까?`),
+      F04 의 주 버튼도 그것을 부른다(`조부터 풀어보기`). 2,136자 중 **여섯**(収 枠 塡 頰 𠮟 剝)에
+      그 소리가 없다. 넣을 것이 없는 자리에 한자를 그대로 넣으면 "이 収, 한자로는 어떤 모양일까?" 가
+      되는데, 그건 묻는 게 아니라 **답을 보여 주고 묻는 것**이다. 없는 말을 지어내는 대신 못
+      만들었다고 말한다 — 문안을 못 만들었을 때와 같은 길(F04a)로 보낸다.
+
+      **후리가나는 문지기가 아니다.** 없으면 그 문장만 ruby 없이 가고 카드는 선다. 셋을 같이 막으면
+      읽기를 못 구한 날 카드가 안 열린다.
     */
-    if (!made) redirect(noCard(inputId, kanji, failed));
+    const sound = node.meta.ko_sound ?? null;
+    if (!made || !sound) redirect(noCard(inputId, kanji, failed));
     const { content, source } = made;
     const counts = new Map<string, number>();
     for (const p of node.meta.parts ?? []) counts.set(p, (counts.get(p) ?? 0) + 1);
     const parts: CardPart[] = [...counts.entries()].map(([ch, count]) => ({ ch, name: names.get(ch) ?? null, count }));
-    // F03 은 nodes.meta 의 ko_word·ko_sound 로 "지출의 지" 를 보여 준다. 카드의 후킹도 같은 단어여야
-    // "지출은 알아. 支만 모르지" 로 이어진다. 문안 생성이 다른 단어를 골라 오면 두 화면이 다른 말을
-    // 하게 되므로, 사전에 앵커가 있으면 그쪽을 쓴다 (docs/FLOW.md 1장 4·5).
-    const hook =
-      node.meta.ko_word && node.meta.ko_sound
-        ? { word: node.meta.ko_word, mark: node.meta.ko_sound }
-        : content.hook;
+    /*
+      **발판은 사전에서만 온다.** F03 은 `nodes.meta` 의 ko_word·ko_sound 로 "지출의 지" 를 보여 주고,
+      카드도 같은 자리를 봐야 "지출은 알아. 支만 모르지" 로 이어진다.
+
+      **없으면 없는 채로 간다.** 전에는 이 갈래가 문안 생성이 골라 온 낱말로 떨어졌는데, 문안 쪽
+      스키마가 그 칸을 필수로 잡고 있어서 **그 낱말은 언제나 지어낸 것**이었다. 그래서 F03 이
+      "부를 낱말이 아직 없어" 로 내려놓은 `条` 가 다음 화면에서 "조건은 알아" 가 됐다 — 한 탭 만에
+      앞 화면을 거짓으로 만든 것이다. 뒤집힘은 낱말이 화면에 있어서가 아니라 **앱이 아직 못 골랐다고
+      해 놓고 그 낱말을 사용자가 안다고 말해서** 생긴다 (design/SCREENS.md, docs/FLOW.md 97).
+
+      소리 없이 낱말만 있는 `収`("수입")은 위 문지기에서 이미 걸린다. F03 도 낱말과 소리를 **둘 다**
+      보고 둘째 묶음에 두므로, 두 화면이 같은 글자를 같은 쪽에 놓는다.
+    */
+    const anchor = node.meta.ko_word ?? null;
     // 후리가나도 payload 에 굳힌다. 한 번 만들면 그대로라, 나중에 읽기가 바뀌어 이 카드의 문장만
     // 달라지는 일이 없다. 못 구하면 undefined — 그 문장은 ruby 없이 간다.
     const payload: CardPayload = {
       ...content,
-      hook,
+      sound,
+      anchor,
       kanji: node.key,
       reading: node.reading ?? node.meta.on?.[0] ?? "",
       parts,

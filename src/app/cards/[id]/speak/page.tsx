@@ -47,7 +47,7 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
     where = ctx.where;
     // 착지와 같은 함수로 고른다 — 안 만난 한자가 낀 낱말은 여기서 읽기까지 크게 띄우므로
     // 더 크게 샌다 (lib/cards/landing.ts).
-    const w = landingWords(card.payload, await judgedKanji(user.id))[0];
+    const w = landingWords(card.payload, await judgedKanji(user.id)).words[0];
     word = w.word;
     reading = w.reading;
     loop = await loadSpeakLoop(user.id, { card: card.id }, "ja");

@@ -6,7 +6,7 @@ import { cardContext } from "@/lib/cards/progress";
 import { landingWords } from "@/lib/cards/landing";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Label, Lead, Card, Grow, Button, Ghost, Mark, Ja, rubyKanji, uiStyles as s } from "@/components/ui";
-import { withParticle } from "@/lib/ko";
+import { iGa, withParticle } from "@/lib/ko";
 import { GuessForm } from "./guess-form";
 import { LandingButtons } from "./landing-buttons";
 
@@ -15,7 +15,8 @@ export const dynamic = "force-dynamic";
 const PREVIEW: CardPayload = {
   kanji: "協",
   reading: "きょう",
-  hook: { word: "협력", mark: "협" },
+  sound: "협",
+  anchor: "협력",
   parts: [
     { ch: "十", name: "열 십", count: 1 },
     { ch: "力", name: "힘 력", count: 3 },
@@ -91,14 +92,22 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   const next = (n: number) => (preview ? `/cards/preview/${n}` : `/cards/${id}/${n}`);
 
   if (scene === 1) {
+    /*
+      **자리는 그대로 서고 담기는 것만 바뀐다** (design/screens/Scene1.html · Scene1a.html).
+      부를 낱말이 있으면 낱말을 내고 그 안의 한 음절에만 틴트를 씌운다(협**력**의 `협`).
+      없으면 **소리 한 글자**를 틴트 없이 낸다 — 음절이 하나뿐이면 틴트가 강조가 아니라 상자로
+      읽힌다. 틴트의 일은 여럿 중 이것을 가리키는 것인데 견줄 나머지가 없다 (디자인 판정).
+
+      물음은 양쪽이 같다. 이미 소리만 쓰고 있어서 새로 지을 말이 없다.
+    */
     return (
       <Screen {...common}>
         <Grow />
         <div className={`${s.center} ${s.centerWide}`}>
-          <Label>늘 쓰는 단어</Label>
-          <Ja size="lg">{markSyllable(p.hook.word, p.hook.mark)}</Ja>
+          <Label>{p.anchor ? "늘 쓰는 단어" : "이미 아는 소리"}</Label>
+          <Ja size="lg">{p.anchor ? markSyllable(p.anchor, p.sound) : p.sound}</Ja>
           <h1 className={s.ask}>
-            이 {p.hook.mark}, 한자로는
+            이 {p.sound}, 한자로는
             <br />
             어떤 모양일까?
           </h1>
@@ -216,13 +225,37 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   }
 
   // scene 5
+  /*
+    **머리줄은 셋으로 갈린다. 카드에 뜨는 낱말은 어느 쪽이든 그대로다** — 바뀌는 건 h1 뿐이다.
+
+    1. 부를 낱말이 **없는** 카드(둘째 묶음)면 **보여 주기만 한다**: `이 조가 여기 들어 있어`.
+       착지 낱말(条件·条約)은 그대로 서지만 **안다는 말을 뺀다.** 뒤집힘의 정체가 "낱말을 대서" 가
+       아니라 **"앱이 아직 못 골랐다고 해 놓고 사용자가 그 낱말을 안다고 말해서"** 라서다. 그래서
+       착지 낱말이 남았는지가 아니라 **앵커가 있는지**로 가른다 — 디자인이 머리줄 넷을 그려 보고
+       `이미 아는 단어에 条가 들어 있어` 는 착지 낱말이 있어도 뒤집힌다고 답했다
+       (design/SCREENS.md "결 하나를 정하고 세 줄을 거기서 뽑는다" · "뒤집을 수 있나").
+       Scene1 의 `이미 아는 소리` 를 그대로 이어받아 같은 실로 앉는다.
+    2. 앵커는 있는데 **안전한 착지 낱말이 하나도 안 남았으면** 뜨는 것은 그 한자 하나뿐이라
+       "이미 아는 단어에" 가 거짓이 된다. 그때만 `이미 아는 소리에 모양이 생겼어` 다.
+    3. 나머지가 본래의 `이미 아는 단어에 協이 들어 있어`.
+  */
+  const landing = landingWords(p, met);
   return (
     <Screen {...common}>
       <Grow />
-      <Label as="h1">이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.hook.mark }, "이가")} 들어 있어</Label>
+      <Label as="h1">
+        {!p.anchor ? (
+          // 소리는 한글이라 조사를 글자에서 센다 — `건` 이면 "이 건이 여기 들어 있어" 다.
+          `이 ${p.sound}${iGa(p.sound)} 여기 들어 있어`
+        ) : landing.landed ? (
+          <>이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.sound }, "이가")} 들어 있어</>
+        ) : (
+          "이미 아는 소리에 모양이 생겼어"
+        )}
+      </Label>
       <Space h={10} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {landingWords(p, met).map((w) => (
+        {landing.words.map((w) => (
           <Card key={w.word}>
             <div className={s.landing}>
               <div className={s.landingWord}>

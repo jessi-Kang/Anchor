@@ -11,6 +11,19 @@ export type CardPayload = CardContent & {
   kanji: string;
   /** 음독 (きょう) */
   reading: string;
+  /**
+   * **발판: 이 한자의 한국 한자음 한 글자**(協 → "협"). 카드가 서려면 이것 하나는 있어야 해서
+   * `string | null` 이 아니다 — 없으면 카드를 안 만든다 (`app/inputs/[id]/actions.ts`).
+   * 원칙 2 가 "사용자의 것" 이라고 보장한 값이라, 앱이 고른 것이 아니다.
+   */
+  sound: string;
+  /**
+   * **부를 낱말**(協 → "협력"). 2,136자 중 656자에만 있다. 없으면 `null` 이고, 그때 카드는
+   * 소리 하나로 선다 — **낱말을 지어내지 않는다.** F03 이 "부를 낱말이 아직 없어" 라고 한
+   * 글자에 다음 화면이 낱말을 대면 그 화면이 거짓이 된다 (design/SCREENS.md, docs/FLOW.md 97).
+   * 사전(`nodes.meta.ko_word`)에서만 온다. 문안 생성이 고른 낱말은 쓰지 않는다.
+   */
+  anchor: string | null;
   parts: CardPart[];
   /**
    * 출처: 자료 문장과 그 한자가 든 단어 (F04).
@@ -63,6 +76,21 @@ export async function createCard(userId: string, nodeId: string, inputId: string
   });
 }
 
+/**
+ * 옛 payload 를 지금 모양으로 읽는다. **payload 는 만들 때 굳히므로 고쳐 쓰지 않고 읽을 때 맞춘다.**
+ *
+ * `sound`·`anchor` 로 가르기 전에 만든 카드는 `hook: { word, mark }` 하나를 지고 있다. `mark` 는
+ * 언제나 한국 한자음이고 `word` 는 그때 그 카드가 실제로 띄운 낱말이라, 그대로 옮긴다 — 그 카드가
+ * 보여 준 것을 지금 와서 바꾸면 굳힌 이유가 없어진다. 새 카드부터 사전만 보고 채워진다.
+ */
+type LegacyPayload = Omit<CardPayload, "sound" | "anchor"> & { hook?: { word: string; mark: string } };
+
+export function cardPayload(raw: CardPayload | LegacyPayload): CardPayload {
+  if ("sound" in raw && raw.sound) return raw as CardPayload;
+  const hook = (raw as LegacyPayload).hook;
+  return { ...(raw as LegacyPayload), sound: hook?.mark ?? "", anchor: hook?.word ?? null };
+}
+
 export async function getCard(userId: string, id: string): Promise<CardRow | null> {
   return withUser(userId, async (tx) => {
     const { rows } = await tx.query<CardRow>(
@@ -70,7 +98,8 @@ export async function getCard(userId: string, id: string): Promise<CardRow | nul
        FROM cards WHERE user_id = $1 AND id = $2`,
       [userId, id],
     );
-    return rows[0] ?? null;
+    const row = rows[0];
+    return row ? { ...row, payload: cardPayload(row.payload) } : null;
   });
 }
 

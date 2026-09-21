@@ -53,9 +53,14 @@ export async function inputProgress(userId: string, input: InputRow): Promise<In
 /**
  * **아직 카드가 안 된 한자.** "남았다" 의 정의는 이 한 줄이고, `inputProgress.remaining` 과
  * `cardsLeft` 가 같이 쓴다. 둘이 따로 세면 화면은 남았다고 하고 하루 끝은 끝났다고 한다.
+ *
+ * **카드가 될 수 없는 한자는 안 센다.** 한국 한자음이 없는 여섯(収 枠 塡 頰 𠮟 剝)은 발판이 없어
+ * 카드가 서지 않는다 (`app/inputs/[id]/actions.ts`). 세면 그 글자가 든 자료는 "남았다" 가 영영
+ * 안 줄어 하루 끝(F15)이 못 뜨고, 큐는 내밀 것이 없는데 수만 남는다 — **안 내미는 것을 세면
+ * 화면이 못 가는 곳을 가리킨다.**
  */
 function openKanji(nodes: KanjiNode[], known: Set<string>, landed: Set<string>): KanjiNode[] {
-  return nodes.filter((n) => !known.has(n.key) && !landed.has(n.key));
+  return nodes.filter((n) => Boolean(n.meta.ko_sound) && !known.has(n.key) && !landed.has(n.key));
 }
 
 /**
@@ -189,7 +194,9 @@ export function nextCandidates(prog: InputProgress, justLit?: string): Candidate
   const soundOf = new Map(prog.nodes.map((n) => [n.key, n.meta.ko_sound ?? null]));
   const howOf = (k: string): Knew => (prog.solved.has(k) ? "solved" : landed.has(k) ? "lit" : "knew");
   return prog.nodes
-    .filter((n) => !known.has(n.key) && !landed.has(n.key))
+    // 발판(한국 한자음)이 없는 글자는 카드가 못 선다. "다음 카드는 이거" 가 가리킬 수 없으니
+    // `openKanji`·`nextKanji` 와 같은 규칙으로 뺀다 — 셋이 갈리면 화면마다 다음이 달라진다.
+    .filter((n) => Boolean(n.meta.ko_sound) && !known.has(n.key) && !landed.has(n.key))
     .map((n) => {
       const shared = [...new Set(n.meta.parts ?? [])].filter((part) => owner.has(part));
       const viaKanji = shared.length ? owner.get(shared[0])! : null;

@@ -25,12 +25,12 @@ export default async function InputPage({ params, searchParams }: { params: Prom
 
   if (isDesignPreview()) {
     const anchored: JudgeItem[] = [
-      { nodeId: "a", kanji: "協", sub: "협력의 협", hasWord: true, known: null },
-      { nodeId: "b", kanji: "開", sub: "개발의 개", hasWord: true, known: null },
-      { nodeId: "c", kanji: "基", sub: "기반의 기", hasWord: true, known: null },
+      { nodeId: "a", kanji: "協", sub: "협력의 협", hasWord: true, hasSound: true, known: null },
+      { nodeId: "b", kanji: "開", sub: "개발의 개", hasWord: true, hasSound: true, known: null },
+      { nodeId: "c", kanji: "基", sub: "기반의 기", hasWord: true, hasSound: true, known: null },
     ];
     // 낱말은 없고 소리만 있는 행 — 부제는 한국 한자음 한 글자다 (docs/FLOW.md 1장 F03 행).
-    const bare: JudgeItem[] = [{ nodeId: "d", kanji: "妥", sub: "타", hasWord: false, known: null }];
+    const bare: JudgeItem[] = [{ nodeId: "d", kanji: "妥", sub: "타", hasWord: false, hasSound: true, known: null }];
     return (
       <Screen where="아침 기사" up="/today" aside="오전 8:42" fixed={fixed === "1"}>
         <Space h={28} />

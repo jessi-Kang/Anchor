@@ -21,7 +21,9 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
   const queueA = anchored.filter((i) => !isKnown(i));
   const queueB = bare.filter((i) => !isKnown(i));
   const knownItems = [...anchored, ...bare].filter(isKnown);
-  const first = queueA[0] ?? queueB[0] ?? null;
+  // 주 버튼이 가리킬 글자. **소리가 없으면 카드가 못 서므로 내밀지 않는다** — 규칙은
+  // `nextKanji` 와 같은 한 줄이다 (lib/cards/judge-items.ts). 행은 그대로 선다: 판정은 발판 없이도 된다.
+  const first = queueA.find((i) => i.hasSound) ?? queueB.find((i) => i.hasSound) ?? null;
   const unknownCount = queueA.length + queueB.length;
 
   const set = (nodeId: string, v: boolean) => {
