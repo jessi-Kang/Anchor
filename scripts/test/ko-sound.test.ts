@@ -1,0 +1,61 @@
+/**
+ * 앵커 낱말과 한국 한자음이 **같은 것을 가리키는지** 잰다.
+ *
+ * 이 망이 없던 동안 `金` 의 한국 한자음이 「김」이었다. KANJIDIC2 는 金 에 김·금을 둘 다 싣고
+ * 빌드가 첫 값을 집었다. 1학년·빈도 53 이고 F03·Scene1 이 앵커 없는 글자에 그 소리를 그대로
+ * 세우는 자리라, **앱의 전제가 그 줄에서 끊긴다** — きん 은 금에서 오지 김에서 안 온다.
+ * 눈으로는 안 잡힌다(2,136자 중 열여섯 자였다). 그래서 잰다.
+ */
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { anchorHits, headSound, pickKoSound } from "../../src/lib/kanji/ko-sound";
+
+type Item = { kanji: string; ko: string | null; ko_all: string[] };
+const items = (JSON.parse(readFileSync("db/seed/kanji.json", "utf8")) as { items: Item[] }).items;
+const words = (JSON.parse(readFileSync("db/seed/kanji-ko.json", "utf8")) as { words: Record<string, string> }).words;
+
+test("앵커 낱말은 그 글자의 한국 한자음을 품는다 (두음법칙 허용)", () => {
+  const bad = items
+    .filter((it) => words[it.kanji])
+    .filter((it) => {
+      const w = words[it.kanji];
+      if (!it.ko) return true; // 앵커는 있는데 소리가 없으면 "○○의 ?" 가 된다
+      return !Array.from(w).some((syl, i) => syl === it.ko || (i === 0 && headSound(it.ko!) === syl));
+    })
+    .map((it) => `${it.kanji} 앵커=${words[it.kanji]} 소리=${it.ko ?? "없음"} 목록=${JSON.stringify(it.ko_all)}`);
+  assert.deepEqual(bad, [], `앵커가 제 글자의 소리를 안 품는다:\n  ${bad.join("\n  ")}`);
+});
+
+test("고른 소리는 늘 KANJIDIC2 목록 안에 있다 — 지어낸 값이 없다", () => {
+  const made = items.filter((it) => it.ko !== null && !it.ko_all.includes(it.ko));
+  assert.deepEqual(made.map((it) => `${it.kanji} ${it.ko} ∉ ${JSON.stringify(it.ko_all)}`), []);
+});
+
+test("소리가 없는 글자는 목록도 비어 있다 — 있는데 안 고른 자리는 없다", () => {
+  const skipped = items.filter((it) => it.ko === null && it.ko_all.length > 0);
+  assert.deepEqual(skipped.map((it) => it.kanji), []);
+});
+
+test("앵커가 가리키는 글자는 모두 씨앗 안에 있다", () => {
+  const seed = new Set(items.map((it) => it.kanji));
+  assert.deepEqual(Object.keys(words).filter((k) => !seed.has(k)), []);
+});
+
+test("두음법칙은 낱말 첫머리에서만 편다", () => {
+  assert.equal(headSound("량"), "양");
+  assert.equal(headSound("래"), "내");
+  assert.equal(headSound("녀"), "여");
+  assert.equal(headSound("금"), "금");
+  // 両 은 사전에 「량」이지만 앵커는 「양사」다 — 접지 않으면 멀쩡한 값이 틀린 것으로 잡힌다
+  assert.deepEqual(anchorHits(["량"], "양사"), ["량"]);
+  // 肉(육·유)은 「육류」의 「류」에 걸리면 안 된다. 둘째 음절은 접히지 않으니 류는 유가 아니다
+  assert.deepEqual(anchorHits(["육", "유"], "육류"), ["육"]);
+});
+
+test("앵커가 하나를 못 집으면 첫 값에 머문다 — 값을 지어내지 않는다", () => {
+  assert.equal(pickKoSound(["식", "사"], "식사"), "식"); // 둘 다 걸린다 → 첫 값
+  assert.equal(pickKoSound(["삼", "참"], undefined), "삼"); // 앵커 없음 → 첫 값
+  assert.equal(pickKoSound(["삼", "참"], "참고"), "참"); // 앵커가 하나를 집는다
+  assert.equal(pickKoSound([], "수입"), null); // 목록이 비면 없는 것이다
+});

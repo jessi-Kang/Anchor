@@ -33,8 +33,16 @@ const PREVIEW: CardPayload = {
   content_source: "authored",
 };
 
-/** 단어 안에서 한 음절(협)만 배경 틴트 */
+/**
+ * 단어 안에서 한 음절(협)만 배경 틴트.
+ *
+ * **글자가 하나뿐이면 안 씌운다.** 틴트의 일은 *여럿 중 이것*을 가리키는 것인데, 견줄 나머지가
+ * 없으면 강조가 아니라 **상자로 읽히고** 더 나쁘게는 낱말 속 한 글자처럼 보여 뒤가 잘린 것 같다
+ * (design/screens/Scene1a.html · Scene5a.html, 둘 다 틴트가 빠져 있다). 착지의 마지막 수단은
+ * 그 한자 하나뿐이라 여기로 온다.
+ */
 function markSyllable(word: string, mark: string) {
+  if (word.length <= mark.length) return <>{word}</>;
   const i = word.indexOf(mark);
   if (i < 0) return <>{word}</>;
   return (
