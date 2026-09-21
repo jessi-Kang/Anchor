@@ -77,6 +77,8 @@ async function main() {
   const browser = await chromium.launch({ executablePath: findChromium() });
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const problems: string[] = [];
+  // 센 자리. 「어긋난 곳 없음」을 낼 때 **무엇을 몇 개 봤는지**를 같이 찍는다.
+  const looked = { tap: 0, link: 0, spacer: 0, term: 0, overflow: 0, primary: 0 };
   const tall: string[] = [];
   const INTERNAL = internalTerms();
 
@@ -128,12 +130,24 @@ async function main() {
             return got >= want ? null : { want, got };
           })
           .filter((x): x is { want: number; got: number } => x !== null),
+        // **0 은 「없다」와 「안 봤다」를 구분 못 하는 유일한 수다.** 「어긋난 곳 없음」이 몇 자리를
+        // 보고 한 말인지가 같이 있어야 그 0 이 값이 된다 — 탭 대상이 0개인 화면과 다 통과한 화면이
+        // 같은 줄로 나오면 안 된다. 그래서 **센 자리의 수**를 돌려준다.
+        tapCount: tappable.length,
+        spacerCount: [...frame.children].filter((c) => /height:\s*\d+px/.test(c.getAttribute("style") || "")).length,
         frameH: frame.clientHeight,
         text: (frame.innerText || "").replace(/\s+/g, " "),
         hrefs: links.map((a) => a.getAttribute("href") || ""),
         primary: links.filter((a) => /background: #2A2D33/.test(a.getAttribute("style") || "")).length,
       };
     }, { tapMin: TAP_MIN, frameStyle: FRAME_STYLE });
+
+    looked.overflow += 1;
+    looked.primary += 1;
+    looked.tap += found.tapCount;
+    looked.link += found.hrefs.length;
+    looked.spacer += found.spacerCount;
+    looked.term += INTERNAL.length;
 
     if (found.overflow) problems.push(`${id}: 틀(${found.frameH}px)을 넘친다`);
     for (const q of found.squeezed) {
@@ -156,7 +170,10 @@ async function main() {
     console.error(problems.join("\n"));
     process.exit(1);
   }
-  console.log(`화면 ${ids.length}장, 규칙 어긋난 곳 없음`);
+  const total = looked.tap + looked.link + looked.spacer + looked.term + looked.overflow + looked.primary;
+  console.log(
+    `화면 ${ids.length}장 · 잰 자리 ${total}곳 (탭 영역 ${looked.tap} · 링크 ${looked.link} · 선언한 여백 ${looked.spacer} · 내부 용어 ${looked.term} · 넘침 ${looked.overflow} · 주 버튼 ${looked.primary}), 규칙 어긋난 곳 없음`,
+  );
   /*
     **틀을 키우면 넘침이 사라진다.** 고의가 아니라 실수로 그렇게 된다 — `844` 고정은 못 속이는데
     제가 선언한 틀은 속일 수 있다. 그래서 **선언이 조용해지지 않게** 한 줄로 남긴다.
