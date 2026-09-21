@@ -41,7 +41,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
     return (
       <Screen where="아침 기사" up="/today" aside="오전 8:42" fixed={fixed === "1"}>
         <Space h={28} />
-        <JudgeRows inputId="preview" anchored={anchored} bare={bare} empty={false} />
+        <JudgeRows inputId="preview" anchored={anchored} bare={bare} seen={1} found={1} />
       </Screen>
     );
   }
@@ -65,7 +65,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
   }
 
   // 줄과 그 순서는 F04a("다음 글자")와 한 곳에서 온다 (lib/cards/judge-items.ts).
-  const { found, items } = await judgeItems(user.id, input.body);
+  const { seen, found, items } = await judgeItems(user.id, input.body);
   if (!input.extracted_at) await markExtracted(user.id, input.id, found);
 
   const anchored = items.filter((i) => i.hasWord);
@@ -76,7 +76,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
   return (
     <Screen where={where} up="/today" aside={nowKST()}>
       <Space h={28} />
-      <JudgeRows inputId={input.id} anchored={anchored} bare={bare} empty={found.length === 0} />
+      <JudgeRows inputId={input.id} anchored={anchored} bare={bare} seen={seen.length} found={found.length} />
     </Screen>
   );
 }

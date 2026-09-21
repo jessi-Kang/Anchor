@@ -25,7 +25,18 @@ export type JudgeItem = {
   known: boolean | null;
 };
 
-export async function judgeItems(userId: string, body: string): Promise<{ found: string[]; items: JudgeItem[] }> {
+/**
+ * `seen` 은 자료에서 **뽑아낸** 한자 전부, `found` 는 그중 **우리가 아는** 것이다.
+ *
+ * 둘을 갈라 돌려주는 이유 하나뿐이다 — 화면이 **"한자가 없다"** 와 **"우리가 아직 그 한자를
+ * 모른다"** 를 다르게 말해야 하기 때문이다. `found` 만 돌려주던 때 F03 은 둘을 같은 것으로 보고
+ * 자료에 한자가 열아홉이어도 "이 자료엔 한자가 없어" 라고 했다. 없는 것은 자료의 한자가 아니라
+ * 우리 쪽 행이었다.
+ */
+export async function judgeItems(
+  userId: string,
+  body: string,
+): Promise<{ seen: string[]; found: string[]; items: JudgeItem[] }> {
   const chars = extractKanji(body);
   const nodes = await getKanjiNodes(chars);
   const found = chars.filter((c) => nodes.has(c));
@@ -60,7 +71,7 @@ export async function judgeItems(userId: string, body: string): Promise<{ found:
       known: st ? st.knows_meaning : null,
     };
   });
-  return { found, items };
+  return { seen: chars, found, items };
 }
 
 /**
