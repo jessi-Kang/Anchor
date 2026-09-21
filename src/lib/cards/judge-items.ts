@@ -15,6 +15,11 @@ export type JudgeItem = {
   sub: string | null;
   /** 이 글자를 부를 한국어 낱말을 우리가 골라 뒀는가. **두 묶음을 가르는 축이 이것이다** */
   hasWord: boolean;
+  /**
+   * 한국 한자음이 있는가 — **카드가 설 수 있는가**. 2,136자 중 여섯(収 枠 塡 頰 𠮟 剝)에 없다.
+   * 판정(알아/몰라)은 발판 없이도 되므로 **행은 그대로 서고**, 카드 큐에서만 빠진다.
+   */
+  hasSound: boolean;
   known: boolean | null;
 };
 
@@ -48,6 +53,7 @@ export async function judgeItems(userId: string, body: string): Promise<{ found:
       sub: koWord && sound ? `${koWord}의 ${sound}` : (sound ?? null),
       // 두 묶음을 가르는 축은 **낱말 하나**다. 소리는 양쪽 다 있다 (docs/FLOW.md 1장 F03 행).
       hasWord: Boolean(koWord && sound),
+      hasSound: Boolean(sound),
       known: st ? st.knows_meaning : null,
     };
   });
@@ -61,8 +67,11 @@ export async function judgeItems(userId: string, body: string): Promise<{ found:
  * `skip` 은 **이번에 문안을 못 만든 한자**다. 다시 내밀면 F04a 가 같은 글자를 "다음 글자" 라고
  * 부르게 되고, 눌러도 또 못 만들어 제자리를 돈다. 저장하지는 않는다 — 주소로만 다닌다
  * (design/SCREENS.md "실패를 저장하지 않는다").
+ *
+ * **소리 없는 글자는 아예 안 내민다.** 발판이 없으면 카드가 못 서니(`app/inputs/[id]/actions.ts`)
+ * 내밀어 봐야 F04a 로 되돌아온다. 될 리 없는 것을 "다음 글자" 라고 부르지 않는다.
  */
 export function nextKanji(items: JudgeItem[], skip: string[] = []): string | null {
-  const open = items.filter((i) => i.known !== true && !skip.includes(i.kanji));
+  const open = items.filter((i) => i.known !== true && i.hasSound && !skip.includes(i.kanji));
   return (open.find((i) => i.hasWord) ?? open[0])?.kanji ?? null;
 }

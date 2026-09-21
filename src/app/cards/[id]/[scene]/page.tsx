@@ -15,7 +15,8 @@ export const dynamic = "force-dynamic";
 const PREVIEW: CardPayload = {
   kanji: "協",
   reading: "きょう",
-  hook: { word: "협력", mark: "협" },
+  sound: "협",
+  anchor: "협력",
   parts: [
     { ch: "十", name: "열 십", count: 1 },
     { ch: "力", name: "힘 력", count: 3 },
@@ -91,14 +92,22 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   const next = (n: number) => (preview ? `/cards/preview/${n}` : `/cards/${id}/${n}`);
 
   if (scene === 1) {
+    /*
+      **자리는 그대로 서고 담기는 것만 바뀐다** (design/screens/Scene1.html · Scene1a.html).
+      부를 낱말이 있으면 낱말을 내고 그 안의 한 음절에만 틴트를 씌운다(협**력**의 `협`).
+      없으면 **소리 한 글자**를 틴트 없이 낸다 — 음절이 하나뿐이면 틴트가 강조가 아니라 상자로
+      읽힌다. 틴트의 일은 여럿 중 이것을 가리키는 것인데 견줄 나머지가 없다 (디자인 판정).
+
+      물음은 양쪽이 같다. 이미 소리만 쓰고 있어서 새로 지을 말이 없다.
+    */
     return (
       <Screen {...common}>
         <Grow />
         <div className={`${s.center} ${s.centerWide}`}>
-          <Label>늘 쓰는 단어</Label>
-          <Ja size="lg">{markSyllable(p.hook.word, p.hook.mark)}</Ja>
+          <Label>{p.anchor ? "늘 쓰는 단어" : "이미 아는 소리"}</Label>
+          <Ja size="lg">{p.anchor ? markSyllable(p.anchor, p.sound) : p.sound}</Ja>
           <h1 className={s.ask}>
-            이 {p.hook.mark}, 한자로는
+            이 {p.sound}, 한자로는
             <br />
             어떤 모양일까?
           </h1>
@@ -216,13 +225,24 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   }
 
   // scene 5
+  /*
+    **머리줄을 가르는 축은 「안전한 착지 낱말이 남았나」다** — 「앵커 낱말이 있나」가 아니다.
+    Scene5 는 착지고, 방금 푼 한자를 낱말에 앉히는 것이 카드의 마지막 일이다. 앵커가 없다는 건
+    *시작할 때* 부를 낱말이 없다는 뜻이지 *끝에 앉을* 낱말이 없다는 뜻이 아니라서, `条` 카드라도
+    `件` 을 이미 만났으면 `条件` 이 뜨는 게 맞는 동작이다. 거꾸로 앵커가 있어도 안 만난 글자
+    때문에 다 걸러질 수 있다. 그래서 `landingWords` 가 실제로 무엇을 냈는지를 보고 고른다
+    (design/SCREENS.md "Scene5 는 낱말을 대야 한다").
+  */
+  const landing = landingWords(p, met);
   return (
     <Screen {...common}>
       <Grow />
-      <Label as="h1">이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.hook.mark }, "이가")} 들어 있어</Label>
+      <Label as="h1">
+        {landing.landed ? <>이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.sound }, "이가")} 들어 있어</> : "이미 아는 소리에 모양이 생겼어"}
+      </Label>
       <Space h={10} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {landingWords(p, met).map((w) => (
+        {landing.words.map((w) => (
           <Card key={w.word}>
             <div className={s.landing}>
               <div className={s.landingWord}>

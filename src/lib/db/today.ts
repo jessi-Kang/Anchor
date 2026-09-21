@@ -1,7 +1,7 @@
 import { withUser } from "@/lib/db";
 import { judgedKanji } from "@/lib/db/kanji";
 import { landingWords } from "@/lib/cards/landing";
-import type { CardPayload } from "@/lib/db/cards";
+import { cardPayload, type CardPayload } from "@/lib/db/cards";
 
 /**
  * 하루 끝(F15)이 세는 것. **"오늘" 은 한국 시각의 하루다** — 사용자가 사는 날짜로 세야
@@ -60,5 +60,7 @@ export async function spokenToday(userId: string): Promise<string[]> {
 
   // 카드 녹음이 하나도 없으면 판정된 한자를 읽을 이유가 없다.
   const met = rows.some((r) => r.card_payload) ? await judgedKanji(userId) : new Set<string>();
-  return rows.map((r) => r.chunk_text ?? landingWords(r.card_payload as CardPayload, met)[0].word);
+  // 질의가 payload 를 날로 꺼내므로 여기서도 옛 모양을 맞춰 읽는다 — `getCard` 만 맞추면
+  // 카드 화면과 하루 끝이 같은 행을 다르게 읽는다.
+  return rows.map((r) => r.chunk_text ?? landingWords(cardPayload(r.card_payload as CardPayload), met).words[0].word);
 }
