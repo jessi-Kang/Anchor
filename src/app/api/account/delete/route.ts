@@ -17,6 +17,10 @@ export const dynamic = "force-dynamic";
  * 하나 생긴다** — 사용자 행을 가진 표가 전부 `users` 까지 이어져 있다는 것. 그 가정은 주석이
  * 아니라 `pnpm test:db` 가 붙든다 (`src/lib/db/delete-paths.ts`).
  *
+ * **1 을 지난 뒤로는 되돌아갈 수 없다.** 그 뒤 어느 단계에서 멈추든 음성 원본은 이미 사라졌고
+ * DB 를 되돌려도 안 돌아온다. 그래서 1 이 지운 개수를 끝까지 들고 다니며 **멈출 때 그걸 같이
+ * 말한다** — "데이터는 그대로 있다" 는 하나도 안 지웠을 때만 참이다.
+ *
  * 1 이 2 보다 먼저인 이유: CASCADE 가 recordings 행을 지우면 audio_object_key 도 함께 사라진다.
  * 키가 사라진 뒤에는 어떤 오브젝트를 지워야 하는지 알 방법이 없어, 주인 없는 녹음이 스토리지에 영영 남는다.
  * 스토리지 삭제가 실패하면 DB 를 건드리지 않고 멈춘다 — 지웠다고 응답해 놓고 남기지 않는다.
@@ -60,14 +64,32 @@ export async function POST(req: Request) {
     return Response.json({ error: "음성 원본 일부를 찾지 못해 삭제를 멈췄다. 관리자에게 알려 달라." }, { status: 500 });
   }
 
+  /*
+    **이 수는 블록 밖에 있어야 한다.** 여기서부터 뒤로는 실패하더라도 **음성 원본은 이미 사라진
+    뒤다.** 그 상태에서 "데이터는 그대로 있다" 고 말하면 사용자는 아무 일도 없었다고 믿고 나가고,
+    **자기 녹음이 전부 소리가 안 나는 계정을 갖게 된다. 그 말을 아무도 안 해 준 채로.**
+    되돌릴 수 없는 일이 이미 일어났으면 그걸 일어났다고 말하는 것이 이 수가 하는 일이다.
+    (순서 자체는 그대로 둔다 — 키가 먼저 사라지면 오브젝트를 영영 못 지운다.)
+  */
+  let removed = 0;
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (token) {
     try {
-      const removed = await deleteVoiceObjects(user.id, token);
+      await deleteVoiceObjects(user.id, token, (n) => (removed += n));
       if (removed) console.log("[account delete] 음성 원본 삭제", { userId: user.id, removed });
     } catch (e) {
-      console.error("[account delete] 음성 원본 삭제 실패, DB 는 건드리지 않는다", { userId: user.id, e });
-      return Response.json({ error: "음성 원본을 지우지 못해 삭제를 멈췄다. 다시 시도해 달라." }, { status: 502 });
+      // 여러 쪽에 걸쳐 지우므로 중간에 실패하면 앞쪽은 이미 없다. 몇 개가 사라졌는지 같이 말한다.
+      console.error("[account delete] 음성 원본 삭제 실패", { userId: user.id, removed, e });
+      return Response.json(
+        {
+          error:
+            removed > 0
+              ? `음성 원본 ${removed}개를 지운 뒤 나머지에서 멈췄다. 계정과 학습 기록은 그대로다. 다시 시도해 달라.`
+              : "음성 원본을 지우지 못해 삭제를 멈췄다. 다시 시도해 달라.",
+          voice_removed: removed,
+        },
+        { status: 502 },
+      );
     }
   } else {
     const leftover = await withUser(user.id, async (tx) => {
@@ -116,11 +138,38 @@ export async function POST(req: Request) {
     if (gone.rowCount !== 1) throw new Error(`users 행이 지워지지 않았다 (rowCount=${gone.rowCount})`);
     return true;
   }).catch((e) => {
-    console.error("[account delete] DB 삭제 실패, 아무것도 안 지웠다", { userId: user.id, e });
+    // "아무것도 안 지웠다" 고 적지 않는다 — 음성 원본은 이미 지워졌을 수 있고, 그 수를 같이 남긴다.
+    console.error("[account delete] DB 삭제 실패", { userId: user.id, voiceRemoved: removed, e });
     return false;
   });
   if (!deleted) {
-    return Response.json({ error: "삭제하지 못했다. 데이터는 그대로 있다. 다시 시도해 달라." }, { status: 500 });
+    /*
+      **여기서 "데이터는 그대로 있다" 는 `removed === 0` 일 때만 참이다.** 위 훑기가 끝까지 갔으면
+      이 계정의 음성 원본은 전부 사라졌다 — DB 를 되돌려도 그건 안 돌아온다.
+
+      돌아오지 않는 것을 DB 가 계속 가리키게 두지도 않는다. 훑기가 끝났으니 이 계정 키는 전부
+      없는 오브젝트를 가리키고, 그 상태로 두면 표가 "오디오가 있다" 고 말한다 —
+      크론이 이미 같은 짝을 지킨다(`/api/cron/voice`: 오브젝트를 지운 것만 키를 뗀다).
+      이건 되돌리기가 아니라 **표를 사실에 맞추는 것**이라 실패해도 로그만 남기고 넘어간다.
+    */
+    if (removed > 0) {
+      await withUser(user.id, (tx) =>
+        tx.query(
+          "UPDATE recordings SET audio_object_key = NULL, audio_expires_at = NULL WHERE user_id = $1 AND audio_object_key IS NOT NULL",
+          [user.id],
+        ),
+      ).catch((e) => console.error("[account delete] 사라진 원본의 키를 떼지 못했다", { userId: user.id, e }));
+    }
+    return Response.json(
+      {
+        error:
+          removed > 0
+            ? `삭제하지 못했다. 다만 음성 원본 ${removed}개는 이미 지워졌고 돌아오지 않는다. 계정과 학습 기록은 그대로다. 다시 시도해 달라.`
+            : "삭제하지 못했다. 데이터는 그대로 있다. 다시 시도해 달라.",
+        voice_removed: removed,
+      },
+      { status: 500 },
+    );
   }
 
   const { error } = await auth.deleteUser();
