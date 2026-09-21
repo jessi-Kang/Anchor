@@ -37,6 +37,22 @@ test("소리가 없는 글자는 목록도 비어 있다 — 있는데 안 고�
   assert.deepEqual(skipped.map((it) => it.kanji), []);
 });
 
+test("한 글자는 앵커 표에 한 번만 적혀 있다", () => {
+  /*
+    JSON 은 겹친 키의 **뒤엣것만** 남긴다. 전에 812줄에 133자가 겹쳐 있었고, 그래서 `理` 는
+    여섯 번 적힌 채(이해·이유·관리·요리·처리·정리) 「정리」가 살고 있었다. 조용히 덮이는 것만도
+    문제인데, 이제 앵커가 그 글자의 `ko` 를 정하므로 **줄을 위에 끼워 넣는 것만으로 소리가 바뀐다.**
+    어느 낱말이 살지는 기획이 고를 일이고, 여기서 재는 것은 **고르는 자리가 파일 순서가 아닌 것**뿐이다.
+  */
+  const raw = readFileSync("db/seed/kanji-ko.json", "utf8");
+  const body = raw.slice(raw.indexOf('"words"'));
+  const seen = new Map<string, number>();
+  for (const m of body.matchAll(/"([^"]+)"\s*:\s*"([^"]+)"/g)) seen.set(m[1], (seen.get(m[1]) ?? 0) + 1);
+  const dup = [...seen].filter(([, n]) => n > 1).map(([k, n]) => `${k} ${n}번`);
+  assert.deepEqual(dup, [], `한 글자가 여러 번 적혀 있다 (뒤엣것만 산다):\n  ${dup.join("\n  ")}`);
+  assert.equal(seen.size, Object.keys(words).length);
+});
+
 test("앵커가 가리키는 글자는 모두 씨앗 안에 있다", () => {
   const seed = new Set(items.map((it) => it.kanji));
   assert.deepEqual(Object.keys(words).filter((k) => !seed.has(k)), []);
