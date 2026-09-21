@@ -106,7 +106,19 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
 
   const talkRows: HomeRow[] = langs.includes("en")
     // 부제에 "못 한 말" 을 또 쓰지 않는다 — 제목이 이미 그 말이라 한 행에서 같은 낱말을 두 번 쓰게 된다.
-    ? [{ id: "talk", title: "못 한 말", sub: talkCount > 0 ? `${talkCount}개` : "한 줄이면 돼", next: null, href: "/talk" }]
+    //
+    // **덩어리가 있으면 목록(F18)으로, 없으면 쓰기(F13)로.** 늘 F13 으로 보내면 덩어리가 셋이어도
+    // 빈 입력 칸에 떨어지고, 지난 덩어리로 돌아갈 길이 어디에도 없다 — 같은 말의 2회차가 안 생겨
+    // 곡선 표본이 1회차짜리만 쌓인다 (docs/FLOW.md 1′장 F01 행).
+    ? [
+        {
+          id: "talk",
+          title: "못 한 말",
+          sub: talkCount > 0 ? `${talkCount}개` : "한 줄이면 돼",
+          next: null,
+          href: talkCount > 0 ? "/talk/past" : "/talk",
+        },
+      ]
     : [];
 
   const rows = await Promise.all(

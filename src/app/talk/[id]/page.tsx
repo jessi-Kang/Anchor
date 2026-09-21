@@ -70,8 +70,13 @@ export default async function TalkChunkPage({
   // 둘 다 눈으로 견줄 수 있어야 한다. 실제 화면은 이 파라미터를 보지 않는다.
   const targetVoice = preview ? native !== "0" : loop.targetVoice;
 
+  /*
+    **한 단계 위는 쓰는 화면(F13)이 아니라 목록(F18)이다.** 방금 만든 덩어리도 목록에 있으므로
+    어디서 들어왔든 위는 같고, 지난 것을 다시 말하다 위로 갔을 때 빈 입력 칸에 안 떨어진다
+    (docs/FLOW.md 1′장 F14 행). 홈까지 2탭도 이걸로 지켜진다 — 라벨 → F18 → 홈.
+  */
   return (
-    <Screen where="못 한 말" up="/talk" aside={preview ? "오후 7:11" : nowKST()} fixed={fixed === "1"}>
+    <Screen where="지난 것" up="/talk/past" aside={preview ? "오후 7:11" : nowKST()} fixed={fixed === "1"}>
       <Space h={28} />
       <Card>
         <Label>내가 하려던 말</Label>

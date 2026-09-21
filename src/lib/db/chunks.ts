@@ -79,14 +79,49 @@ export async function getSituation(userId: string, id: string): Promise<{ situat
   });
 }
 
-/** 홈의 "못 한 말" 행이 쓰는 개수. */
+/**
+ * 홈의 "못 한 말" 행이 쓰는 개수. **영어 문장이 있는 것만 센다.**
+ *
+ * 이 수가 홈 행을 F18(목록)로 보낼지 F13(쓰기)으로 보낼지 가른다. 행 전체를 세면 F13 에서 한 줄
+ * 쓰고 F17 에서 그만둔 사람이 **빈 목록으로 떨어진다** — 그 행은 F18 이 안 내기 때문이다.
+ * 세는 조건과 목록에 내는 조건이 같아야 한다.
+ */
 export async function countChunks(userId: string, lang: Lang3 = "en"): Promise<number> {
   return withUser(userId, async (tx) => {
-    const { rows } = await tx.query<{ n: string }>("SELECT count(*)::text AS n FROM chunks WHERE user_id = $1 AND lang = $2", [
-      userId,
-      lang,
-    ]);
+    const { rows } = await tx.query<{ n: string }>(
+      "SELECT count(*)::text AS n FROM chunks WHERE user_id = $1 AND lang = $2 AND btrim(text) <> ''",
+      [userId, lang],
+    );
     return Number(rows[0]?.n ?? 0);
+  });
+}
+
+export type PastChunk = { id: string; situation: string; chunk: string };
+
+/**
+ * F18 목록. **마지막으로 말한 지 오래된 것이 위다** (`docs/FLOW.md` 1′장 F18 행).
+ *
+ * 최근 순으로 세우면 오늘 말한 것만 또 말하게 되어 **회차가 안 쌓인다** — 같은 덩어리 5회차
+ * 곡선 일치도가 통과 기준이라(`docs/SPEC.md` 9장) 이 줄 세우기가 측정의 전제다.
+ *
+ * **한 번도 말 안 한 것이 맨 위다.** `NULLS FIRST` 를 명시하는 이유는 ASC 기본이 NULLS LAST 라,
+ * 안 적으면 한 번도 안 말한 것이 **맨 뒤로** 가기 때문이다 — 규칙이 정확히 뒤집힌다.
+ *
+ * **영어 문장이 없는 행은 안 낸다.** F13 과 F17 사이에서 멈춘 것이라, 목록에 띄우면 추측을
+ * 건너뛰고 답 없는 F14 로 들어간다.
+ */
+export async function pastChunks(userId: string, lang: Lang3 = "en"): Promise<PastChunk[]> {
+  return withUser(userId, async (tx) => {
+    const { rows } = await tx.query<PastChunk>(
+      `SELECT c.id, c.situation, coalesce(nullif(c.meta ->> 'chunk', ''), c.text) AS chunk
+         FROM chunks c
+         LEFT JOIN recordings r ON r.chunk_id = c.id AND r.user_id = $1
+        WHERE c.user_id = $1 AND c.lang = $2 AND btrim(c.text) <> ''
+        GROUP BY c.id
+        ORDER BY max(r.created_at) ASC NULLS FIRST, c.created_at ASC`,
+      [userId, lang],
+    );
+    return rows;
   });
 }
 
