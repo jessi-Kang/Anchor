@@ -74,26 +74,35 @@ async function main() {
     const found = await page.evaluate((tapMin) => {
       // 화면 틀은 390×844 인 div 다. `body.firstElementChild` 를 쓰다가 <link> 를 집고 있었다 —
       // 넘침은 documentElement 쪽 조건이 대신 잡아 줘서 표가 안 났고, 본문 글자를 읽으려니 그제야 빈 값이 나왔다.
-      const frame = (document.querySelector('div[style*="height: 844px"]') ?? document.body) as HTMLElement;
+      // **높이를 박아서 찾지 않는다.** 전에는 `height: 844px` 로 찾았는데, 설정처럼 제 높이를
+      // 선언한 화면에서 이 선택자가 **빗나가 body 로 떨어졌다.** body 는 넘치는 일이 없어서
+      // 검사가 조용히 통과했다 — 못 찾은 것을 "괜찮다" 로 답한 것이다.
+      const frame = ([...document.querySelectorAll("div")].find((d) => /width:\s*390px/.test(d.getAttribute("style") || "")) ??
+        document.body) as HTMLElement;
       const links = [...document.querySelectorAll("a")].filter((a) => !a.href.includes("fonts.g"));
       const tappable = [...document.querySelectorAll("a, button, [role=button], [data-tap]")].filter(
         (el) => !(el instanceof HTMLAnchorElement) || !el.href.includes("fonts.g"),
       );
       return {
-        overflow: frame.scrollHeight > frame.clientHeight || document.documentElement.scrollHeight > 844,
+        // **넘침은 「선언한 틀」을 기준으로 잰다.** 844 를 박아 두면 설정처럼 원래 스크롤되는
+        // 화면이 영영 빨갛다. 그런 화면은 틀을 제 높이로 선언해서 **잘린 데 없이** 보여 준다 —
+        // 아래가 잘린 그림은 다음 사람에게 "여기까지가 전부" 라고 거짓말을 한다.
+        // 틀보다 내용이 크면 그건 여전히 넘침이다 (design/SCREENS.md).
+        overflow: frame.scrollHeight > frame.clientHeight || document.documentElement.scrollHeight > frame.clientHeight,
         small: tappable
           .map((el) => {
             const r = el.getBoundingClientRect();
             return { text: (el.textContent || "").trim().slice(0, 14), h: Math.round(r.height), w: Math.round(r.width) };
           })
           .filter((x) => x.h < tapMin || x.w < tapMin),
+        frameH: frame.clientHeight,
         text: (frame.innerText || "").replace(/\s+/g, " "),
         hrefs: links.map((a) => a.getAttribute("href") || ""),
         primary: links.filter((a) => /background: #2A2D33/.test(a.getAttribute("style") || "")).length,
       };
     }, TAP_MIN);
 
-    if (found.overflow) problems.push(`${id}: 844px 를 넘친다`);
+    if (found.overflow) problems.push(`${id}: 틀(${found.frameH}px)을 넘친다`);
     for (const s of found.small) problems.push(`${id}: 탭 영역 ${s.w}×${s.h} — "${s.text}" (가로·세로 ${TAP_MIN}px 이상이어야 한다)`);
     for (const href of found.hrefs) {
       if (!existsSync(path.join(DIR, href))) problems.push(`${id}: 없는 화면으로 간다 — ${href}`);
