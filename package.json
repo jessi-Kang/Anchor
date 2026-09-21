@@ -22,7 +22,8 @@
     "pitch:baseline": "tsx scripts/pitch/clone-baseline.ts",
     "measure": "tsx scripts/measure.ts",
     "measure:fixture": "tsx scripts/measure-fixture.ts",
-    "seed:parts-sql": "tsx scripts/seed-parts-sql.ts"
+    "seed:parts-sql": "tsx scripts/seed-parts-sql.ts",
+    "test:db": "tsx --test scripts/test/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
