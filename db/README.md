@@ -48,7 +48,7 @@ pnpm test:db     # DATABASE_URL_ADMIN 과 ANCHOR_DATABASE_URL 둘 다 필요하�
 
 쓰는 계정은 `fixture-` 로 시작하는 것뿐이고 끝나면 지운다. **프로덕션 연결로 돌리지 않는다.** 로컬이나 일회용 DB 를 쓴다.
 
-지금 붙들어 두는 것은 `encounters` 가 덧붙이는가다. 이 표는 한 번 덮어쓰기로 돌아간 적이 있고, 그때 코드에는 반대로 적힌 주석이 또렷하게 달려 있었다. **틀려도 화면은 똑같이 돌고 인식률만 위로 부푼 채 D+14 까지 간다** — 그런 문장은 주석이 아니라 테스트로 적는다.
+붙들어 두는 것 둘. **재전송 멱등 키**(0008)가 스키마에 서 있는가 — 이게 빠지면 다시 보낸 녹음이 새 회차로 앉아 5회차 자리에 4회차 소리가 앉는다. 그리고 **`encounters` 가 덧붙이는가**. 뒤쪽은 한 번 덮어쓰기로 돌아간 적이 있고, 그때 코드에는 반대로 적힌 주석이 또렷하게 달려 있었다. **틀려도 화면은 똑같이 돌고 인식률만 위로 부푼 채 D+14 까지 간다** — 그런 문장은 주석이 아니라 테스트로 적는다.
 
 ## RLS 동작 방식
 
@@ -75,6 +75,6 @@ withUser(userId, tx => ...)
 | `user_node_state` | 안다의 3층: `knows_sound` / `knows_meaning` / `can_say` + confidence | |
 | `cards` | 발견 카드와 추측 기록 | CHECK: 정답 공개 전에 추측 또는 건너뛰기 필수 |
 | `chunks` | 대화 덩어리 (상황 → 덩어리, 태도, 강도) | |
-| `recordings` | 피치 곡선만. 원본 오디오는 key + 만료일만 | `target_voice_kind`·`target_voice_id` 는 그 회차가 겨눈 기준선을 무엇으로 만들었는지 (0007) |
+| `recordings` | 피치 곡선만. 원본 오디오는 key + 만료일만 | `target_voice_kind`·`target_voice_id` = 겨눈 기준선을 무엇으로 만들었는지 (0007). `client_id` = 재전송 멱등 키 (0008) |
 | `encounters` | 재만남 인식 기록 (지표용) | 읽을 때마다 **쌓는다**. `recognized` 는 셋: true·false·NULL(판정할 자리가 아니었다) |
 | `account_deletions` | 삭제 원장. 백업 복구 시 재삭제 근거 | 앱은 INSERT 만 |
