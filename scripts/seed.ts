@@ -57,7 +57,7 @@ async function main() {
         `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
          VALUES (NULL, 'en', $1, $2, $3, $4)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
-         DO UPDATE SET display = EXCLUDED.display, meta = nodes.meta || EXCLUDED.meta`,
+         DO UPDATE SET display = EXCLUDED.display, meta = EXCLUDED.meta`,
         [
           it.kind,
           it.key,
@@ -100,7 +100,7 @@ async function main() {
         `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
          VALUES (NULL, 'ja', 'radical', $1, $1, $2)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
-         DO UPDATE SET meta = nodes.meta || EXCLUDED.meta
+         DO UPDATE SET meta = EXCLUDED.meta
          RETURNING id`,
         [ch, JSON.stringify(name ? { ko_name: name } : {})],
       );
@@ -116,23 +116,30 @@ async function main() {
       const seed = seedByKanji.get(it.kanji);
       const koWord = koWords[it.kanji] ?? seed?.ko_word;
       /*
-        **없는 칸도 `null` 로 적는다. 빼면 안 된다.**
+        **적재는 파일이 말하는 상태를 쓴다. 쌓지 않는다.**
 
-        위 upsert 는 `meta = nodes.meta || EXCLUDED.meta` 다. jsonb `||` 는 **오른쪽에 없는 키를
-        왼쪽에서 그대로 살린다.** 그래서 조건부 전개(`...(x ? { k: x } : {})`)로 칸을 빼면,
-        **파일에서 지운 값이 DB 에서는 안 지워진다.** 적재는 "파일이 말하는 상태"가 아니라
-        "파일이 말한 적 있는 모든 상태의 합"이 된다.
+        위 upsert 셋은 `meta = EXCLUDED.meta` 다. 전에는 `meta = nodes.meta || EXCLUDED.meta`
+        였는데, jsonb `||` 는 **오른쪽에 없는 키를 왼쪽에서 그대로 살린다.** 그래서 칸이 하나라도
+        빠지면 **파일에서 지운 값이 DB 에서는 안 지워졌고**, 적재가 "파일이 말하는 상태"가 아니라
+        "파일이 말한 적 있는 모든 상태의 합"이 됐다.
 
         **돌려서 봤다** (로컬, 2026-09-21): `駅` 의 앵커를 「역」으로 넣어 놓고 — 표에서 뺀 뒤의
         파일로 — 다시 적재하니 `meta.ko_word` 가 **「역」 그대로 남았다.** F03 은 그 한 칸으로
         두 묶음을 가르므로, 화면은 표에서 뺀 지 한참 뒤에도 **"역의 역"** 이라고 말한다.
         규칙 1 이 물린 바로 그 거짓말이 적재를 타고 살아남는 것이다.
 
-        셋 다 같은 모양이라 셋 다 적는다 — 앵커 낱말이 빠질 수 있듯, 한자가 `ja-seed.json` 에서
-        빠지면 예문이, `kanji-cards.json` 에서 빠지면 손 카드가 똑같이 남는다. 지금 그 두 자리가
-        실제로 빠진 적은 없지만, **한 번 빠지면 아무도 화면에서 못 알아본다**(앵커는 오늘 열둘이
-        빠졌고, 그때도 화면만 보고는 몰랐다). 읽는 쪽은 전부 `?? null` 이나 참/거짓이라 `null` 과
-        「없음」을 같게 본다(`meta ->> 'ko_word'` 도 SQL NULL 이다).
+        **칸마다 `?? null` 로 막는 길도 있었는데, 그건 「빠뜨리지 않기」를 사람이 매번 지키는
+        길이다.** 실제로 한 자리를 고친 뒤에도 `...(x ? { k: x } : {})` 가 세 군데 남아 있었고,
+        그걸 막으려고 쓴 시험은 `const meta: Record<…>` 모양만 찾아서 **나머지를 안 보고도 초록
+        이었다.** 문법을 바꾸면 그 규칙 자체가 없어진다 — 조건부로 빼든 안 빼든, DB 는 파일이
+        말한 것만 갖는다.
+
+        **탐침으로 갈랐다** (2026-09-21, `anchor_local` 복제본): `扌` 의 훈과 `retro-` 의 `es` 를
+        파일에서 뺀 채로 돌려서, `||` 는 옛 값을 살리고(`{"ko_name": "손 수"}`) `= EXCLUDED.meta`
+        는 지우는 것(`{}`)을 봤다. 같은 돌림에서 행 수(18·2136·505·22·427)와 kind 별 칸(14·1·6·7)
+        은 그대로였다. **새로 지워지는 건 「씨앗이 안 쓰는데 DB 엔 있는 칸」뿐**인데, 공용 `nodes`
+        를 쓰는 건 이 파일과 `scripts/seed-parts-sql.ts`(칸 하나, `meta.parts` — 여기서도 쓴다)
+        뿐이고, 앱 역할은 RLS 로 공용 노드를 못 고친다(`db/migrations/0006_node_cards.sql`).
       */
       const meta: Record<string, unknown> = {
         on: it.on,
@@ -155,7 +162,7 @@ async function main() {
         `INSERT INTO nodes (user_id, lang, kind, key, display, reading, meta)
          VALUES (NULL, 'ja', 'kanji', $1, $1, $2, $3)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
-         DO UPDATE SET reading = EXCLUDED.reading, meta = nodes.meta || EXCLUDED.meta
+         DO UPDATE SET reading = EXCLUDED.reading, meta = EXCLUDED.meta
          RETURNING id`,
         [it.kanji, reading, JSON.stringify(meta)],
       );
