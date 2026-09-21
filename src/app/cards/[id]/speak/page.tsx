@@ -59,7 +59,7 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
     // 디자인 어긋남으로 셌다 (`pnpm design:diff`).
     <Screen where={where} up={`/cards/${id}`} aside={preview ? "점심 12:34" : nowKST()} fixed={fixed === "1"}>
       <Space h={28} />
-      <Card style={{ padding: "26px 20px" }}>
+      <Card glyph>
         <div className={s.speakWord}>
           <h1 className={s.speakBig} lang="ja">
             {word}
