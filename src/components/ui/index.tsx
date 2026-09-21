@@ -38,6 +38,10 @@ export function Screen({
       <div className={s.topBar}>
         {up ? (
           <Link href={up} className={s.topUp}>
+            {/* 뜻(나가는 쪽)은 링크의 글자와 href 가 이미 나른다. 화살괄호는 눈에만 쓰므로 안 읽힌다. */}
+            <span className={s.topUpMark} aria-hidden>
+              ‹
+            </span>
             {where}
           </Link>
         ) : (
