@@ -15,6 +15,10 @@ import { withUser } from "@/lib/db";
  * **자격은 여기서 걸지 않는다.** "카드 착지 +3일", "글자마다 첫 재만남 한 번" 같은 것은 세는
  * 쪽(`pnpm measure`)이 판단한다. 쓸 때 걸러 버리면 나중에 3일을 5일로 바꿀 때 다시 못 센다.
  * 여기는 **일어난 일을 그대로** 적는 자리다.
+ *
+ * **덮어쓰지 않는다.** 같은 자료를 다시 읽으면 줄을 새로 쌓고, 첫 판정은 세는 쪽이 `created_at`
+ * 으로 고른다 (MEASURE 0′). 고쳐 쓰면 첫 판정이 사라지는데 **그 오차는 한쪽으로만 난다** —
+ * 다시 읽으면 알아볼 확률이 언제나 올라가니 인식률이 위로만 부푼다.
  */
 export type EncounterRow = { nodeId: string; recognized: boolean };
 
@@ -30,20 +34,13 @@ export function recordEncounters(userId: string, inputId: string, rows: Encounte
     const { rowCount: mine } = await tx.query("SELECT 1 FROM inputs WHERE id = $1 AND user_id = $2", [inputId, userId]);
     if (!mine) throw new Error("그런 자료가 없다");
     for (const r of rows) {
-      // 자료 하나에 한 글자당 한 줄. 같은 자료를 다시 읽으면 그 줄의 값을 고친다 — 읽은 횟수가
-      // 아니라 **그 자료에서 그 글자를 어떻게 만났는가**를 세는 표다. 처음 만난 시각은 그대로 둔다.
-      const { rowCount } = await tx.query(
-        "UPDATE encounters SET recognized = $4 WHERE user_id = $1 AND node_id = $2 AND input_id = $3",
-        [userId, r.nodeId, inputId, r.recognized],
-      );
-      if (!rowCount) {
-        await tx.query("INSERT INTO encounters (user_id, node_id, input_id, recognized) VALUES ($1, $2, $3, $4)", [
-          userId,
-          r.nodeId,
-          inputId,
-          r.recognized,
-        ]);
-      }
+      // 읽을 때마다 한 줄씩 쌓는다. "두 번째엔 안 열었다" 자체가 값이라 덮어쓰지 않는다.
+      await tx.query("INSERT INTO encounters (user_id, node_id, input_id, recognized) VALUES ($1, $2, $3, $4)", [
+        userId,
+        r.nodeId,
+        inputId,
+        r.recognized,
+      ]);
     }
   });
 }
