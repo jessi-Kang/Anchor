@@ -47,6 +47,7 @@ type RecordingRow = {
   target_pitch: unknown;
   target_voice_kind: string | null;
   target_voice_id: string | null;
+  fallback: boolean;
 };
 
 const n1 = (x: number) => x.toFixed(1);
@@ -98,6 +99,20 @@ async function main() {
          WHERE user_id = $1 AND landed_at IS NOT NULL
          GROUP BY node_id
       ),
+      -- 그 글자를 카드로 푼 자료의 **본문**. 같은 글을 다시 넣은 자료에서 읽힌 것은 글자를 알아본
+      -- 것인지 그 글을 기억한 것인지 가를 수 없고, 틀리는 방향이 한쪽이다 (MEASURE 1장).
+      solved AS (
+        SELECT DISTINCT c.node_id, i.body
+          FROM cards c
+          JOIN inputs i ON i.id = c.input_id AND i.user_id = $1
+         WHERE c.user_id = $1 AND c.landed_at IS NOT NULL
+      ),
+      /*
+        **무효를 먼저 버리고 나서 첫 번째를 센다.** 순서가 거꾸로면 무효가 유효를 밀어낸다 —
+        카드를 푼 기사를 며칠 뒤 다시 넣고, 그 뒤에 진짜 새 기사에서 만났다면, 먼저 세고 나중에
+        거르는 구현은 재투입을 첫 재만남으로 잡은 뒤 진짜를 버린다. 표본 하나가 그냥 사라진다.
+        그래서 row_number() 는 아래 WHERE 가 무효를 걷어낸 **뒤**의 줄에만 매겨진다.
+      */
       qualified AS (
         SELECT e.node_id,
                n.display,
@@ -111,6 +126,7 @@ async function main() {
          WHERE e.user_id = $1
            AND e.recognized IS NOT NULL
            AND i.created_at >= l.landed_at + make_interval(days => $2::int)
+           AND NOT EXISTS (SELECT 1 FROM solved s WHERE s.node_id = e.node_id AND s.body = i.body)
       )
       SELECT node_id, display, recognized, gap_days
         FROM qualified WHERE rn = 1 ORDER BY gap_days
@@ -122,11 +138,17 @@ async function main() {
       자격에 못 미친 행과, 착지했지만 다시 안 나온 한자. **비율에는 안 들어간다.** 70% 가 안 나온
       날 그게 "아직 이르다"인지 "안 된다"인지를 가르는 재료라 같이 찍는다 (MEASURE 0′장).
     */
-    const { rows: ctx } = await client.query<{ too_soon: string; landed: string; never_back: string; no_judgement: string }>(
+    const { rows: ctx } = await client.query<{ too_soon: string; landed: string; never_back: string; no_judgement: string; same_body: string }>(
       `
       WITH landed AS (
         SELECT node_id, min(landed_at) AS landed_at
           FROM cards WHERE user_id = $1 AND landed_at IS NOT NULL GROUP BY node_id
+      ),
+      solved AS (
+        SELECT DISTINCT c.node_id, i.body
+          FROM cards c
+          JOIN inputs i ON i.id = c.input_id AND i.user_id = $1
+         WHERE c.user_id = $1 AND c.landed_at IS NOT NULL
       ),
       -- 다시 나오기는 했는가. **자격도 판정 여부도 안 본다** — 자격 미달과 판정 불가는 아래에서
       -- 따로 세므로, 여기서까지 걸러 버리면 같은 글자가 두 곳에 잡혀 합이 안 맞는다. "다시 안
@@ -153,7 +175,16 @@ async function main() {
            JOIN landed l ON l.node_id = e.node_id
            JOIN inputs i ON i.id = e.input_id AND i.user_id = $1
           WHERE e.user_id = $1 AND e.recognized IS NULL
-            AND i.created_at >= l.landed_at + make_interval(days => $2::int)) AS no_judgement
+            AND i.created_at >= l.landed_at + make_interval(days => $2::int)) AS no_judgement,
+        -- 자격은 갖췄는데 **카드를 푼 그 글을 다시 넣은 자료**라 버린 것. 0 이 아니면 그 자체가
+        -- 신호다 — 같은 글을 다시 읽고 있다는 뜻이고, 그만큼 표본이 줄어든다.
+        (SELECT count(DISTINCT e.node_id)::text
+           FROM encounters e
+           JOIN landed l ON l.node_id = e.node_id
+           JOIN inputs i ON i.id = e.input_id AND i.user_id = $1
+          WHERE e.user_id = $1 AND e.recognized IS NOT NULL
+            AND i.created_at >= l.landed_at + make_interval(days => $2::int)
+            AND EXISTS (SELECT 1 FROM solved s WHERE s.node_id = e.node_id AND s.body = i.body)) AS same_body
       `,
       [userId, QUALIFY_DAYS],
     );
@@ -164,12 +195,25 @@ async function main() {
       화면 상태가 아니라 쌓인 사실이다. 1회차와 5회차만 쓰지만 전부 읽어 온다 — 중간 회차가
       비어 있는지(돌아갈 길이 없어 1회차만 다섯 개인지)를 같이 봐야 한다.
     */
+    /*
+      **문안이 폴백으로 만들어진 덩어리는 곡선 집계에서 뺀다.** 영어를 못 만들면
+      `src/lib/talk/chunk-content.ts` 의 `fallbackContent` 가 사용자가 쓴 **한국어를 그대로**
+      `english`·`chunk` 에 넣는다. 그러면 화면이 그 한국어를 영어 목소리로 읽고
+      (`pitch-loop.tsx` 의 `u.lang = "en-US"`), 그 소리의 곡선이 1회차 기준선으로 굳는다.
+      MEASURE 2장의 전제는 "기준선은 제대로 발음된 소리" 인데 그 행의 기준선은 **영어 목소리가
+      읽은 한국어 문장**이라, 그 대상의 거리 숫자가 통째로 뜻을 잃는다. 화면에는 멀쩡한 숫자가
+      뜨므로 여기서 안 빼면 아무도 모른다.
+
+      `chunks.meta.content_source` 에 이미 적혀 있다(`lib/db/chunks.ts` 의 saveGuessAndEnglish).
+      새 칸도 마이그레이션도 필요 없다. **재만남 쪽은 건드리지 않는다** — 오염된 것은 영어 곡선뿐이다.
+    */
     const { rows: rec } = await client.query<RecordingRow>(
       `
       SELECT COALESCE('card:' || r.card_id::text, 'chunk:' || r.chunk_id::text) AS target_key,
              COALESCE(n.display, left(ch.text, 40))                             AS label,
              COALESCE(c.lang::text, ch.lang::text)                              AS lang,
-             r.attempt, r.pitch, r.target_pitch, r.target_voice_kind, r.target_voice_id
+             r.attempt, r.pitch, r.target_pitch, r.target_voice_kind, r.target_voice_id,
+             (ch.meta ->> 'content_source' = 'fallback')                       AS fallback
         FROM recordings r
         LEFT JOIN cards  c  ON c.id  = r.card_id  AND c.user_id  = $1
         LEFT JOIN nodes  n  ON n.id  = c.node_id AND (n.user_id IS NULL OR n.user_id = $1)
@@ -189,7 +233,7 @@ async function main() {
 function print(
   userId: string,
   enc: EncounterRow[],
-  ctx: { too_soon: string; landed: string; never_back: string; no_judgement: string } | undefined,
+  ctx: { too_soon: string; landed: string; never_back: string; no_judgement: string; same_body: string } | undefined,
   rec: RecordingRow[],
 ) {
   console.log(`Anchor 측정 — ${new Date().toISOString()}`);
@@ -204,6 +248,16 @@ function print(
   if (isFixtureUser(userId)) {
     console.log("");
     console.log("※ 이 계정은 배관 확인용 합성 데이터다. 사람이 만든 숫자가 아니고 판정에 쓰지 않는다.");
+  }
+  /*
+    **뺀 것은 세어서 말한다.** 안 보이게 빼면 곡선 표본이 왜 작은지를 못 가른다. 그리고 이 수가
+    0 이 아니라는 것 자체가 신호다 — 영어 문안을 못 만들고 있다는 뜻이다.
+  */
+  const dropped = new Set(rec.filter((r) => r.fallback).map((r) => r.target_key)).size;
+  if (dropped) {
+    console.log("");
+    console.log(`※ 폴백 문안이라 곡선에서 뺀 대상 ${dropped}개 — 영어를 못 만들어 한국어가 그대로 덩어리에 들어간 행이다.`);
+    console.log("  그 기준선은 영어 목소리가 읽은 한국어라 거리에 뜻이 없다. 재만남 쪽은 그대로 센다.");
   }
 
   // ── 1 ──────────────────────────────────────────────────────────────────────
@@ -233,6 +287,10 @@ function print(
       `참고: 착지한 한자 ${ctx.landed}자 · 자격 미달(간격 ${QUALIFY_DAYS}일 미만) ${ctx.too_soon}자 · 착지 뒤 다시 안 나온 한자 ${ctx.never_back}자`,
     );
     console.log("  자격 미달과 다시 안 나온 것은 비율에 안 들어간다. 왜 그 숫자가 나왔는지를 볼 재료다.");
+    if (ctx.same_body !== "0")
+      console.log(
+        `  카드를 푼 그 글을 다시 넣은 자료에서의 출현 ${ctx.same_body}자 — 글자를 알아본 것인지 글을 기억한 것인지 못 가른다. 분모에서 뺀다.`,
+      );
     if (ctx.no_judgement !== "0")
       console.log(
         `  판정이 일어날 수 없던 출현 ${ctx.no_judgement}자 — 안 만난 한자가 섞인 덩어리라 읽기를 열 기회가 없었다. 분모에서 뺀다.`,
@@ -254,6 +312,7 @@ function print(
   type Result = {
     label: string;
     lang: string;
+    fallback: boolean;
     d1: number | null;
     d5: number | null;
     attempts: number;
@@ -272,6 +331,7 @@ function print(
     results.push({
       label: rows[0].label ?? "?",
       lang: rows[0].lang ?? "?",
+      fallback: rows.some((r) => r.fallback),
       d1: dist(at(FIRST_ATTEMPT)),
       d5: dist(at(LAST_ATTEMPT)),
       attempts: rows.length,
@@ -291,7 +351,7 @@ function print(
     ["en", "영어 (M4 판정 대상)"],
     ["ja", "일본어 (판정에 안 쓴다 — 기준선이 맞는지 아직 확인 안 됐다)"],
   ] as const) {
-    const group = results.filter((r) => r.lang === lang);
+    const group = results.filter((r) => r.lang === lang && !r.fallback);
     console.log("");
     console.log(`### ${title}`);
     /*
