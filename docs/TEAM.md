@@ -8,6 +8,13 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 세션 이름은 `Anchor · <역할>` 하나로 통일한다. 서로를 부를 때도 이 이름을 쓴다(예전의 `Plan_main`·`UX_QA`·`Dev` 같은 별칭은 쓰지 않는다).
 세션끼리 메시지를 보낼 때는 이름이 아니라 세션 ID 가 주소다: `create_trigger(persistent_session_id=<ID>, 스케줄 없음)` + `fire_trigger`.
 
+**이 통로에는 시간당 한도가 있다.** 손으로 쏘는 `fire_trigger` 도, 한 번짜리 루틴에 `run_once_at` 을 다시 다는 것도 같은 한도를 쓴다
+(2026-09-21 확인: 한도에 닿으면 `This account has reached its hourly manual fire limit` + 남은 시간). 한도에 닿으면 남은 방법이 없다 —
+`create_trigger` 로 메시지를 만들어 두는 것까지는 되지만 **쏘는 것이 막힌다.** 그래서 두 가지를 지킨다.
+- **한 세션에 갈 말은 한 번에 모은다.** 같은 상대에게 세 번 쏘지 않는다. 답을 기다렸다가 묶어서 보낸다.
+- **쏘기 전에 말을 끝낸다.** 만들어 둔 루틴의 **프롬프트는 나중에 못 고친다** (`a routine's instructions can be changed only from the conversation the routine posts into`). 사실이 바뀌면 지우고 다시 만드는 수밖에 없다. 그러니 "일단 만들어 두고 다듬자" 를 하지 않는다.
+- **막히면 우회하지 않는다.** 다른 세션에 대신 쏘아 달라고 부탁하는 것은 한도를 계정 단위로 돌려 쓰는 것이라 같은 벽에 다시 닿고, 남의 세션에 내 판단을 대신 시키는 모양이 된다. 기다렸다가 내가 쏜다.
+
 | 이름 | 하는 일 | 이 세션만 고치는 곳 | 브랜치 | 세션 ID |
 | --- | --- | --- | --- | --- |
 | **Anchor · 프로덕트 리더** | **PM 들의 리더.** 프로덕트에 관한 모든 책임이 여기 있다 — 노스 스타·마일스톤·PM 간 충돌·Jessi 와의 결정. 코드/디자인/기획 문서를 직접 고치지 않는다 | `README.md` · `docs/TEAM.md` | `claude/affectionate-brahmagupta-947f48` | `session_01QPJ4i1hJ5zENanv7ykjp1t` |
