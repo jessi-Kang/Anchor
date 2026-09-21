@@ -124,16 +124,17 @@ async function main() {
       자격에 못 미친 행과, 착지했지만 다시 안 나온 한자. **비율에는 안 들어간다.** 70% 가 안 나온
       날 그게 "아직 이르다"인지 "안 된다"인지를 가르는 재료라 같이 찍는다 (MEASURE 0′장).
     */
-    const { rows: ctx } = await client.query<{ too_soon: string; landed: string; never_back: string }>(
+    const { rows: ctx } = await client.query<{ too_soon: string; landed: string; never_back: string; no_judgement: string }>(
       `
       WITH landed AS (
         SELECT node_id, min(landed_at) AS landed_at
           FROM cards WHERE user_id = $1 AND landed_at IS NOT NULL GROUP BY node_id
       ),
-      -- 다시 나오기는 했는가. **자격은 안 본다** — 자격 미달은 아래에서 따로 세므로, 여기서까지
-      -- 걸러 버리면 같은 글자가 "자격 미달" 과 "다시 안 나왔다" 두 곳에 잡혀 합이 안 맞는다.
+      -- 다시 나오기는 했는가. **자격도 판정 여부도 안 본다** — 자격 미달과 판정 불가는 아래에서
+      -- 따로 세므로, 여기서까지 걸러 버리면 같은 글자가 두 곳에 잡혀 합이 안 맞는다. "다시 안
+      -- 나왔다" 는 글자 그대로 **줄이 하나도 없다** 는 뜻이어야 한다.
       seen AS (
-        SELECT DISTINCT e.node_id FROM encounters e WHERE e.user_id = $1 AND e.recognized IS NOT NULL
+        SELECT DISTINCT e.node_id FROM encounters e WHERE e.user_id = $1
       )
       SELECT
         (SELECT count(DISTINCT e.node_id)::text
@@ -143,7 +144,18 @@ async function main() {
           WHERE e.user_id = $1 AND e.recognized IS NOT NULL
             AND i.created_at <  l.landed_at + make_interval(days => $2::int)) AS too_soon,
         (SELECT count(*)::text FROM landed) AS landed,
-        (SELECT count(*)::text FROM landed WHERE node_id NOT IN (SELECT node_id FROM seen)) AS never_back
+        (SELECT count(*)::text FROM landed WHERE node_id NOT IN (SELECT node_id FROM seen)) AS never_back,
+        -- 다시 나왔는데 **판정이 일어날 수 없었던** 출현. F12 는 안 만난 한자가 섞인 덩어리를 열 수
+        -- 없게 해 두었으므로(읽기를 열면 다음 카드의 답이 샌다) 그 안의 만난 글자에는 "열었다 / 안
+        -- 열었다" 가 생기지 않는다. 분모에 넣으면 기회가 없던 것을 못 읽은 것으로 세게 되니 뺀다.
+        -- 다만 **얼마나 빠지는지는 봐야 한다** — 2자 낱말이 흔한 일본어에서 이게 표본을 크게 깎을 수
+        -- 있고, D+7 에 분모만 보는 이유가 그것이다 (MEASURE 3장).
+        (SELECT count(DISTINCT e.node_id)::text
+           FROM encounters e
+           JOIN landed l ON l.node_id = e.node_id
+           JOIN inputs i ON i.id = e.input_id
+          WHERE e.user_id = $1 AND e.recognized IS NULL
+            AND i.created_at >= l.landed_at + make_interval(days => $2::int)) AS no_judgement
       `,
       [userId, QUALIFY_DAYS],
     );
@@ -180,7 +192,7 @@ async function main() {
 function print(
   userId: string,
   enc: EncounterRow[],
-  ctx: { too_soon: string; landed: string; never_back: string } | undefined,
+  ctx: { too_soon: string; landed: string; never_back: string; no_judgement: string } | undefined,
   rec: RecordingRow[],
 ) {
   const synthetic = enc.some((r) => r.synthetic) || rec.some((r) => r.synthetic);
@@ -226,6 +238,10 @@ function print(
       `참고: 착지한 한자 ${ctx.landed}자 · 자격 미달(간격 ${QUALIFY_DAYS}일 미만) ${ctx.too_soon}자 · 착지 뒤 다시 안 나온 한자 ${ctx.never_back}자`,
     );
     console.log("  자격 미달과 다시 안 나온 것은 비율에 안 들어간다. 왜 그 숫자가 나왔는지를 볼 재료다.");
+    if (ctx.no_judgement !== "0")
+      console.log(
+        `  판정이 일어날 수 없던 출현 ${ctx.no_judgement}자 — 안 만난 한자가 섞인 덩어리라 읽기를 열 기회가 없었다. 분모에서 뺀다.`,
+      );
   }
 
   // ── 2 ──────────────────────────────────────────────────────────────────────
