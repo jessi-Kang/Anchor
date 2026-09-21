@@ -399,7 +399,23 @@ env ANCHOR_DATABASE_URL='postgres://x:x@localhost:5432/x' ANCHOR_APP_PASSWORD='x
     pnpm build
 ```
 
-**`test:db` 는 이 방법으로 안 된다** — 그쪽은 진짜 Postgres 가 필요하다 (`db/README.md` 의 지역 조리법).
+**그러면 `pnpm verify` 도, `pnpm push` 도 안 돈다** — `verify` 가 `build` 다음에 `test:db` 를 부르고
+그쪽은 진짜 Postgres 를 쓴다. **그리고 그게 손으로 `git merge` 하게 되는 진짜 이유다.** 차례를 묶어
+둔 명령이 안 도니까 사람이 다시 잇고, 그러면 합치기 제목이 git 기본값으로 나가고 ②(합친 뒤 재기)가
+빠진다. **조심할 거리가 아니라 DB 를 켤 거리다.** `db/README.md` 의 지역 조리법으로 켠 뒤:
+
+```bash
+export DATABASE_URL_ADMIN="postgres://postgres:<로컬용>@localhost:5432/anchor"
+export ANCHOR_DATABASE_URL="postgres://anchor_app:<로컬용>@localhost:5432/anchor"
+export ANCHOR_APP_PASSWORD="<로컬용>"
+export NEON_AUTH_BASE_URL="https://example.invalid"
+export NEON_AUTH_COOKIE_SECRET="0000000000000000000000000000000000000000"   # 32자 이상이기만 하면 된다
+pnpm db:migrate && pnpm verify      # 2026-09-21 12시 기준 80 pass / 0 fail
+pnpm push --main                    # 이제 ①합치기 ②재기 ③조상 ④밀기가 한 명령으로 돈다
+```
+
+**`<로컬용>` 은 이 컨테이너 밖으로 안 나가는 아무 값이다.** 진짜 비밀값을 여기 넣지 않는다 —
+넣을 이유도 없다. 붙는 곳이 샌드박스 Postgres 하나뿐이다.
 
 **`pnpm verify` 가 따로 있는 이유는 종료 코드다.** 넷을 손으로 이어 돌리면서 결과를 파이프로 거르면
 (`pnpm test:db | grep "# pass"`) **앞 명령의 종료 코드가 버려진다** — `&&` 나 사람이 보는 것은 `grep` 의
