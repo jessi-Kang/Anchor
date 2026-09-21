@@ -10,10 +10,16 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 
 | 이름 | 하는 일 | 이 세션만 고치는 곳 | 브랜치 | 세션 ID |
 | --- | --- | --- | --- | --- |
-| **Anchor · PM (조율)** | 결정·우선순위·통합 순서·완결 판정. 코드/디자인/기획 문서를 직접 고치지 않는다 | `docs/TEAM.md` | `claude/affectionate-brahmagupta-947f48` | `session_01QPJ4i1hJ5zENanv7ykjp1t` |
+| **Anchor · PM (프로덕트)** | 노스 스타·마일스톤·Jessi 와의 결정·PM 간 충돌. 코드/디자인/기획 문서를 직접 고치지 않는다 | `README.md` · `docs/TEAM.md` | `claude/affectionate-brahmagupta-947f48` | `session_01QPJ4i1hJ5zENanv7ykjp1t` |
+| **Anchor · PM 진실** | 앱이 화면에서 하는 말이 참인가. UX·QA·테스터가 여기로 보고한다 | (레포 파일 없음) | — | `session_01S3rZjdHgoi3UCdghdwk3rw` |
+| **Anchor · PM 축** | 두 축이 두 번째 만남까지 끊기지 않는가. 기획·개발·디자인이 여기로 보고한다 | (레포 파일 없음) | — | `session_017ZhJTL6g4CQrguRD6fuBgs` |
+| **Anchor · PM 측정** | 2주 뒤 숫자 둘이 실제로 나오는가. 코드를 고치지 않고 읽는다 | `docs/MEASURE.md` | `measure/definitions` | `session_011cR9tZ7RdCfUfaKi9nazW8` |
+| **Anchor · HR** | 인력이 마일스톤에 맞는지, 비용이 값을 하는지. 채용·정지는 PM 승인 뒤 집행 | (레포 파일 없음) | — | `session_01NyKmzA2gnWcy4RQEvJZS4U` |
+| **Anchor · UX (문구)** | 화면 문구를 사용자 쪽에서 읽는다. **코드를 고치지 않는다** | (레포 파일 없음) | — | `session_01McGRGb8P8UbvnBnCH7uS2C` |
+| **Anchor · 테스터 아홉** | 실제 사용자로 써 보고 걸린 것을 다듬지 않고 올린다. 코드·기획서를 안 본다 | (레포 파일 없음) | — | (언어 × 초/중/고. 스페인어 셋은 멈춤) |
 | **Anchor · 기획** | 화면 순서·목적·나가는 길·문구 의도, 제품 원칙 | `CLAUDE.md` · `docs/SPEC.md` · `docs/FLOW.md` · `docs/SITEMAP.md` | (세션 생성 시 할당) | `session_01YJ3vydkSn54KDcf69rC6Vp` |
 | **Anchor · 기록** | 사무실 대시보드에 오간 말과 상태를 기록한다. 판단하지 않는다 | (레포 파일 없음) | — | `session_01VDLmWntuURPMRLBr4WWVMC` |
-| **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지 | `README.md` · `docs/STATUS.md` · `docs/BACKUP.md` | `claude/docs-status-7t3m1a` | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
+| **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지. **`README.md` 는 PM 소유로 옮겼다** — 노스 스타라 결정과 같이 움직인다 | `docs/STATUS.md` · `docs/BACKUP.md` | `claude/docs-status-7t3m1a` | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
 | **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_01JXYTj8AuVoomHGMVQjEB6R` |
 | **Anchor · 보안** | 데이터 원칙이 코드와 DB 에서 실제로 성립하는지 확인한다. **코드를 고치지 않는다** | `docs/SECURITY.md` | `claude/security-audit-1mrnbe` | `session_01MRNbEc9RPrR5vsdK3chLWR` |
@@ -26,10 +32,10 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 
 | 묶음 | 태그 | 누가 | 무엇을 소유하는가 |
 | --- | --- | --- | --- |
-| 조율 | `anchor-lead` | PM | 결정과 전달. 산출물을 직접 만들지 않는다 |
+| 조율 | `anchor-lead` | PM · PM 진실 · PM 축 · HR | 결정과 전달. 산출물을 직접 만들지 않는다 |
 | 기준 | `anchor-spec` | 기획 · 문서 | 문서. 무엇을 만들지와 지금 무엇이 참인지를 쓴다 |
 | 제작 | `anchor-build` | 디자인 · 개발 | 화면과 코드. 기준 문서를 그대로 옮긴다 |
-| 검증 | `anchor-verify` | QA · 보안 | 읽기 전용. 만든 것이 기준과 맞는지 본다 |
+| 검증 | `anchor-verify` | QA · 보안 · PM 측정 · UX · 테스터 | 읽기 전용. 만든 것이 기준과 맞는지 본다 |
 
 끝난 세션은 `anchor` 를 떼고 `anchor-closed` 를 단다. 명단에 섞이지 않게 하려는 것이고, 기록은 남는다.
 
@@ -38,7 +44,15 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 **세션은 승인 없이 도구를 쓸 수 있는 모드로 띄운다.** plan 모드 세션은 도구를 쓸 때마다 사람의 승인을 기다리므로 Jessi 의 손을 붙잡는다. 권한 모드는 만든 뒤에 바꿀 수 없으니, 잘못 떴으면 같은 역할을 새 세션으로 세우고 옛 세션은 멈춘다. 브랜치에 main 에 없는 커밋이 없는지 먼저 확인한다.
 
 보내는 길:
-- QA 가 찾은 것 → 코드 결함은 **개발**, 기획 문제는 **PM**. QA 가 두 곳에 같은 건을 보내지 않는다.
+
+**2026-09-21 부터 PM 이 넷이다.** 일감은 질문 단위로 갈린다 — 앱이 하는 말이 참인가(**PM 진실**), 두 축이 두 번째 만남까지 이어지는가(**PM 축**), 2주 뒤 숫자가 나오는가(**PM 측정**), 인력과 비용(**HR**). 넷 다 **PM(프로덕트)** 에게 올리고, Jessi 에게 직접 보내지 않는다.
+
+- UX·테스터가 찾은 것 → **PM 진실**. 거기서 코드/화면/규칙으로 갈라 PM 축에 넘긴다.
+- QA 가 찾은 것 → **PM 진실**. 코드 결함이면 거기서 PM 축으로 간다.
+- 보안이 찾은 것 → **PM 측정**. 다만 등급이 "샘"(남의 데이터가 보이거나 비밀값이 나간다)이면 **PM(프로덕트) 직행**이고 다른 모든 일보다 먼저 고친다. 한 박자도 쉬지 않는다.
+- 문서가 찾은 것 → **PM 측정**.
+- 기획·개발·디자인이 막히면 → **PM 축**.
+- PM 측정이 코드를 고쳐야 하면 → **PM 축**에 요청한다. 직접 안 고친다.
 - 보안이 찾은 것 → 전부 **PM**. 등급이 "샘"(남의 데이터가 보이거나 비밀값이 나간다)이면 다른 모든 일보다 먼저 고친다.
 - 디자인이 화면 순서·화면 추가/삭제·문구 의도를 바꾸고 싶으면 → **PM**. PM 이 결정하고 **기획**이 `docs/FLOW.md` 에 반영한 뒤 **개발**에 알린다.
 - 개발이 기획 문서와 다르게 만들어야 할 이유를 찾으면 → **PM**. 혼자 판단해서 문서와 다르게 만들지 않는다.
