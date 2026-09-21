@@ -1,5 +1,5 @@
 import { withUser } from "@/lib/db";
-import { getInput, listInputs, type InputRow } from "@/lib/db/inputs";
+import { countingInputs, getInput, type InputRow } from "@/lib/db/inputs";
 import { getKanjiNodes, getKanjiStates, isJudged, type KanjiNode } from "@/lib/db/kanji";
 import type { CardRow } from "@/lib/db/cards";
 
@@ -46,8 +46,16 @@ export async function inputProgress(userId: string, input: InputRow): Promise<In
   const landed = landedRows.map((r) => r.key);
   const solved = new Set(landedRows.filter((r) => r.guess_correct).map((r) => r.key));
   const landedSet = new Set(landed);
-  const remaining = nodes.filter((n) => !known.has(n.key) && !landedSet.has(n.key)).length;
+  const remaining = openKanji(nodes, known, landedSet).length;
   return { input, nodes, known, anchors, solved, landedKanji: landed, remaining, total: landedSet.size + remaining };
+}
+
+/**
+ * **아직 카드가 안 된 한자.** "남았다" 의 정의는 이 한 줄이고, `inputProgress.remaining` 과
+ * `cardsLeft` 가 같이 쓴다. 둘이 따로 세면 화면은 남았다고 하고 하루 끝은 끝났다고 한다.
+ */
+function openKanji(nodes: KanjiNode[], known: Set<string>, landed: Set<string>): KanjiNode[] {
+  return nodes.filter((n) => !known.has(n.key) && !landed.has(n.key));
 }
 
 /**
@@ -67,9 +75,44 @@ export function freshKanji(prog: InputProgress): string[] {
  * 자료 하나만 보고 띄우면 남은 것을 끝났다고 말하게 된다.
  */
 export async function cardsLeft(userId: string): Promise<number> {
-  const inputs = await listInputs(userId, 10);
-  const progs = await Promise.all(inputs.filter((i) => i.lang === "ja").map((i) => inputProgress(userId, i)));
-  return progs.reduce((n, p) => n + p.remaining, 0);
+  /*
+    **상한이 없다.** 전에는 최근 10개만 봤는데, 그건 바로 위 주석이 막으려던 일("자료 하나만 보고
+    띄우면 남은 것을 끝났다고 말하게 된다")을 "열 개만 보면" 으로 다시 한 것이다. 열한 번째 자료에
+    카드가 남아 있으면 이 함수가 0 을 내고, 그래프 화면이 "오늘 켜진 것" 버튼을 세우고, 하루 끝이
+    뜬다 — **카드가 남았는데 끝났다고 말한다.** 되돌릴 방법이 없는 종류의 거짓말이다.
+
+    자료마다 `inputProgress` 를 돌리지 않고 **세 질의로 한 번에** 센다. 자료가 쉰이면 그쪽은
+    백쉰 질의다. 대신 "남았다" 의 정의는 `openKanji` 한 곳에서 같이 가져다 쓴다 — 빠르게 세려고
+    규칙을 베껴 쓰면 언젠가 둘이 갈린다.
+  */
+  const inputs = await countingInputs(userId);
+  const chars = [...new Set(inputs.flatMap((i) => i.meta.kanji ?? []))];
+  if (chars.length === 0) return 0;
+
+  const nodeMap = await getKanjiNodes(chars);
+  const states = await getKanjiStates(
+    userId,
+    [...nodeMap.values()].map((n) => n.id),
+  );
+  const known = new Set([...nodeMap.values()].filter((n) => states.get(n.id)?.knows_meaning).map((n) => n.key));
+  const landed = await withUser(userId, async (tx) => {
+    const { rows } = await tx.query<{ input_id: string; key: string }>(
+      `SELECT c.input_id, n.key FROM cards c JOIN nodes n ON n.id = c.node_id
+        WHERE c.user_id = $1 AND c.landed_at IS NOT NULL AND c.input_id IS NOT NULL`,
+      [userId],
+    );
+    const by = new Map<string, Set<string>>();
+    for (const r of rows) (by.get(r.input_id) ?? by.set(r.input_id, new Set()).get(r.input_id)!).add(r.key);
+    return by;
+  });
+
+  return inputs.reduce((n, i) => {
+    const nodes = (i.meta.kanji ?? []).flatMap((c) => {
+      const node = nodeMap.get(c);
+      return node ? [node] : [];
+    });
+    return n + openKanji(nodes, known, landed.get(i.id) ?? new Set()).length;
+  }, 0);
 }
 
 export type CardContext = InputProgress & { where: string; n: number };

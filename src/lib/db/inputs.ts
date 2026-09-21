@@ -64,11 +64,46 @@ export async function hasInputs(userId: string, lang: Lang3): Promise<boolean> {
   });
 }
 
-export async function listInputs(userId: string, limit = 20): Promise<InputRow[]> {
+/**
+ * 목록을 보여 주는 화면들이 한 번에 부르는 자료 수. **넷이 같은 값을 써야 한다.**
+ *
+ * 전에는 홈 10 · F19 100 · `cardsLeft` 10 · F15 20 이었다. 같은 질문("내 자료가 무엇인가")에
+ * 답이 넷이었고, 그래서 **안 끝낸 오래된 자료가 어디에도 안 떴다**: 홈과 F19 가 같은 `splitForHome`
+ * 을 쓰는데 **입력이 다르면 같은 함수도 다른 답을 낸다.** 홈은 11번째 자료를 애초에 안 불러오고,
+ * F19 는 그걸 제가 계산한 `home` 에 넣고는 "홈에 선 것은 여기 안 낸다" 며 뺀다. 두 화면 다 없다.
+ *
+ * 사라지는 것이 하필 **시작해 놓고 안 끝낸 자료**다 — 제일 돌아가고 싶은 것이고, 자료 열 개면
+ * 닿는다. 화면은 아무 말도 안 한다.
+ */
+export const INPUT_LIST = 100;
+
+export async function listInputs(userId: string, limit = INPUT_LIST): Promise<InputRow[]> {
   return withUser(userId, async (tx) => {
     const { rows } = await tx.query<InputRow>(
       "SELECT id, lang, title, body, created_at, extracted_at, meta FROM inputs WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2",
       [userId, limit],
+    );
+    // **상한에 닿는 것을 조용히 두지 않는다.** 넘는 자료는 어느 화면에도 안 뜨는데 오류도 빈 칸도
+    // 없다. 지금은 100 이라 멀지만 성질이 같아서, 닿는 날이 오면 적어도 기록에는 남아야 한다.
+    if (rows.length === limit) console.warn(`[inputs] 목록 상한 ${limit} 에 닿았다 — 그 아래 자료는 화면에 안 뜬다`);
+    return rows;
+  });
+}
+
+/**
+ * **세는 쪽이 쓰는 목록. 상한이 없다.**
+ *
+ * 보여 주는 것과 세는 것은 다르다 — 덜 보여 주면 사용자가 찾아 들어가지만, **"오늘은 끝났다" 는
+ * 틀리면 되돌릴 방법이 없다.** `cardsLeft` 가 열 개만 보고 0 을 내면 카드가 남았는데 하루 끝
+ * 화면이 뜬다 (`cards/progress.ts`).
+ *
+ * 본문은 안 읽는다. 세는 데 필요한 것은 `meta.kanji` 뿐이고, 기사 본문 수십 개를 끌어올 이유가 없다.
+ */
+export async function countingInputs(userId: string): Promise<Pick<InputRow, "id" | "lang" | "meta">[]> {
+  return withUser(userId, async (tx) => {
+    const { rows } = await tx.query<Pick<InputRow, "id" | "lang" | "meta">>(
+      "SELECT id, lang, meta FROM inputs WHERE user_id = $1 AND lang = 'ja' ORDER BY created_at DESC",
+      [userId],
     );
     return rows;
   });

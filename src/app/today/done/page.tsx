@@ -51,7 +51,7 @@ export default async function DonePage({ searchParams }: { searchParams: Promise
       돌아가는 사람 몫으로 자료·진행도를 훑지 않는다.
     */
     if (lit.length === 0 && spoken.length === 0) redirect("/today");
-    const inputs = await listInputs(user.id, 20);
+    const inputs = await listInputs(user.id);
     const progs = await Promise.all(inputs.filter((i) => i.lang === "ja").map((i) => inputProgress(user.id, i)));
     // 아직 안 만난 한자는 자료마다 나오니 글자로 모은다 — 같은 한자가 두 기사에 있어도 하나다.
     waiting = [...new Set(progs.flatMap(freshKanji))];
