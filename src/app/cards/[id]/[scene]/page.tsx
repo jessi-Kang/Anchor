@@ -112,6 +112,21 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   if (scene === 2) {
     const parts = p.parts.length ? p.parts : [{ ch: p.kanji, name: null, count: 1 }];
     const small = parts.length > 2;
+    /*
+      **이름 줄은 부를 이름이 다 있을 때만 낸다.**
+
+      부품이 없는 한자(457자, 상용한자의 21%)는 위에서 그 한자 자신을 타일에 넣는데, 그러면
+      이름 줄이 `pt.name ?? pt.ch` 로 **같은 글자를 또 찍었다.** 큰 타일에 上, 그 밑에 작게 上,
+      그 아래 "上 한 글자" — 한 화면에 같은 글자가 셋이고 가운데 줄은 아무것도 안 알려 준다.
+      글자를 이름 자리에 놓는 것은 이름을 대는 게 아니라 **이름이 없다는 걸 감추는 것**이다.
+
+      이름이 하나라도 비면 줄 전체를 안 낸다 — 일부만 그리면 타일과 이름의 짝이 어긋나서
+      **어느 이름이 어느 타일 것인지** 알 수 없게 된다. 빈 자리를 남기는 것도 같은 이유로 안 한다.
+
+      남는 화면은 큰 타일 하나 + "上 한 글자" + 다음 장면의 "이 모양이면 무슨 뜻이 될까?" 다.
+      (이게 Scene2 (나)안과 같은 그림인지는 **디자인이 정할 일이라 여기서 정하지 않았다.**)
+    */
+    const named = p.parts.length > 0 && parts.every((pt) => pt.name);
     return (
       <Screen {...common}>
         <Grow />
@@ -127,11 +142,13 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
               </div>
             ))}
           </div>
-          <div className={s.partNames}>
-            {parts.map((pt, i) => (
-              <span key={pt.ch + i}>{pt.name ?? pt.ch}</span>
-            ))}
-          </div>
+          {named && (
+            <div className={s.partNames}>
+              {parts.map((pt, i) => (
+                <span key={pt.ch + i}>{pt.name}</span>
+              ))}
+            </div>
+          )}
           <h1 className={s.ask}>{p.parts_meaning}</h1>
         </div>
         <Grow />
