@@ -3,6 +3,9 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
 import { getInput } from "@/lib/db/inputs";
+import { inputProgress } from "@/lib/cards/progress";
+import { runStates } from "@/lib/kanji/runs";
+import { recordEncounters } from "@/lib/db/encounters";
 import { getKanjiNodes, getPartNames, judgeKanji } from "@/lib/db/kanji";
 import { createCard, findOpenCard, type CardPart, type CardPayload } from "@/lib/db/cards";
 import { getSettings } from "@/lib/db/settings";
@@ -66,4 +69,38 @@ export async function startCard(inputId: string, kanji: string) {
   if (kanaGate(settings) === "ask")
     redirect(`/onboarding/kana?next=${encodeURIComponent(`/cards/${cardId}`)}&from=${encodeURIComponent(`/inputs/${input.id}`)}`);
   redirect(`/cards/${cardId}`);
+}
+
+/**
+ * F12 "읽기 끝". **여기서 재만남 기록이 한 번에 남는다** (`docs/MEASURE.md` 1장).
+ *
+ * `opened` 는 사용자가 탭해서 읽기를 연 덩어리 번호다(`runStates` 와 같은 순서). 그 덩어리 안의
+ * 만난 한자는 전부 `recognized = false`, 안 연 덩어리의 만난 한자는 `true` 다 — 실제로 일어난
+ * 행동 하나가 그것이다. 묻지 않았으니 자기 보고가 아니고, 점수도 정답도 없으니 시험이 아니다.
+ *
+ * **다 만난 덩어리만 적는다.** 妥協 처럼 안 만난 글자가 섞인 덩어리는 처음부터 열 수 없게 해 뒀으므로
+ * (읽기를 열면 다음 카드의 답이 샌다) 그 안의 만난 글자에는 **판정이 일어난 적이 없다.** 그런 자리를
+ * true 로 적으면 열어 볼 기회가 없던 것을 "열지 않고 읽었다" 로 세게 된다 — 분자를 부풀리는 값이다.
+ *
+ * 화면을 그냥 떠나면 이 함수가 안 불린다. 반쯤 읽은 것을 판정으로 만들지 않는다.
+ */
+export async function finishRead(inputId: string, opened: number[]) {
+  const user = await requireUser();
+  const input = await getInput(user.id, inputId);
+  if (input && input.lang === "ja") {
+    const prog = await inputProgress(user.id, input);
+    const nodeOf = new Map(prog.nodes.map((n) => [n.key, n.id]));
+    const open = new Set(opened);
+    const rows = runStates(input.body, prog.anchors)
+      .flatMap((run, i) => (run.allMet ? run.chars.map((c) => ({ ch: c, recognized: !open.has(i) })) : []))
+      // 같은 글자가 두 덩어리에 나오면 **연 적이 있는 쪽**을 남긴다. 한 번이라도 막혔으면 막힌 것이다.
+      .reduce<Map<string, boolean>>((acc, r) => acc.set(r.ch, (acc.get(r.ch) ?? true) && r.recognized), new Map());
+    const payload = [...rows].flatMap(([ch, recognized]) => {
+      const nodeId = nodeOf.get(ch);
+      return nodeId ? [{ nodeId, recognized }] : [];
+    });
+    // 기록이 실패해도 읽기는 끝난 것이다 — 화면을 붙잡지 않는다.
+    await recordEncounters(user.id, inputId, payload).catch((e) => console.error("[encounters] 기록 실패", e));
+  }
+  redirect("/today");
 }

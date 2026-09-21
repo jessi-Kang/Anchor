@@ -76,7 +76,16 @@ export async function getKanjiNodeById(id: string): Promise<KanjiNode | null> {
   });
 }
 
-/** 부품 이름 ("열 십"). radical 노드의 display. */
+/**
+ * 부품을 **부르는 이름**. 두 곳에서 온다:
+ *  1. 부품 노드의 훈 ("열 십") — `parts-ko.json` 에서 온다.
+ *  2. 없으면 **그 글자 자체의 한국 한자음** ("리") — 부품이 그 자체로 한자면 사용자가 이미 아는
+ *     소리가 있다(원칙 2). 使 = 亻 + 吏 의 吏 가 그 경우다.
+ *
+ * 둘을 고르는 일은 **씨앗이 적재할 때 이미 끝난다**(`scripts/seed.ts`) — 여기서 또 고르면 두 곳이
+ * 되고, 한쪽만 고쳐지는 순간 씨앗이 남긴 부품을 화면이 이름 없이 받아 "𠂒와 어진사람" 이 다시 난다.
+ * 그래서 여기는 노드에 적힌 이름을 읽기만 한다.
+ */
 export async function getPartNames(chars: string[]): Promise<Map<string, string>> {
   if (chars.length === 0) return new Map();
   return withoutUser(async (tx) => {
@@ -85,7 +94,7 @@ export async function getPartNames(chars: string[]): Promise<Map<string, string>
        WHERE user_id IS NULL AND lang = 'ja' AND kind = 'radical' AND key = ANY($1::text[])`,
       [chars],
     );
-    return new Map(rows.filter((r) => r.name).map((r) => [r.key, r.name as string]));
+    return new Map(rows.flatMap((r) => (r.name ? [[r.key, r.name] as const] : [])));
   });
 }
 
