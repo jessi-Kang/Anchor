@@ -47,7 +47,8 @@ export function LanguageRows({ enabled }: { enabled: Lang3[] }) {
           />
         );
       })}
-      <Row title="언어 추가" sub="처음 화면에서 고르듯이" href="/onboarding/languages" />
+      {/* 부제를 안 단다. 누르면 그 화면이 나오는데 미리 설명할 게 없다 (참고에도 없다). */}
+      <Row title="언어 추가" href="/onboarding/languages" />
     </>
   );
 }
