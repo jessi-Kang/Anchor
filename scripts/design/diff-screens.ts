@@ -18,6 +18,7 @@ import path from "node:path";
 import { chromium, type BrowserContext } from "playwright-core";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
+import { FRAME_W, FRAME_H, FRAME_STYLE } from "./frame";
 
 /**
  * 지정한 글꼴로 그려졌는지 재는 조각. **화살표 함수가 아니라 문자열이다** — `tsx` 가 이름을 살려
@@ -44,8 +45,7 @@ const FONT_PROBE = [
   "})()",
 ].join("\n");
 
-const W = 390;
-const H = 844;
+const W = FRAME_W;
 const outDir = path.resolve(process.cwd(), ".design-check");
 
 /**
@@ -141,12 +141,15 @@ function findChromium(): string | undefined {
  * 놓고 봐야 했다 — 여는 값이 보는 값보다 크면 안 본다. 이름이 짧은 쪽이 먼저 여는 것이다:
  * `<ID>.png` 가 세 칸짜리, `<ID>-ref/-app/-diff.png` 는 한 칸을 크게 볼 때 쓴다.
  * 칸 이름을 그림 안에 넣는 건 브라우저로 그리기 때문이다 — 픽셀로 글자를 찍는 것보다 싸다.
+ *
+ * 높이는 **그 화면의 틀**이다. 844 를 박아 두면 긴 화면의 석 장이 눌려서, 잘리지도 않은 그림이
+ * 세로로 찌그러진 채 나란히 선다 — 그걸 보고 "왜 다르지" 를 세는 사람이 다음 사람이다.
  */
-async function writeStrip(ctx: BrowserContext, id: string, ref: Buffer, app: Buffer, diff: Buffer) {
+async function writeStrip(ctx: BrowserContext, id: string, h: number, ref: Buffer, app: Buffer, diff: Buffer) {
   const src = (b: Buffer) => `data:image/png;base64,${b.toString("base64")}`;
   const cell = (label: string, b: Buffer) =>
     `<figure style="margin:0"><figcaption style="font:500 13px 'Noto Sans KR',sans-serif;color:#6B7078;padding-bottom:8px">${label}</figcaption>` +
-    `<img src="${src(b)}" width="${W}" height="${H}" style="display:block;border:1px solid #E6E7EA;border-radius:4px"></figure>`;
+    `<img src="${src(b)}" width="${W}" height="${h}" style="display:block;border:1px solid #E6E7EA;border-radius:4px"></figure>`;
   const page = await ctx.newPage();
   await page.setContent(
     `<body style="margin:0;background:#F6F6F7"><div id="s" style="display:inline-flex;gap:16px;padding:20px">` +
@@ -165,9 +168,9 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
 
   const browser = await chromium.launch({ executablePath: findChromium() });
-  const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+  const ctx = await browser.newContext({ viewport: { width: W, height: FRAME_H }, deviceScaleFactor: 1 });
 
-  const rows: Array<{ id: string; pct: number }> = [];
+  const rows: Array<{ id: string; pct: number; h: number }> = [];
   const unreachable: Array<{ id: string; why: string }> = [];
 
   /**
@@ -243,10 +246,36 @@ async function main() {
           `차이값이 거짓이 되므로 멈춘다 — design/fonts/ 의 파일과 화면의 @font-face 경로를 봐라.`,
       );
     }
-    const refPng = await ref.screenshot({ clip: { x: 0, y: 0, width: W, height: H } });
+    /*
+      **자는 참고가 선언한 틀이다.** 844 를 박아 두고 거기서 잘랐더니 F16 이 5.48% 로 맨 위에
+      섰는데, 그 화면은 참고가 1014 를 선언하고 주 버튼을 **바닥**에 붙인다 — 844 에서 자르면
+      참고 버튼은 잘려 나가고 앱 버튼은 남는다. 내용으로는 절대 못 줄이는 차이라, 그 순위는
+      화면이 아니라 자를 가리키고 있었다. `design:lint` 는 이미 선언을 읽고 있었으니
+      (`frame.ts`) **두 도구가 서로 다른 화면을 보고 있던 것**이다.
+
+      **자르는 게 아니라 둘 다 그 높이로 그린다.** 자만 바꾸면 앱은 여전히 844 짜리 화면으로
+      그려진다 — 앱의 비교 모드 CSS(`.screenFixed`)도 844 를 박고 있었다. 844 를 박은 자리가
+      셋이었던 것이다. 그래서 창을 틀 높이로 열고, 그 높이를 `--frame-h` 로 넣어 준다.
+      그래야 `Grow` 가 미는 주 버튼이 참고와 같은 바닥에 선다.
+    */
+    const frameH = await ref.evaluate((style) => {
+      const re = new RegExp(style);
+      const frame = [...document.querySelectorAll("div")].find((d) => re.test(d.getAttribute("style") || ""));
+      return frame ? frame.clientHeight : 0;
+    }, FRAME_STYLE);
+    if (!frameH) {
+      // **기본값으로 안 돌아간다.** 844 로 떨어뜨리면 못 찾은 것이 "괜찮다" 로 읽힌다 —
+      // lint 가 틀을 높이로 찾다가 body 로 떨어져 조용히 통과하던 것과 같은 실수다.
+      unreachable.push({ id, why: `참고에서 틀(폭 ${W}px)을 못 찾았다` });
+      await ref.close();
+      continue;
+    }
+    if (frameH !== FRAME_H) await ref.setViewportSize({ width: W, height: frameH });
+    const refPng = await ref.screenshot({ clip: { x: 0, y: 0, width: W, height: frameH } });
     await ref.close();
 
     const app = await ctx.newPage();
+    if (frameH !== FRAME_H) await app.setViewportSize({ width: W, height: frameH });
     const url = `${base}${route}${route.includes("?") ? "&" : "?"}fixed=1`;
     const res = await app.goto(url, { waitUntil: "networkidle" }).catch(() => null);
     const landed = app.url();
@@ -257,26 +286,34 @@ async function main() {
       continue;
     }
     await app.evaluate(() => document.fonts.ready);
-    const appPng = await app.screenshot({ clip: { x: 0, y: 0, width: W, height: H } });
+    // 앱의 비교 모드(`.screenFixed`)에 틀 높이를 넘긴다. 글꼴까지 기다린 **뒤**에 넣는다 —
+    // 값만 바뀌는 것이라 여기서 넣어도 찍히는 그림은 같고, 넣을 자리가 하나뿐이라 안 갈린다.
+    await app.evaluate((h) => document.documentElement.style.setProperty("--frame-h", `${h}px`), frameH);
+    const appPng = await app.screenshot({ clip: { x: 0, y: 0, width: W, height: frameH } });
     await app.close();
 
     writeFileSync(path.join(outDir, `${id}-ref.png`), refPng);
     writeFileSync(path.join(outDir, `${id}-app.png`), appPng);
     const a = PNG.sync.read(refPng);
     const b = PNG.sync.read(appPng);
-    const diff = new PNG({ width: W, height: H });
-    const n = pixelmatch(a.data, b.data, diff.data, W, H, { threshold: 0.1 });
+    const diff = new PNG({ width: W, height: frameH });
+    const n = pixelmatch(a.data, b.data, diff.data, W, frameH, { threshold: 0.1 });
     const diffPng = PNG.sync.write(diff);
     writeFileSync(path.join(outDir, `${id}-diff.png`), diffPng);
-    await writeStrip(ctx, id, refPng, appPng, diffPng);
-    rows.push({ id, pct: (n / (W * H)) * 100 });
+    await writeStrip(ctx, id, frameH, refPng, appPng, diffPng);
+    rows.push({ id, pct: (n / (W * frameH)) * 100, h: frameH });
   }
 
   await browser.close();
 
   rows.sort((x, y) => y.pct - x.pct);
   console.log(`\n참고 화면과 구현의 차이 — 큰 순서 (${rows.length}장, ${base})\n`);
-  for (const r of rows) console.log(`  ${r.pct.toFixed(2).padStart(6)}%  ${r.id.padEnd(8)} .design-check/${r.id}.png`);
+  // **다른 자로 잰 화면은 그렇다고 말한다.** 안 적으면 F16 의 퍼센트만 목록에 서고, 그것이
+  // 844 짜리 옆 줄과 같은 자로 나온 값처럼 읽힌다 (lint 의 "틀이 844px 보다 큰 화면" 과 같은 결).
+  for (const r of rows) {
+    const ruler = r.h === FRAME_H ? "" : `  (틀 ${r.h}px)`;
+    console.log(`  ${r.pct.toFixed(2).padStart(6)}%  ${r.id.padEnd(8)} .design-check/${r.id}.png${ruler}`);
+  }
 
   if (unreachable.length) {
     console.log(`\n맞대어 보지 못한 것 (${unreachable.length}장)\n`);
