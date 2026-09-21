@@ -18,7 +18,7 @@ import path from "node:path";
 import { chromium, type BrowserContext } from "playwright-core";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
-import { FRAME_W, FRAME_H, FRAME_STYLE } from "./frame";
+import { FRAME_W, FRAME_H, FRAME_STYLE, ROUTES, SKIP } from "./frame";
 
 /**
  * 지정한 글꼴로 그려졌는지 재는 조각. **화살표 함수가 아니라 문자열이다** — `tsx` 가 이름을 살려
@@ -52,78 +52,6 @@ const outDir = path.resolve(process.cwd(), ".design-check");
  * 참고 화면 → 구현 라우트. `[id]` 자리는 디자인 미리보기가 아무 값이나 받으므로 `x` 를 쓴다.
  * 여기 없는 화면은 아래 SKIP 에 이유를 적는다 — 빠진 것과 못 부르는 것이 구분돼야 한다.
  */
-const ROUTES: Record<string, string> = {
-  O01: "/",
-  O02a: "/onboarding/languages",
-  F02: "/inputs/new",
-  F03: "/inputs/x",
-  O03: "/onboarding/kana",
-  O03b: "/onboarding/kana/module",
-  F04: "/cards/x",
-  // 카드를 못 만든 자리. **주소로 부를 수 있어서** 여기 있다 — 카드 행을 안 만들기로 하면서
-  // `/cards/[id]` 가 될 수 없어 자료 밑에 제 라우트가 생겼고, 주소가 있는 상태는 맞대어 볼 수 있다.
-  F04a: "/inputs/x/no-card",
-  Scene1: "/cards/x/1",
-  Scene2: "/cards/x/2",
-  Scene3: "/cards/x/3",
-  Scene4: "/cards/x/4",
-  Scene5: "/cards/x/5",
-  F10: "/cards/x/speak",
-  F11: "/graph",
-  F12: "/inputs/x/read",
-  F13: "/talk",
-  F17: "/talk/x/guess",
-  F14: "/talk/x",
-  F18: "/talk/past",
-  F01: "/today",
-  F19: "/inputs",
-  F15: "/today/done",
-  F16: "/settings",
-  F16a: "/settings/delete",
-};
-
-const SKIP: Record<string, string> = {
-  F01a: "같은 라우트의 다른 상태 — URL 로 따로 부를 수 없다",
-  F02a: "같은 라우트의 다른 상태",
-  F03a: "같은 라우트의 다른 상태",
-  O02b: "같은 라우트의 다른 상태(언어 추가 모드)",
-  O03a: "같은 라우트의 다른 상태(읽는 중)",
-  F14a: "같은 라우트의 다른 상태(겨눌 소리 없음)",
-  // 듣기를 누른 **뒤에야** 아는 상태(그 기기에 목소리가 없다)라 주소로 못 부른다.
-  // 한 장이 F10 과 F14 를 같이 덮는다 — 같은 상태를 두 번호로 그리면 한쪽만 고치는 날이 온다.
-  F10a: "같은 라우트의 다른 상태(겨눌 소리도 들려줄 소리도 없음) — 탭 뒤라 URL 로 못 부른다",
-  F12a: "같은 라우트의 다른 상태(틴트 덩어리를 탭해 읽기를 연 F12) — 탭 뒤라 URL 로 못 부른다",
-  // 자료를 다 만난 뒤의 F12. **데이터가 정하는 상태**라 주소로 못 부른다(그 자료의 한자를 전부
-  // 풀어야 선다). 화면 쪽은 이미 서 있다 — 바닥 줄이 "새로 배울 건 없어. 다 만난 글자야." 로 가고,
-  // 섞인 낱말이 없으니 "협은 방금 봤지" 줄은 안 난다 (`inputs/[id]/read/page.tsx`).
-  F12b: "같은 라우트의 다른 상태(다 만난 자료의 F12) — 데이터가 정하는 상태라 URL 로 못 부른다",
-  F17a: "같은 라우트의 다른 상태(영어 문장을 못 만들어 추측이 칸에 남은 F17)",
-  F03c: "같은 라우트의 다른 상태(그 자료의 한자를 전부 알아로 고른 F03) — 데이터가 정하는 상태라 URL 로 못 부른다",
-  F03d: "같은 라우트의 다른 상태(자료의 한자 중 카드로 못 만든 것이 남은 F03) — 씨앗에 무엇이 들어 있나가 정하는 상태라 URL 로 못 부른다",
-  F18a: "같은 라우트의 다른 상태(확인만 남은 줄이 있는 F18) — 어디까지 했나가 정하는 상태라 URL 로 못 부른다",
-  Scene1a: "같은 라우트의 다른 상태(부를 낱말이 없는 한자의 Scene1) — 어느 카드냐가 정하는 상태라 URL 로 못 부른다",
-  Scene5a: "같은 라우트의 다른 상태(안전한 착지 낱말이 하나도 안 남은 Scene5) — 만난 글자가 정하는 상태라 URL 로 못 부른다",
-  // F19 는 `/inputs` 로 정해져 위 ROUTES 에 있다 (SKIP 의 "아직 안 정해졌다" 줄은 그래서 뺐다).
-  X01: "라우트가 아니라 not-found 화면",
-  X02: "라우트가 아니라 error 화면",
-  // E·S 는 **없는 화면이 아니다.** 영어 어근 카드(E01~E06)와 스페인어 소리 카드(S01~S04)는
-  // 일본어 카드와 같은 라우트를 쓴다 — `/cards/[id]`, `/cards/[id]/1..5`, `/cards/[id]/speak`
-  // (docs/SITEMAP.md). 언어는 라우트가 아니라 데이터 속성이라 URL 로 "영어 카드"를 부를 수 없고,
-  // 디자인 미리보기가 내는 카드가 일본어 하나뿐이라 여기서는 맞대어 볼 수가 없다.
-  // 미리보기가 언어를 고를 수 있게 되면 그날 SKIP 에서 빠지고 ROUTES 로 옮겨 간다.
-  // (못 한 말 축 F13·F17·F14 는 이것과 다른 축이고 제 라우트가 있어서 위에서 돌고 있다.)
-  E01: "영어 어근 카드 — `/cards/[id]` 를 F04 와 나눠 쓴다. 미리보기가 일본어 카드만 낸다",
-  E02: "영어 어근 카드 — `/cards/[id]/1..5` 를 Scene1~5 와 나눠 쓴다",
-  E03: "영어 어근 카드 — 같은 장면 라우트",
-  E04: "영어 어근 카드 — 같은 장면 라우트",
-  E05: "영어 어근 카드 — 같은 장면 라우트",
-  E06: "영어 어근 카드 — `/cards/[id]/speak` 를 F10 과 나눠 쓴다",
-  S01: "스페인어 소리 카드 — `/cards/[id]` 를 F04 와 나눠 쓴다. 미리보기가 일본어 카드만 낸다",
-  S02: "스페인어 소리 카드 — `/cards/[id]/1..5` 를 Scene1~5 와 나눠 쓴다",
-  S03: "스페인어 소리 카드 — 같은 장면 라우트",
-  S04: "스페인어 소리 카드 — `/cards/[id]/speak` 를 F10 과 나눠 쓴다",
-};
-
 function findChromium(): string | undefined {
   const root = process.env.PLAYWRIGHT_BROWSERS_PATH;
   if (!root || !existsSync(root)) return undefined;
