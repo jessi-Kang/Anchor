@@ -114,6 +114,23 @@ async function main() {
     const soundId = new Map<string, string>();
     let edges = 0;
     let dropped = 0;
+    /*
+      **노드의 구멍과 엣지의 구멍은 같은 병인데 약이 다르다.** 둘 다 "적재가 파일이 말하는 상태가
+      아니라 말한 적 있는 모든 상태의 합이 된다" 인데,
+
+        노드  upsert 가 그 행을 **다시 쓴다.** 그래서 `meta = EXCLUDED.meta` 로 문법을 바꾸면
+              닫힌다 — 파일이 말하지 않는 칸은 말하지 않은 채로 덮인다 (위 주석).
+        엣지  upsert 가 **없던 줄을 안 건드린다.** 부품 규칙이 바뀌어 더는 안 딸리는 줄은
+              아무도 안 보고, 아무도 안 지운다. **문법으로는 못 닫는다 — 지워야 닫힌다.**
+
+      그래서 여기 DELETE 가 있다. **노드 쪽이 닫혔다고 엣지 쪽이 닫힌 게 아니다.**
+
+      **구멍 크기는 DB 마다 다르다.** 되풀이 적재가 쌓인 DB 에서 `part_of` 가 4,727 이었고 새로
+      세운 DB 는 3,913 이었다(차이 814). 이 세션의 로컬 DB 는 3,913 이라 `part_of` 구멍이 0 이다 —
+      **구멍이 없는 DB 에서 재면 「고칠 게 없다」로 보인다.** 탐침에 있지도 않은 부품 줄 250 개를
+      심고 돌려서 `지운 엣지: 261`(심은 250 + 묵은 `ko_sound_of` 11)을 봤고, 최종 상태는 구멍
+      크기와 무관하게 `part_of 3,913 · ko_sound_of 2,135` 로 같았다.
+    */
     /** 지운 행 수를 세어 돌려준다 — 조용한 DELETE 를 안 만든다. */
     const drop = async (sql: string, params: unknown[]) => (await client.query(sql, params)).rowCount ?? 0;
     for (const it of kanji) {
