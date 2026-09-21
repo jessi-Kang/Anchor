@@ -57,10 +57,28 @@
 .topUp {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   padding: 13px 10px;
   margin: -13px -10px;
   min-width: 44px;
-  color: inherit;
+  /*
+    **T2 다. 옆의 시각(T3)과 색이 갈린다.**
+
+    전에는 `color: inherit` 이었다 — 위 주석이 "모양은 같고 탭 영역만 넓힌다" 고 적어 둔 그대로다.
+    그래서 390px 에서 재 보면 링크와 그 옆 시각이 **색·크기·굵기·밑줄 네 항목이 전부 같았다**
+    (둘 다 #9AA0A8 · 14px · 500 · 밑줄 없음). 다른 것은 탭 상자뿐인데(46px 대 20px) **그건 안 보인다.**
+    44px 규칙은 지켰는데 **눌러 보이지가 않았다** — 규칙이 재는 것은 손가락이고 사람이 먼저 쓰는 것은 눈이다.
+    2026-09-21 에 Jessi 가 프로덕션에서 여기 갇혔다: "여기서 빠져나갈 길이 없어."
+  */
+  color: var(--color-text2);
+}
+
+/* 나가는 쪽을 가리키는 홑화살괄호. 색이 아니라 **모양**으로 말한다 — 채도 높은 색 금지와 안 부딪힌다. */
+.topUpMark {
+  font-size: 17px;
+  line-height: 1;
+  /* 글리프가 글자보다 살짝 위에 앉는다. 줄을 안 밀고 광학적으로만 내린다. */
+  margin-top: -1px;
 }
 
 .progress {
