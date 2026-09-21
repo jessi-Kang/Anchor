@@ -3,16 +3,7 @@
 import { useState, useTransition } from "react";
 import { Card, Label, Row, Ja, Choice, ChoiceRow, Space, Grow, Button, Title, Lead } from "@/components/ui";
 import { judge, startCard } from "./actions";
-
-export type JudgeItem = {
-  nodeId: string;
-  kanji: string;
-  /** 행 부제. 낱말이 있으면 "협력의 협", 없으면 한국 한자음 한 글자("선"), 그것도 없으면 null */
-  sub: string | null;
-  /** 이 글자를 부를 한국어 낱말을 우리가 골라 뒀는가. **두 묶음을 가르는 축이 이것이다** */
-  hasWord: boolean;
-  known: boolean | null;
-};
+import type { JudgeItem } from "@/lib/cards/judge-items";
 
 /**
  * F03 (design/screens/F03.html · F03a.html): 제목 "모르는 한자 N개", 두 묶음 + 한자 행마다 알아/몰라 선택 칩, 주 버튼 "協부터".
@@ -66,7 +57,10 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
         {empty
           ? "다른 자료를 넣어 봐."
           : unknownCount > 0
-            ? "아는 소리로 시작할 수 있는 것부터. 나머지는 나중에."
+            ? // 묶음 제목이 이미 축과 순서를 말하므로 이 줄은 **묶음이 안 하는 일**(무엇을 하면 되는지)만
+              // 한다. 옛 문구 "아는 소리로 시작할 수 있는 것부터" 는 가르는 축이 소리였을 때의 말이라
+              // 지금은 틀린 데다 묶음 제목과 같은 말을 두 번 했다 (docs/FLOW.md 1장 F03 행).
+              "하나씩 알아 / 몰라만 골라."
             : "여기서 새로 배울 건 없어. 다른 자료를 넣어 봐."}
       </Lead>
       <Space h={22} />
