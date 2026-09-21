@@ -81,6 +81,7 @@ export function Card({
   children,
   tint,
   list,
+  flush,
   style,
 }: {
   children: ReactNode;
@@ -88,10 +89,12 @@ export function Card({
   tint?: boolean;
   /** 행(Row) 목록용 패딩 */
   list?: boolean;
+  /** 라벨 없이 행만 서는 카드. 첫 줄 위·끝 줄 아래를 카드 여백에 맞춰 대칭으로 만든다. */
+  flush?: boolean;
   style?: CSSProperties;
 }) {
   return (
-    <section className={cx(s.card, tint && s.cardTint, list && s.cardList)} style={style}>
+    <section className={cx(s.card, tint && s.cardTint, list && s.cardList, flush && s.cardFlush)} style={style}>
       {children}
     </section>
   );
