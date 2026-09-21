@@ -98,6 +98,17 @@ async function main() {
   await client.connect();
   try {
     /*
+      **그 계정이 있는지 먼저 본다.** 없는 id 를 주면 아래 질의가 전부 0 을 돌려주고 출력은
+      "표본 없음" 이 된다 — **오타와 「아직 안 쌓였다」가 구분이 안 된다.** D+14 에 그걸 받아들고
+      "2주를 썼는데 아무것도 안 남았다" 로 읽으면 그날 하루를 엉뚱한 데서 쓴다. 돌려 보고 알았다.
+    */
+    const { rows: who } = await client.query<{ id: string }>("SELECT id FROM users WHERE id = $1", [userId]);
+    if (!who[0]) {
+      console.error(`그런 계정이 없다: ${userId}`);
+      console.error("users.id 를 그대로 줘야 한다. 계정이 맞는데 이 말이 나오면 DB 를 잘못 보고 있는 것이다.");
+      process.exit(1);
+    }
+    /*
       ── 1. 재만남 인식률 ──────────────────────────────────────────────────────
       분모: 카드를 착지한 한자 중, 착지 +3일 뒤에 넣은 자료에서 **다시 나온 것** (MEASURE 1장).
             다시 안 나온 글자는 분모에 안 넣는다 — 그건 앱의 효과가 아니라 자료 선택을 재는 것이다.
