@@ -1,10 +1,11 @@
 /**
- * **Jessi 가 보는 창에서 화면마다 둘을 본다.**
+ * **Jessi 가 보는 창에서 화면마다 셋을 본다.**
  *   pnpm design:fold                      — http://localhost:3000
  *   pnpm design:fold http://localhost:4000
  *
  *   (가) 주 버튼이 스크롤 없이 보이는가
  *   (나) 나가는 길이 눌러 보이는가 — 옆에 선 글자와 **눈으로** 갈리는가
+ *   (다) 붙은 막대가 글자를 가리나 — 바닥에 고정된 것 밑으로 글자가 들어가지 않는가
  *
  * `docs/SPEC.md` 9장 MVP 범위의 첫 방문 칸을 켜는 조건이 이 둘이고, 이 스크립트가 그 조건이다.
  * 문장으로만 적어 두면 다음 사람이 폰으로 한 번 열어 보고 「봤다」고 켠다.
@@ -16,8 +17,17 @@
  * 이미 보고도 0.02% 라고 적었다 — **재던 축이 「참고와 같은가」 하나뿐이라서** 넘친다는 사실이
  * 퍼센트 안으로 사라졌다.
  *
- * **그래서 이 도구는 참고를 안 본다.** 앱만 열어서 **사람 쪽 두 가지**를 잰다. 기준이 바깥에
+ * **그래서 이 도구는 참고를 안 본다.** 앱만 열어서 **사람 쪽 세 가지**를 잰다. 기준이 바깥에
  * 있으니 참고와 앱이 같이 틀려도 걸린다.
+ *
+ * **(다) 는 (가) 를 고치면서 생긴 축이다.** 주 버튼을 창 바닥에 붙이자(2026-09-21) **접히는 것과
+ * 가리는 것이 갈렸다** — 붙은 막대는 접히지 않으면서 그 아래 글자를 덮을 수 있다. (가) 는 그걸
+ * 못 본다. 실제로 그날 붙는 요소에 배경을 잘못 줘서 **주 버튼이 통째로 회색**이 된 채로 (가)·(나)
+ * 가 25/25 초록이었다(잡은 건 `design:diff` 였다). **자 하나가 초록인 것과 괜찮은 것은 다른 말이다.**
+ *
+ * **지금은 이 열이 처음부터 전부 0 이다. 그게 맞다** — 자는 결함이 있을 때 세우는 게 아니라
+ * **결함이 안 생겼다는 것을 계속 말해 주려고** 세운다. 다음에 누가 붙는 요소를 하나 더 만들면
+ * 그때 빨개진다.
  *
  * **자는 `scripts/design/frame.ts` 의 `VIEW_W × VIEW_H` 다** — 참고 틀(390×844)이 아니라
  * Jessi 의 폰에서 실제로 보이는 창(360×650). 그 수가 어떻게 나왔는지는 그 파일에 적혀 있다.
@@ -88,7 +98,91 @@ const PROBE = `(function () {
  */
 const NO_UP = new Set(["O01", "O02a", "F01"]);
 
-type Row = { id: string; route: string; fold: string; exit: string; ok: boolean };
+/**
+ * **(다) 붙은 막대가 글자를 가리나.** 끝까지 내린 상태에서 잰다 — 붙은 요소가 **쉬는 자리**에
+ * 서 있을 때도 글자를 덮으면 그건 스크롤로 못 푸는 가림이다.
+ *
+ * 세 가지를 지킨다:
+ *
+ *  1. **잎 노드만 센다.** 부모를 세면 `main` 부터 전부 걸려서 수가 뜻을 잃는다.
+ *  2. **붙은 요소 자신과 그 자식은 뺀다.** 버튼 글자는 제 버튼 위에 있는 것이지 가려진 게 아니다.
+ *  3. **칠하는 띠까지 넓혀 잰다.** 붙은 줄의 배경을 가짜 요소(`::before`·`::after`)로 제 상자보다
+ *     넓게 깔아 둔 자리가 있다(`ui.module.css` 의 버튼 줄 둘레 띠). 요소 상자만 재면 **내가
+ *     방금 넣은 그 띠를 자가 못 본다.** 절대 위치 가짜 요소의 음수 `inset` 과 `top:100%` 만큼
+ *     바깥으로 넓힌다. 퍼센트로 남는 값은 못 읽으니 건너뛴다 — 못 잰 것을 잰 척하지 않는다.
+ *
+ * **비침도 같이 본다.** 배경이 반투명하거나 `opacity < 1` 인 붙은 요소는 밑이 비쳐 읽힌다.
+ * 그때는 그 아래 글자를 **가려진 것으로 센다** — 덮은 것과 비친 것은 사용자에게 같은 일이다.
+ * 제 배경이 비쳐도 **가짜 요소가 불투명하게 깔아 주면** 비치지 않는다(지금 버튼 줄이 그 꼴이다).
+ */
+const COVER = `(function () {
+  function alpha(c) {
+    var m = /rgba?\\(([^)]+)\\)/.exec(c);
+    if (!m) return c === "transparent" ? 0 : 1;
+    var p = m[1].split(",");
+    return p.length > 3 ? parseFloat(p[3]) : 1;
+  }
+  function px(v) { return /px$/.test(v) ? parseFloat(v) : NaN; }
+
+  /** 요소 상자 + 그 요소가 **칠하는** 가짜 요소 띠 */
+  function painted(el) {
+    var r = el.getBoundingClientRect();
+    var box = { top: r.top, bottom: r.bottom, left: r.left, right: r.right, opaque: alpha(getComputedStyle(el).backgroundColor) === 1 };
+    ["::before", "::after"].forEach(function (which) {
+      var cs = getComputedStyle(el, which);
+      if (!cs || cs.content === "none" || cs.position === "static") return;
+      var t = px(cs.top), b = px(cs.bottom), l = px(cs.left), ri = px(cs.right), h = px(cs.height);
+      if (!isNaN(t) && t < 0) box.top = Math.min(box.top, r.top + t);
+      if (!isNaN(l) && l < 0) box.left = Math.min(box.left, r.left + l);
+      if (!isNaN(ri) && ri < 0) box.right = Math.max(box.right, r.right - ri);
+      if (!isNaN(b) && b < 0) box.bottom = Math.max(box.bottom, r.bottom - b);
+      // top 이 요소 높이와 같으면 100% 로 붙인 띠다 — 그 아래로 height 만큼 더 칠한다
+      if (!isNaN(t) && !isNaN(h) && Math.abs(t - r.height) < 1) box.bottom = Math.max(box.bottom, r.bottom + h);
+      if (alpha(cs.backgroundColor) === 1) box.opaque = true;
+    });
+    return box;
+  }
+
+  var stuck = Array.prototype.slice.call(document.querySelectorAll("body *")).filter(function (e) {
+    var p = getComputedStyle(e).position;
+    return p === "sticky" || p === "fixed";
+  });
+  var bars = stuck.map(function (e) {
+    var b = painted(e);
+    b.el = e;
+    b.seeThrough = !b.opaque || parseFloat(getComputedStyle(e).opacity) < 1;
+    b.text = (e.innerText || "").replace(/\\s+/g, " ").slice(0, 12);
+    return b;
+  });
+
+  // 잎 노드 글자만. 붙은 요소 자신과 그 자식은 뺀다.
+  var leaves = Array.prototype.slice.call(document.querySelectorAll("body *")).filter(function (e) {
+    if (e.children.length) return false;
+    if (!(e.innerText || "").trim()) return false;
+    for (var i = 0; i < stuck.length; i++) if (stuck[i] === e || stuck[i].contains(e)) return false;
+    return true;
+  });
+
+  var hidden = [];
+  leaves.forEach(function (e) {
+    var r = e.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return;
+    for (var i = 0; i < bars.length; i++) {
+      var b = bars[i];
+      var over = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
+      var side = Math.min(r.right, b.right) - Math.max(r.left, b.left);
+      if (over > 1 && side > 1) { hidden.push({ text: (e.innerText || "").trim().slice(0, 10), bar: b.text }); break; }
+    }
+  });
+
+  return {
+    bars: bars.length,
+    seeThrough: bars.filter(function (b) { return b.seeThrough; }).map(function (b) { return b.text; }),
+    hidden: hidden,
+  };
+})()`;
+
+type Row = { id: string; route: string; fold: string; exit: string; cover: string; ok: boolean };
 
 async function main() {
   const base = (process.argv[2] ?? "http://localhost:3000").replace(/\/$/, "");
@@ -99,12 +193,17 @@ async function main() {
 
   for (const [id, route] of Object.entries(ROUTES)) {
     let r: Awaited<ReturnType<typeof page.evaluate>>;
+    let cv: Awaited<ReturnType<typeof page.evaluate>>;
     try {
       await page.goto(base + route, { waitUntil: "networkidle", timeout: 20000 });
       await page.evaluate("document.fonts.ready");
       r = await page.evaluate(PROBE);
+      // (다) 는 **끝까지 내린 뒤** 잰다. 붙은 것이 쉬는 자리로 돌아간 상태에서도 덮으면 그게 진짜 가림이다.
+      await page.evaluate("window.scrollTo(0, document.scrollingElement.scrollHeight)");
+      await page.waitForTimeout(80);
+      cv = await page.evaluate(COVER);
     } catch {
-      rows.push({ id, route, fold: "못 열었다", exit: "—", ok: false });
+      rows.push({ id, route, fold: "못 열었다", exit: "—", cover: "—", ok: false });
       continue;
     }
     const m = r as {
@@ -144,16 +243,28 @@ async function main() {
       exit = okB ? `갈림 (같은 항목 ${same.length}/4)` : `옆 글자와 똑같음 (${m.link!.color})`;
     }
 
-    rows.push({ id, route, fold, exit, ok: okA && okB });
+    // (다) 붙은 막대가 글자를 가리나
+    const c = cv as { bars: number; seeThrough: string[]; hidden: { text: string; bar: string }[] };
+    const okC = c.hidden.length === 0 && c.seeThrough.length === 0;
+    const cover =
+      c.bars === 0
+        ? "붙은 것 없음"
+        : c.hidden.length > 0
+          ? `▲ ${c.hidden.length}자 가려짐 (${c.hidden[0].text} — ${c.hidden[0].bar})`
+          : c.seeThrough.length > 0
+            ? `비치는 막대 ${c.seeThrough.length} (${c.seeThrough[0]})`
+            : `안 가림 (막대 ${c.bars})`;
+
+    rows.push({ id, route, fold, exit, cover, ok: okA && okB && okC });
   }
   await browser.close();
 
   const bad = rows.filter((r) => !r.ok);
   console.log(`Jessi 가 보는 창 ${VIEW_W}×${VIEW_H} — 화면 ${rows.length}장\n`);
-  console.log("      화면  라우트                  (가) 주 버튼            (나) 나가는 길");
+  console.log("      화면  라우트                  (가) 주 버튼          (나) 나가는 길          (다) 가림");
   for (const r of rows)
     console.log(
-      `${r.ok ? "  통과" : "  실패"}  ${r.id.padEnd(6)}${r.route.padEnd(24)}${r.fold.padEnd(22)}${r.exit}`,
+      `${r.ok ? "  통과" : "  실패"}  ${r.id.padEnd(6)}${r.route.padEnd(24)}${r.fold.padEnd(20)}${r.exit.padEnd(24)}${r.cover}`,
     );
   console.log(`\n${rows.length - bad.length} 통과 / ${bad.length} 실패`);
   if (bad.length) {
