@@ -107,6 +107,22 @@ async function main() {
             return { text: (el.textContent || "").trim().slice(0, 14), h: Math.round(r.height), w: Math.round(r.width) };
           })
           .filter((x) => x.h < tapMin || x.w < tapMin),
+        // **선언한 간격이 실제로 그 값인가.** 틀이 `display:flex` 라 자식의 `flex-shrink` 가 1 이고,
+        // 내용이 틀보다 크면 **넘치는 대신 여백이 줄어든다.** 그러면 `scrollHeight` 는 안 넘쳐서
+        // 위 `overflow` 가 조용히 통과하는데 **간격은 전부 틀려 있다** — F16 을 900·920·950 으로
+        // 두는 동안 24·18·10·16 이 16·12·7·11 로 눌려 있었고 검사는 세 번 다 통과했다.
+        // 그래서 **선언한 높이와 잰 높이를 맞대 본다.** 눌린 여백은 넘침의 다른 얼굴이다.
+        squeezed: [...frame.children]
+          .map((c) => {
+            const m = (c.getAttribute("style") || "").match(/height:\s*(\d+)px/);
+            if (!m) return null;
+            const want = Number(m[1]);
+            const got = Math.round(c.getBoundingClientRect().height);
+            // **줄어든 것만 본다.** 늘어난 것(`flex-grow` 가 같이 붙은 여백)은 의도한 것이고,
+            // 눌린 것만 「틀이 내용보다 작다」를 뜻한다.
+            return got >= want ? null : { want, got };
+          })
+          .filter((x): x is { want: number; got: number } => x !== null),
         frameH: frame.clientHeight,
         text: (frame.innerText || "").replace(/\s+/g, " "),
         hrefs: links.map((a) => a.getAttribute("href") || ""),
@@ -115,6 +131,9 @@ async function main() {
     }, TAP_MIN);
 
     if (found.overflow) problems.push(`${id}: 틀(${found.frameH}px)을 넘친다`);
+    for (const q of found.squeezed) {
+      problems.push(`${id}: 선언한 여백 ${q.want}px 이 ${q.got}px 로 눌렸다 — 틀(${found.frameH}px)이 내용보다 작다`);
+    }
     if (found.frameH > H) tall.push(`${id}(${found.frameH}px)`);
     for (const s of found.small) problems.push(`${id}: 탭 영역 ${s.w}×${s.h} — "${s.text}" (가로·세로 ${TAP_MIN}px 이상이어야 한다)`);
     for (const href of found.hrefs) {
