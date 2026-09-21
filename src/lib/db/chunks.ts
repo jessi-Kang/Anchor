@@ -54,8 +54,17 @@ export type ChunkRow = {
 /**
  * `text` 가 빈 문자열이면 **영어 문장을 아직 안 만든 것**이다 (F13 → F17 사이).
  * 추측 화면(F17)이 열려 있는 동안 답이 DB 에도 없어야 새어 나갈 자리가 아예 없다.
+ *
+ * **폴백 행도 영어가 없는 것으로 친다.** 게이트가 서기 전에 들어간 행은 `text` 에 **사용자가 쓴
+ * 한국어**가 들어 있다. 지어낸 영어가 아니라 다른 언어가 들어앉은 것이라, 있는 것으로 치면
+ * 그 행은 **영영 안 낫는다** — F14 가 F17 로 안 보내니 다시 만들 길이 없고, 그동안 F18 목록에서
+ * 한국어 한 줄이 영어 덩어리 자리에 앉아 있고 듣기가 그걸 영어 목소리로 읽는다.
+ *
+ * 지우지도 숨기지도 않는다. **열면 낫는다** — 첫 탭에 F17 로 가서 다시 만들고, 그 뒤로는 진짜
+ * 영어다 (PM 판정). 숨기면 닿을 길이 없어져서 오히려 영영 안 낫는다.
  */
-export function hasEnglish(row: Pick<ChunkRow, "text">): boolean {
+export function hasEnglish(row: Pick<ChunkRow, "text" | "meta">): boolean {
+  if (row.meta.content_source === "fallback") return false;
   return row.text.trim().length > 0;
 }
 
@@ -106,7 +115,14 @@ export async function getSituation(
         그대로 있어야 "없어졌다" 가 아니라 "아직 확인 중" 으로 읽힌다.
         **영어 문장(`text`)은 여전히 안 돌려준다** — 이 화면이 답을 들고 있으면 안 된다.
       */
-      `SELECT situation, btrim(text) <> '' AS done, meta ->> 'guess' AS guess
+      /*
+        **폴백 행은 `done` 이 아니다.** `hasEnglish` 와 같은 눈으로 봐야 한다 — 여기만 "있다" 고
+        하면 F17 이 F14 로 보내고 F14 는 영어가 없다며 다시 여기로 보내 **두 화면이 끝없이 돈다.**
+        고치려던 행이 하필 닿을 수 없는 행이 된다.
+      */
+      `SELECT situation,
+              btrim(text) <> '' AND coalesce(meta ->> 'content_source', '') <> 'fallback' AS done,
+              meta ->> 'guess' AS guess
          FROM chunks WHERE user_id = $1 AND id = $2`,
       [userId, id],
     );
@@ -180,6 +196,11 @@ export async function pastChunks(userId: string, lang: Lang3 = "en"): Promise<Pa
  *
  * 이미 문장이 있으면 덮지 않는다. 같은 상황에 매번 다른 영어가 나오면 "그때 그 말" 이 아니게 된다.
  *
+ * **폴백 행에는 쓴다.** `btrim(text) = ''` 를 없애는 게 아니다 — 그 조건의 일은 **멀쩡한 영어를
+ * 덮어쓰지 않는 것**이고 그건 그대로 필요하다. 폴백 행은 정의상 멀쩡한 영어가 아니라(사용자가 쓴
+ * 한국어가 들어 있다) 거기만 정확히 열어 준다. 곡선 기준선 걱정도 여기선 반대다 — 그 행의 1회차
+ * 기준선은 **영어 목소리가 한국어를 읽은 소리**라 지켜 봐야 뜻이 없다.
+ *
  * **그리고 이건 측정의 전제이기도 하다.** 곡선 기준선은 1회차에 뽑아 고정한다(`docs/MEASURE.md`
  * 2장). 나중에 누가 이 문장을 고치면 **옛 문장의 기준선과 새 문장을 말한 내 곡선**을 겨누게 되고,
  * 화면에는 멀쩡한 숫자가 뜬다 — 조용히 깨지는 종류다. 그래서 `btrim(text) = ''` 조건은 화면 편의가
@@ -208,7 +229,8 @@ export async function saveEnglish(
           SET text = $3::text,
               attitude = coalesce(attitude, $4),
               meta = meta || jsonb_build_object('chunk', $5::text, 'content_source', $6::text)
-        WHERE user_id = $1 AND id = $2 AND btrim(text) = ''`,
+        WHERE user_id = $1 AND id = $2
+          AND (btrim(text) = '' OR meta ->> 'content_source' = 'fallback')`,
       [userId, id, english.text, english.attitude, english.chunk, english.source],
     );
   });

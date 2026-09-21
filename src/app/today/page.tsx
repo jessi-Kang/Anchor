@@ -62,7 +62,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const home = homeRedirect(settings);
   if (home) redirect(home);
   const langs = enabledLanguages(settings);
-  const inputs = await listInputs(user.id, 10);
+  const inputs = await listInputs(user.id);
   if (inputs.length === 0) {
     // 켠 언어가 하나면 버튼 하나로 충분하다. 둘 이상이면 행이 없으면 **첫 언어 말고는 들어갈 길이 없다** —
     // 이미 켠 언어는 O02a 가 통과시키지 않으므로 주소를 손으로 치는 수밖에 없었다. 1장 2 의

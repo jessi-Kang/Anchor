@@ -4,7 +4,7 @@ import { listInputs } from "@/lib/db/inputs";
 import { litToday, spokenToday } from "@/lib/db/today";
 import { inputProgress, freshKanji } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
-import { Screen, Space, Title, Card, Label, Row, Pill, Grow, Button } from "@/components/ui";
+import { Screen, Space, Title, Card, Row, Pill, Grow, Button } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +51,7 @@ export default async function DonePage({ searchParams }: { searchParams: Promise
       돌아가는 사람 몫으로 자료·진행도를 훑지 않는다.
     */
     if (lit.length === 0 && spoken.length === 0) redirect("/today");
-    const inputs = await listInputs(user.id, 20);
+    const inputs = await listInputs(user.id);
     const progs = await Promise.all(inputs.filter((i) => i.lang === "ja").map((i) => inputProgress(user.id, i)));
     // 아직 안 만난 한자는 자료마다 나오니 글자로 모은다 — 같은 한자가 두 기사에 있어도 하나다.
     waiting = [...new Set(progs.flatMap(freshKanji))];
@@ -62,8 +62,13 @@ export default async function DonePage({ searchParams }: { searchParams: Promise
       <Space h={28} />
       <Title lg>오늘 켜진 것</Title>
       <Space h={22} />
-      <Card>
-        <Label>그래프</Label>
+      {/*
+        **라벨이 없다.** "그래프" 는 우리끼리 쓰는 말이라 화면에 안 쓴다 (CLAUDE.md 내부 용어 금지,
+        docs/FLOW.md 1′장 F15 행). 라벨 없이 서는 게 이 화면에서만 되는 이유는 **바로 위 h1
+        ("오늘 켜진 것")이 이 카드가 무엇인지 이미 말하고 있어서**다 (디자인 확인).
+        `flush` 는 라벨이 만들던 위 간격을 카드 여백으로 대신 맞춘다.
+      */}
+      <Card flush>
         {lit.length > 0 && <Row title={lit.join(" ")} sub={`한자 ${lit.length}`} right={<Pill on>켜짐</Pill>} plain />}
         {spoken.length > 0 && (
           <Row title={spoken.join(" · ")} sub={`말해본 것 ${spoken.length}`} right={<Pill on>켜짐</Pill>} plain />
