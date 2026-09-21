@@ -79,6 +79,11 @@ async function main() {
   const problems: string[] = [];
   // 센 자리. 「어긋난 곳 없음」을 낼 때 **무엇을 몇 개 봤는지**를 같이 찍는다.
   const looked = { tap: 0, link: 0, spacer: 0, term: 0, overflow: 0, primary: 0 };
+  // 화면마다 몇 자리를 봤나. **합계만 있으면 「어느 화면이 덜 걸렸나」가 안 보인다** — 쉰두 장이
+  // 고르게 걸린 896 과 한 장이 다 채운 896 이 같은 줄로 나온다. 그래서 **제일 적게 걸린 쪽**을
+  // 같이 찍는다. **적다고 틀린 것은 아니다** — 로그인(O01)처럼 원래 누를 것이 하나뿐인 화면이 있다.
+  // 이 수가 말하는 것은 **그 화면의 「없음」이 몇 자리에 기대고 있나**다. 적으면 적은 만큼만 믿는다.
+  const perScreen: { id: string; n: number }[] = [];
   const tall: string[] = [];
   const INTERNAL = internalTerms();
 
@@ -142,6 +147,7 @@ async function main() {
       };
     }, { tapMin: TAP_MIN, frameStyle: FRAME_STYLE });
 
+    perScreen.push({ id, n: found.tapCount + found.hrefs.length + found.spacerCount + INTERNAL.length + 2 });
     looked.overflow += 1;
     looked.primary += 1;
     looked.tap += found.tapCount;
@@ -171,9 +177,13 @@ async function main() {
     process.exit(1);
   }
   const total = looked.tap + looked.link + looked.spacer + looked.term + looked.overflow + looked.primary;
+  const thin = [...perScreen].sort((x, y) => x.n - y.n).slice(0, 3);
   console.log(
     `화면 ${ids.length}장 · 잰 자리 ${total}곳 (탭 영역 ${looked.tap} · 링크 ${looked.link} · 선언한 여백 ${looked.spacer} · 내부 용어 ${looked.term} · 넘침 ${looked.overflow} · 주 버튼 ${looked.primary}), 규칙 어긋난 곳 없음`,
   );
+  if (ids.length > 3) {
+    console.log(`제일 적게 걸린 화면: ${thin.map((t) => `${t.id}(${t.n})`).join(" · ")} — 이 화면들의 「없음」은 그만큼만 뒷받침된다`);
+  }
   /*
     **틀을 키우면 넘침이 사라진다.** 고의가 아니라 실수로 그렇게 된다 — `844` 고정은 못 속이는데
     제가 선언한 틀은 속일 수 있다. 그래서 **선언이 조용해지지 않게** 한 줄로 남긴다.
