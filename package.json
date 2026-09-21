@@ -26,7 +26,8 @@
     "fallbacks": "tsx scripts/fallbacks.ts",
     "test:db": "tsx scripts/db-provenance.ts && tsx --test scripts/test/*.test.ts",
     "verify": "pnpm typecheck && pnpm lint && pnpm build && pnpm test:db",
-    "push": "bash scripts/push.sh"
+    "push": "bash scripts/push.sh",
+    "seed:sql": "tsx scripts/seed-sql.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
