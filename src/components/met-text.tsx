@@ -65,7 +65,18 @@ export function MetText({
     const runChars = Array.from(run.text);
     const allMet = runChars.every((ch) => met.has(ch));
     const isOpen = opened.includes(i);
-    const reading = allMet && isOpen ? readings?.[i] : undefined;
+    /*
+      **열 것이 있을 때만 열 수 있다.** 읽기를 못 구한 자료(후리가나 생성 실패, 또는 키가 없는
+      환경)에서는 `readings` 가 통째로 없다. 전에는 그래도 탭 영역을 만들어서, 탭하면 `opened`
+      만 바뀌고 **ruby 는 끝내 안 떴다** — 화면은 눌리는 척하는데 아무 일도 안 일어났고,
+      `aria-label` 은 "읽기 보기" 에서 "읽기" 로 바뀌어 **열렸다고 거짓말까지 했다.**
+
+      `docs/MEASURE.md` 1장이 F12 의 조건 셋 중 하나로 "읽기는 **언제나** 한 번 탭이면 열린다"
+      를 못박는다. 열 수 없는 자리를 눌리게 두면 그 조건이 깨지고, 그 화면에서 나온 판정도
+      같이 못 쓴다 (`finishRead` 가 그런 덩어리를 `null` 로 적는 이유가 그것이다).
+    */
+    const openable = allMet && !!readings?.[i];
+    const reading = openable && isOpen ? readings?.[i] : undefined;
     // 판정은 글자마다, **그리는 것은 붙어 있는 만큼 한 덩어리로.** 글자마다 틴트 상자를 씌우면
     // 상자마다 좌우 여백이 들어가 協 力 사이에 흰 틈이 생기고, 한 낱말이 두 조각으로 보인다.
     const glyphs = runChars
@@ -82,7 +93,7 @@ export function MetText({
         </span>
       ));
 
-    if (allMet) {
+    if (openable) {
       // 탭 영역은 글자 자체다 — 따로 키우면 옆 글자를 덮는다. 본문 줄높이(2.3)가 세로를 벌어 준다.
       out.push(
         <span
@@ -103,7 +114,7 @@ export function MetText({
         </span>,
       );
     } else {
-      // 안 만난 글자가 섞인 덩어리. **읽기를 그대로 단다.** 그 글자는 카드에서 풀 것이고, 카드가
+      // 안 만난 글자가 섞인 덩어리(또는 읽기를 못 구한 덩어리). **읽기가 있으면 그대로 단다.** 그 글자는 카드에서 풀 것이고, 카드가
       // 묻는 것은 읽기가 아니라 뜻이다(Scene3 의 질문 = `payload.question`, 읽기는 Scene4 에서야
       // 나온다). 그래서 여기 읽기를 달아도 추측 전에 답을 주지 않는다. 새는 것은 한국어 발판인데,
       // 그건 안 만난 글자가 섞인 낱말에 "타협" 을 안 붙이는 규칙이 이미 막고 있다 (docs/FLOW.md 1′장).
