@@ -76,7 +76,7 @@ C6~C13 은 음성 원본에 대한 것이다. `/api/recordings` 가 들어오면
 | E2 | `/api/cron/backup` 이 `CRON_SECRET` 없이 호출되지 않는다 | 헤더 없이 호출해 본다 |
 | E3 | 어떤 백업에도 Google OAuth 토큰이 담기지 않는다 | 백업이 뜨는 표와 컬럼 목록 (세 층 전부) |
 | E4 | 복구 절차가 역할·권한·RLS 까지 되살린다 | `db/recovery/reapply-roles-and-rls.sql` |
-| E5 | 복구 절차가 프로덕션에 실제로 적용된 스키마를 그대로 다시 만든다 | `/api/health` 의 `latest_migration` 과 `main` 의 `db/migrations/` 를 맞춰 본다 |
+| E5 | 복구 절차가 프로덕션에 실제로 적용된 스키마를 그대로 다시 만든다 | `/api/health` 의 `migrations` — `ledger_latest` 와 `repo_latest` 가 같고 `ledger_only` 와 `missing` 이 **둘 다 비어 있어야** 한다. 전에는 `latest_migration` 한 값을 봤는데, 그건 원장에서 이름 역순 첫 줄이라 **레포에 없는 이름도 「최신」으로 나갔다** |
 | E6 | 복구 뒤 같은 Google 계정이 같은 `user_id` 로 이어진다 | 복원 스크립트가 넣는 표 목록 |
 | E7 | 복구 리허설이 분기마다 실제로 수행된다 | `docs/BACKUP.md` 의 리허설 표 |
 

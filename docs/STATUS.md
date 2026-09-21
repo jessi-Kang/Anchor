@@ -52,7 +52,7 @@
 | 마이그레이션 | `db/migrations/` 에 0001 스키마·역할, 0002 RLS, 0003 소유자 읽기, 0004 `users.settings` 구조, 0005 준비 단계 제거, 0006 `node_cards`, 0007 측정 열, 0008 `recordings.client_id`. **프로덕션은 0008 까지 적용됨** — 0007 은 2026-09-21 04:29:38 UTC, 0008 은 04:29:48 UTC. 원장에서 읽은 체크섬은 `db/README.md` 에 있다 |
 | 표 | 11개. `users` · `inputs` · `nodes` · `edges` · `user_node_state` · `cards` · `node_cards` · `chunks` · `recordings` · `encounters` · `account_deletions` |
 | RLS | 11개 표 전부 `ENABLE` + `anchor_app` 정책. `FORCE` 는 0003 이 해제한다(소유자 연결이 백업을 위해 전체를 읽는다) |
-| 프로덕션 확인 | `GET /api/health` → `ok:true`, `db_role: anchor_app`, `role_bypasses_rls: false`, `rls_all_enabled: true`, 표 11개 전부 `rowsecurity: true`. **2026-09-21 06시에 다시 읽었다: `latest_migration` 은 `0008_recordings_client_id.sql`** — 원장과 같다. 어긋난 것이 없다 |
+| 프로덕션 확인 | `GET /api/health` → `ok:true`, `db_role: anchor_app`, `role_bypasses_rls: false`, `rls_all_enabled: true`, 표 11개 전부 `rowsecurity: true`. **2026-09-21 06시에 다시 읽었다: 당시 필드 `latest_migration` 이 `0008_recordings_client_id.sql`** — 원장과 같다. 그 필드는 지금 `migrations`(`ledger_latest`·`repo_latest`·`ledger_only`·`missing`·`applied`)로 갈렸다. `latest_migration` 은 원장 이름 역순 첫 줄이라 **원장에만 있는 줄을 못 보여 준다** — 다음에 읽을 때는 `ledger_only` 가 빈 배열인지까지 적는다 |
 | 백업 1층 PITR | Neon 히스토리. 상시. 보존 기간은 `docs/BACKUP.md` |
 | 백업 2층 배포 전 스냅샷 | `pnpm vercel-build` 가 `scripts/backup/neon-snapshot.ts --pre-deploy` 를 먼저 돌린다 |
 | 백업 3층 매일 JSON | `vercel.json` cron 이 매일 18:17 UTC 에 `/api/cron/backup` 호출 → Vercel Blob `anchor-backups`. 보존 35일 |
