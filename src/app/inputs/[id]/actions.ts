@@ -78,9 +78,10 @@ export async function startCard(inputId: string, kanji: string) {
  * 만난 한자는 전부 `recognized = false`, 안 연 덩어리의 만난 한자는 `true` 다 — 실제로 일어난
  * 행동 하나가 그것이다. 묻지 않았으니 자기 보고가 아니고, 점수도 정답도 없으니 시험이 아니다.
  *
- * **판정이 일어날 수 없었던 자리는 `null` 로 적는다.** 妥協 처럼 안 만난 글자가 섞인 덩어리에서는
- * 그 안의 만난 글자에 **판정이 일어난 적이 없다.** true 로 적으면 기회가 없던 것을 "열지 않고
- * 읽었다" 로 세게 되어 분자가 부푼다. 그렇다고 안 적으면 분모가 왜 작은지를 못 가른다 — 자료에 안
+ * **판정이 일어날 수 없었던 자리는 `null` 로 적는다.** 그런 자리가 둘이다. 妥協 처럼 안 만난
+ * 글자가 섞인 덩어리, 그리고 **읽기를 못 구해 애초에 열 수가 없던 덩어리**(후리가나 생성 실패,
+ * 또는 키가 없는 환경). 둘 다 그 안의 만난 글자에 **판정이 일어난 적이 없다.** true 로 적으면
+ * 기회가 없던 것을 "열지 않고 읽었다" 로 세게 되어 분자가 부푼다. 그렇다고 안 적으면 분모가 왜 작은지를 못 가른다 — 자료에 안
  * 나와서 작은 것과 섞인 덩어리에 갇혀서 작은 것은 손쓸 방법이 다르다. 그래서 적되 분모에서 빼고,
  * 그 수를 `pnpm measure` 가 따로 보여 준다 (`docs/MEASURE.md` 0′장).
  *
@@ -93,12 +94,19 @@ export async function finishRead(inputId: string, opened: number[]) {
     const prog = await inputProgress(user.id, input);
     const nodeOf = new Map(prog.nodes.map((n) => [n.key, n.id]));
     const open = new Set(opened);
+    /*
+      **읽기가 없으면 판정도 없다.** 화면이 그 덩어리를 눌리지 않게 두므로(`met-text.tsx`)
+      사용자는 열 수도, 안 열고 읽어 낼 수도 없다. 그런데 "안 열었다" 는 여기서 true 가 되므로,
+      거르지 않으면 **읽기를 한 번도 못 만든 자료가 인식률 100% 로 들어온다.** 화면과 같은 값을
+      봐야 갈라지지 않는다 — 그래서 `meta.readings` 를 여기서도 읽는다.
+    */
+    const readings = input.meta.readings;
     const rows = runStates(input.body, prog.anchors)
       .flatMap((run, i) =>
-        run.allMet
+        run.allMet && readings?.[i]
           ? run.chars.map((c) => ({ ch: c, recognized: !open.has(i) as boolean | null }))
-          : // 안 만난 글자가 섞인 덩어리. 그 안의 **만난 글자**는 만나기는 했으나 판정이 일어날 수
-            // 없었으므로 null 로 적는다. 안 만난 글자는 애초에 이 지표의 대상이 아니라 안 적는다.
+          : // 안 만난 글자가 섞였거나 읽기가 없는 덩어리. 그 안의 **만난 글자**는 만나기는 했으나
+            // 판정이 일어날 수 없었으므로 null 로 적는다. 안 만난 글자는 이 지표의 대상이 아니라 안 적는다.
             run.met.map((c) => ({ ch: c, recognized: null as boolean | null })),
       )
       // 같은 글자가 두 덩어리에 나오면 **판정이 일어난 쪽**이 이긴다 — 한 자리에서 실제로 읽어 낸

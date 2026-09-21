@@ -33,6 +33,16 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
     const card = await getCard(user.id, id);
     if (!card) notFound();
     if (!card.revealed_at) redirect(`/cards/${id}/3`);
+    /*
+      **착지 안 한 카드는 들어올 때 막는다** — `graph/page.tsx` 가 이미 같은 줄을 갖고 있는데
+      여기만 없었다. 그래서 주소를 직접 치거나 오래된 링크로 들어오면 **듣기·말하기를 다 한 뒤에**
+      "됐어, 다음" 에서 그래프가 튕겨 Scene5 로 돌려보냈다. 자리에서 보면 "됐어를 눌렀는데 카드로
+      돌아왔다" 이고, 카드를 끝낼 수 없는 것처럼 보인다.
+
+      **들어올 때 막으면 될 것을 나갈 때 막고 있었다.** 정상 흐름(Scene5 의 `finishCard`)은 착지를
+      시키고 넘기므로 이 줄에 안 걸린다.
+    */
+    if (!card.landed_at) redirect(`/cards/${id}/5`);
     const ctx = await cardContext(user.id, card);
     where = ctx.where;
     // 착지와 같은 함수로 고른다 — 안 만난 한자가 낀 낱말은 여기서 읽기까지 크게 띄우므로
