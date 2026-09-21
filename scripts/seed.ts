@@ -115,6 +115,25 @@ async function main() {
     for (const it of kanji) {
       const seed = seedByKanji.get(it.kanji);
       const koWord = koWords[it.kanji] ?? seed?.ko_word;
+      /*
+        **없는 칸도 `null` 로 적는다. 빼면 안 된다.**
+
+        위 upsert 는 `meta = nodes.meta || EXCLUDED.meta` 다. jsonb `||` 는 **오른쪽에 없는 키를
+        왼쪽에서 그대로 살린다.** 그래서 조건부 전개(`...(x ? { k: x } : {})`)로 칸을 빼면,
+        **파일에서 지운 값이 DB 에서는 안 지워진다.** 적재는 "파일이 말하는 상태"가 아니라
+        "파일이 말한 적 있는 모든 상태의 합"이 된다.
+
+        **돌려서 봤다** (로컬, 2026-09-21): `駅` 의 앵커를 「역」으로 넣어 놓고 — 표에서 뺀 뒤의
+        파일로 — 다시 적재하니 `meta.ko_word` 가 **「역」 그대로 남았다.** F03 은 그 한 칸으로
+        두 묶음을 가르므로, 화면은 표에서 뺀 지 한참 뒤에도 **"역의 역"** 이라고 말한다.
+        규칙 1 이 물린 바로 그 거짓말이 적재를 타고 살아남는 것이다.
+
+        셋 다 같은 모양이라 셋 다 적는다 — 앵커 낱말이 빠질 수 있듯, 한자가 `ja-seed.json` 에서
+        빠지면 예문이, `kanji-cards.json` 에서 빠지면 손 카드가 똑같이 남는다. 지금 그 두 자리가
+        실제로 빠진 적은 없지만, **한 번 빠지면 아무도 화면에서 못 알아본다**(앵커는 오늘 열둘이
+        빠졌고, 그때도 화면만 보고는 몰랐다). 읽는 쪽은 전부 `?? null` 이나 참/거짓이라 `null` 과
+        「없음」을 같게 본다(`meta ->> 'ko_word'` 도 SQL NULL 이다).
+      */
       const meta: Record<string, unknown> = {
         on: it.on,
         kun: it.kun,
@@ -124,9 +143,12 @@ async function main() {
         grade: it.grade,
         freq: it.freq,
         jlpt: it.jlpt,
-        ...(koWord ? { ko_word: koWord } : {}),
-        ...(seed ? { seed: "ja-onboarding", example: seed.example, example_reading: seed.reading, pattern: seed.pattern } : {}),
-        ...(cards[it.kanji] ? { card: cards[it.kanji] } : {}),
+        ko_word: koWord ?? null,
+        seed: seed ? "ja-onboarding" : null,
+        example: seed?.example ?? null,
+        example_reading: seed?.reading ?? null,
+        pattern: seed?.pattern ?? null,
+        card: cards[it.kanji] ?? null,
       };
       const reading = seed?.onyomi ?? it.on[0] ?? null;
       const { rows } = await client.query<{ id: string }>(
