@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { createChunk, getChunk, hasEnglish, saveEnglish, saveGuess } from "@/lib/db/chunks";
+import { createChunk, findSameChunk, getChunk, hasEnglish, pointAt, saveEnglish, saveGuess } from "@/lib/db/chunks";
 import { getSettings } from "@/lib/db/settings";
 import { enabledLanguages } from "@/lib/languages";
 import { getChunkContent } from "@/lib/talk/chunk-content";
@@ -71,17 +71,42 @@ export async function submitGuess(id: string, guess: string) {
   // 못 만들었으면 **추측을 낸 자리에 그대로 세워 둔다.** F14 로 보내면 곡선·듣기·말하기가 할 일이
   // 없어 껍데기가 된다. 여기 남으면 "없어졌다" 도 "답이 비었다" 도 아니고 "아직 확인 중" 으로 읽힌다.
   if (!made) redirect(`/talk/${id}/guess`);
-  await saveEnglish(user.id, id, {
-    text: made.content.english,
-    attitude: made.content.attitude,
-    chunk: made.content.chunk,
-    source: made.source,
-  });
-  redirect(`/talk/${id}`);
+  redirect(await land(user.id, id, made.content));
 }
 
 /**
- * F17a "다시 만들기". **추측은 안 건드리고 영어 문장만 채운다.**
+ * 만든 문장을 행에 적고 **어느 F14 로 갈지** 돌려준다.
+ *
+ * `submitGuess` 와 `retryEnglish` 가 같은 일을 한다. 한쪽에만 이어 붙이기를 넣으면 "다시 해 볼게"
+ * 로 만든 덩어리만 회차가 갈린다 — 같은 값이 두 길로 들어오면 두 길 다 같은 자리를 지나야 한다.
+ */
+async function land(
+  userId: string,
+  id: string,
+  content: { english: string; attitude: string | null; chunk: string },
+): Promise<string> {
+  await saveEnglish(userId, id, {
+    text: content.english,
+    attitude: content.attitude,
+    chunk: content.chunk,
+    source: "claude",
+  });
+  /*
+    **같은 덩어리는 새로 만들지 않는다** (docs/FLOW.md 4장). 먼저 만난 것이 있으면 오늘 행은
+    지우지 않고 **그것을 가리키게** 한 뒤 먼저 것의 F14 로 간다. 회차와 곡선이 거기 쌓인다.
+    새로 만들면 같은 말을 다섯 번 해도 1회차짜리가 다섯 개가 되어 "같은 덩어리 5회차"
+    (`docs/SPEC.md` 9장)를 영영 못 잰다.
+
+    오늘 쓴 상황과 추측은 오늘 행에 그대로 남는다 — 하나도 없어지지 않는다(데이터 원칙).
+  */
+  const first = await findSameChunk(userId, "en", content.chunk, id);
+  if (!first) return `/talk/${id}`;
+  await pointAt(userId, id, first);
+  return `/talk/${first}`;
+}
+
+/**
+ * F17a "다시 해 볼게". **추측은 안 건드리고 영어 문장만 채운다.**
  *
  * `submitGuess` 를 다시 부르면 안 되는 이유가 둘이다. 하나는 그 함수가 추측이 이미 있으면 F14 로
  * 보내는데, 문장이 없는 F14 는 다시 F17 로 보내서 **두 화면이 끝없이 돈다.** 다른 하나는 화면의
@@ -97,11 +122,5 @@ export async function retryEnglish(id: string) {
 
   const made = await getChunkContent(row.situation);
   if (!made) redirect(`/talk/${id}/guess`);
-  await saveEnglish(user.id, id, {
-    text: made.content.english,
-    attitude: made.content.attitude,
-    chunk: made.content.chunk,
-    source: made.source,
-  });
-  redirect(`/talk/${id}`);
+  redirect(await land(user.id, id, made.content));
 }

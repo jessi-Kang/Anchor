@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/server";
-import { getChunk, hasEnglish, type ChunkRow } from "@/lib/db/chunks";
+import { chunkGroup, getChunk, hasEnglish, type ChunkRow } from "@/lib/db/chunks";
 import { loadSpeakLoop, type SpeakLoopData } from "@/lib/speak-loop";
 import { isDesignPreview } from "@/lib/design-preview";
-import { Screen, Space, Card, Label, Mark, uiStyles as s } from "@/components/ui";
+import { Screen, Space, Card, Label, Lead, Mark, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
 import { TalkLoop } from "./talk-loop";
 
@@ -52,6 +52,8 @@ export default async function TalkChunkPage({
   // 루프가 받을 것(회차·마지막 곡선·겨눌 소리 유무)은 한 군데에서 푼다 (lib/speak-loop.ts).
   // 페이지마다 따로 고르다가 F10 이 곡선을 두고 왔다 — 범례는 회차를 말하는데 곡선이 없었다.
   let loop: SpeakLoopData = { startAttempt: 0, startPrev: null, targetVoice: true };
+  // 이 말을 전에도 만났나 (docs/FLOW.md 4장). 미리보기는 참고 화면 그대로 첫 만남이다.
+  let repeated = false;
 
   if (!preview) {
     const user = await currentUser();
@@ -61,8 +63,20 @@ export default async function TalkChunkPage({
     // 영어 문장이 아직 없으면 추측을 안 거친 것이다. F17 로 돌려보낸다 — 여기서 만들어 주면
     // 추측 화면을 건너뛰는 길이 생긴다 (docs/FLOW.md 1′장: F13 → F17 → F14).
     if (!hasEnglish(row)) redirect(`/talk/${id}/guess`);
+    /*
+      **가리키는 행은 제 화면을 갖지 않는다** (docs/FLOW.md 4장). 오늘 행은 먼저 만난 덩어리를
+      가리키고 있을 뿐이고, 회차와 곡선은 먼저 것에 쌓인다. 여기서 안 보내면 주소를 직접 열었을 때
+      같은 덩어리가 두 화면으로 갈리고, 그 자리에서 녹음하면 **회차가 둘로 쪼개진다.**
+    */
+    if (row.meta.same_as) redirect(`/talk/${row.meta.same_as}`);
     chunk = row;
     loop = await loadSpeakLoop(user.id, { chunk: row.id }, "en");
+    // 맨 위 한 줄은 이 묶음에서 **가장 최근에 쓴 상황**이다 — 오늘 나를 여기 데려온 것은 오늘 쓴 줄이다.
+    const group = await chunkGroup(user.id, id);
+    if (group) {
+      chunk = { ...row, situation: group.situation };
+      repeated = group.repeated;
+    }
   }
 
   const highlight = chunk.meta.chunk ?? chunk.text;
@@ -108,6 +122,17 @@ export default async function TalkChunkPage({
           </h1>
         </div>
       </Card>
+      {/*
+        **두 번째부터만 뜬다** — 이 행을 가리키는 행이 하나라도 있을 때다 (docs/FLOW.md 4장).
+        이것이 영어 축의 재만남이고, 한자 축에서 F12 가 하는 일과 같은 자리다. 참고 화면은 아직
+        없어서 "이 말" 카드 바로 밑에 뒀다 — 그 카드가 말하는 바로 그 말에 붙는 한 줄이라서다.
+      */}
+      {repeated && (
+        <>
+          <Space h={10} />
+          <Lead>이 말, 전에도 막혔어.</Lead>
+        </>
+      )}
       <Space h={16} />
       <TalkLoop chunkId={chunk.id} text={highlight} preview={preview} startAttempt={loop.startAttempt} targetVoice={targetVoice} startPrev={loop.startPrev} />
     </Screen>
