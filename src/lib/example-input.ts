@@ -5,7 +5,9 @@ import type { Lang3 } from "@/lib/db/settings";
  * 일본어 문구는 design/screens/F02.html 그대로.
  *
  * 예시 자료가 갖춰야 하는 것 둘 (design/SCREENS.md):
- *  1. 앵커가 본문 안에 있을 것 — 탭하면 곧바로 첫 카드가 된다. 발판 없는 문장이면 F03 이 "발판 없음"만 내놓는다.
+ *  1. **두 묶음이 다 찰 것** (docs/FLOW.md 96). 부를 낱말이 있는 글자가 있어야 탭하자마자 첫 카드가
+ *     되고, 부를 낱말이 **없는** 글자도 있어야 「부를 낱말이 아직 없어」 묶음이 첫 방문에 선다 —
+ *     한쪽만 있으면 그 묶음은 규칙에만 있고 화면에는 한 번도 안 나타난다.
  *  2. 다른 입구의 예시와 같은 덩어리를 쓰지 않을 것 — F13 의 "못 한 말" 예시와 겹치면 같은 화면을 두 번 보는 것처럼 느껴진다.
  *
  * `name` 은 **이 자료를 부르는 이름**이고, F02 예시 행 이름과 뒷 화면들의 자료 이름이 둘 다 여기서
@@ -33,7 +35,7 @@ export const EXAMPLE_INPUT: Record<Lang3, { name: string; title: string; body: s
   },
   en: {
     // 본문에 앵커(spect 어근)가 retrospective·inspect 둘 들어간다 — 예시를 탭하면 바로 첫 카드가
-    // 되는데, 어근 없는 문장이면 F03 이 "발판 없음"만 내놓는다 (design/SCREENS.md 예시 자료 조건).
+    // 되는데, 어근 없는 문장이면 F03 이 「부를 낱말이 아직 없어」만 내놓는다 (design/SCREENS.md 예시 자료 조건).
     // "회의에서 나온"은 말인지 글인지 모호하다. F02 에 붙여넣는 건 글이고, F13 의 "회의에서 못 한 말"과도 갈린다.
     name: "회의 노트",
     title: "Let's review the deployment schedule",
