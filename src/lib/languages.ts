@@ -35,3 +35,14 @@ export function homeRedirect(s: UserSettings): string | null {
 export function inputPath(lang: Lang3): string {
   return `/inputs/new?lang=${lang}`;
 }
+
+/**
+ * 홈의 "못 한 말" 행이 가는 곳. **덩어리가 있으면 목록(F18), 없으면 쓰기(F13)** 다.
+ *
+ * 늘 F13 으로 보내면 덩어리가 셋이어도 빈 입력 칸에 떨어지고 **지난 덩어리로 돌아갈 길이 어디에도
+ * 없다** — 같은 말의 2회차가 안 생겨 곡선 표본이 1회차짜리만 쌓인다 (`docs/SPEC.md` 9장).
+ * 화면 안에 두면 이 한 줄이 시험에 안 걸려서, `inputPath` 와 같은 자리로 꺼내 둔다.
+ */
+export function talkPath(chunkCount: number): string {
+  return chunkCount > 0 ? "/talk/past" : "/talk";
+}

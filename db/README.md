@@ -10,6 +10,55 @@ pnpm db:migrate            # 미적용 파일을 순서대로 적용 (각 파일
 pnpm db:migrate:status     # 적용 상태만 출력
 ```
 
+### 이 컨테이너에서 로컬 DB 를 세우는 법 (2026-09-21 에 실제로 세워 봄)
+
+Postgres 16 이 깔려 있지만 **안 떠 있고 `anchor` DB 도 없다.** 세션마다 새로 세운다 —
+`sudo -n` 이 통하므로 **기존 DB 를 건드릴 필요가 없다**(이름 바꾸기·지우기를 시도하면
+권한 가드에 걸린다. 걸리면 우회하지 말고 새로 만든다):
+
+```bash
+sudo -u postgres /usr/lib/postgresql/16/bin/pg_ctl -D /var/lib/postgresql/16/main \
+  -l /tmp/pg.log -o "-c config_file=/etc/postgresql/16/main/postgresql.conf" start
+sudo -u postgres psql -c "CREATE DATABASE anchor" -c "CREATE ROLE anchor_app LOGIN PASSWORD '<로컬용>'"
+sudo -u postgres psql -c "ALTER ROLE postgres PASSWORD '<로컬용>'"
+
+export DATABASE_URL_ADMIN="postgres://postgres:<로컬용>@localhost:5432/anchor"
+export ANCHOR_DATABASE_URL="postgres://anchor_app:<로컬용>@localhost:5432/anchor"
+export ANCHOR_APP_PASSWORD='<16자 이상>'
+pnpm db:migrate && pnpm db:seed
+```
+
+**걸리는 자리 셋** — 셋 다 오류 메시지가 원인을 안 말해 준다:
+
+| 증상 | 까닭 |
+| --- | --- |
+| `SASL: client password must be a string` | 소켓이 아니라 TCP 로 붙어서 **`postgres` 역할에 비밀번호가 있어야** 한다 |
+| `0001_init.sql: ANCHOR_APP_PASSWORD (16자 이상) 가 필요하다` | 말 그대로 **16자 이상**이어야 한다 |
+| 시험 로그인이 `/` 로 튕김 | `ANCHOR_TEST_LOGIN=1` 만으로는 안 열린다. **`ANCHOR_TEST_USER_ID`** 가 있어야 하고(`src/lib/auth/test-login.ts`, 기본값 없음) 그 id 의 행이 `users` 에 있어야 한다 |
+
+그 계정으로 `/today` 가 열리려면 `settings` 가 **중첩된 꼴**이어야 한다 — 평평한
+`{"languages":["ja"]}` 는 안 먹는다(`src/lib/db/settings.ts`):
+
+```sql
+UPDATE users SET settings = jsonb_build_object(
+  'languages', jsonb_build_object('ja', jsonb_build_object('enabled_at', now()))
+) WHERE id = '<시험 계정 id>';
+```
+
+**왜 여기 적나.** 이 셋은 2026-09-21 에 세 세션이 따로 막혔던 자리인데 **답이 쪽지에만
+있었다.** 쪽지는 세션과 함께 사라지고, 다음 사람은 `db/README.md` 를 연다.
+
+### 이력이 얕다 — 「그 커밋 없는데?」 는 십중팔구 이것
+
+이 컨테이너의 클론은 기본이 **shallow** 다(세션 시작 때 481 커밋). 경계 너머 커밋은
+`git log` 도 `git cat-file -e` 도 **「없다」**고 답한다. 잘리는 쪽이 오래된 쪽이라
+「마지막으로 건드린 커밋」류는 안 틀리지만, **「X 는 이력에 없다」류는 못 믿는다.**
+
+```bash
+git rev-parse --is-shallow-repository   # true 면 아래를 먼저
+git fetch --deepen=500 origin main
+```
+
 적용 기록은 `schema_migrations(name, applied_at, checksum)` 에 남는다. 이미 적용된 파일의 내용이 바뀌면 체크섬 불일치로 중단한다. 새 변경은 항상 새 파일로.
 
 ## 프로덕션에 올라간 마이그레이션
