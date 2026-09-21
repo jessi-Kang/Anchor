@@ -30,7 +30,8 @@ Anchor 는 사람 1명(Jessi)과 여러 Claude 세션이 동시에 만든다. �
 | **Anchor · 기록** | 사무실 대시보드에 오간 말과 상태를 기록한다. 판단하지 않는다 | (레포 파일 없음) | — | `session_01VDLmWntuURPMRLBr4WWVMC` |
 | **Anchor · 문서** | 문서를 지금의 사실과 같게, 한 문체로 유지. **`README.md` 는 PM 소유로 옮겼다** — 노스 스타라 결정과 같이 움직인다 | `docs/STATUS.md` · `docs/BACKUP.md` | `claude/docs-status-7t3m1a` | `session_01Roo5nyjeU3jAG5qD6vHeQL` |
 | **Anchor · 디자인** | 화면의 모양, 참고 HTML, 토큰, 로고 | `design/**` | `claude/nice-lovelace-9aaqtf` | `session_01PvJ2dicM8k7dndU4smUys1` |
-| **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만 | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_01JXYTj8AuVoomHGMVQjEB6R` |
+| **Anchor · 개발** | 코드 전부. 버그 수정도 여기서만. **아래 개발 · 데이터가 든 파일은 빼고** | `src/**` · `db/**` · `scripts/**` · `package.json` | `claude/serene-pasteur-hflx6o` | `session_01JXYTj8AuVoomHGMVQjEB6R` |
+| **Anchor · 개발 · 데이터** | 두 통과 기준이 **값으로 남는** 자리. 경로는 개발 것이지만 **일의 종류가 데이터라** 여기서 본다 — 만남 기록, 곡선 저장, 측정 스크립트와 그 마이그레이션. 프로덕션에 나갈 SQL 은 **직접 돌리지 않고 파일로 뽑아 프로덕트 리더에게 보낸다** | `src/lib/db/encounters.ts` · `src/app/api/recordings/**` · `db/migrations/0007_*` · `scripts/measure*.ts` | (세션 생성 시 할당) | `session_01HUqdnuDTsUWz59mc3K7PGa` |
 | **Anchor · 보안** | 데이터 원칙이 코드와 DB 에서 실제로 성립하는지 확인한다. **코드를 고치지 않는다** | `docs/SECURITY.md` | `claude/security-audit-1mrnbe` | `session_01MRNbEc9RPrR5vsdK3chLWR` |
 | **Anchor · QA** | 검증 플로우를 만들고, 돌려 보고, 판정한다. **코드를 고치지 않는다** | `docs/QA.md` | `(세션 생성 시 할당)` | `session_01QLkXCYkNnzJef2KbUGchoV` |
 | ~~Anchor · 버그픽스~~ | 개발로 통합, 종료. 고친 것이 없어 브랜치도 버린다 | — | — | `session_01ANSrRXJkcbqr7SwicPUVpM` |
@@ -237,6 +238,8 @@ Jessi 가 결정할 것은 **돈이 들거나**(유료 플랜·외부 계정), *
 **규칙: 문서를 근거로 무엇을 판정할 때는 `git show origin/main:<파일>` 로 읽는다.** 읽기 전에 `git fetch origin main` 을 한다. 로컬 파일을 열어 판정하지 않는다.
 
 "문서를 의심해라" 는 **낡은 사본을 의심해라**를 포함한다. 문서가 틀렸다고 말하기 전에, 내가 보고 있는 것이 지금의 문서인지를 먼저 본다.
+
+**그리고 보내기 직전에 한 번 더 본다.** 쓸 때 맞았던 인용이 보낼 때는 틀릴 수 있다. 세션 통로에는 시간당 한도가 있어 메시지가 몇십 분씩 대기하고, 그 사이에 `main` 이 움직인다. 2026-09-21 에 그대로 일어났다 — F12 의 읽기 처리를 두고 `origin/main` 을 제대로 읽고 "네 판정과 같다" 고 썼는데, 발송을 기다리는 동안 그 줄이 두 번 더 바뀌어 보낼 때는 반대가 돼 있었다. **커밋 해시를 인용한 문장은 보내기 전에 다시 fetch 해서 확인한다.** 해시를 적어 두는 이유가 이것이다 — 무엇을 보고 썼는지가 남아야 늦게 도착한 말이 어디서 어긋났는지 짚힌다.
 
 ## 7″. Jessi 와의 통로는 하나다
 
