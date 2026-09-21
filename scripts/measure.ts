@@ -336,8 +336,13 @@ function print(
   const unknown = byReason("unknown");
   if (fb || unknown) {
     console.log("");
-    if (fb)
+    if (fb) {
       console.log(`※ 폴백 문안이라 곡선에서 뺀 대상 ${fb}개 — 영어를 못 만들어 한국어가 그대로 덩어리에 들어간 행이다.`);
+      // 이 수는 **줄지 않는다.** 게이트가 서서 새 폴백 행은 안 생기지만, 이미 들어간 한국어는
+      // 덮어쓰이지 않는다 — `lib/db/chunks.ts` 의 `saveEnglish` 가 `btrim(text) = ''` 일 때만 쓴다.
+      // 그래서 다음에 봤을 때 그대로여도 "안 고쳐졌다" 가 아니라 "고칠 수 있는 행이 아니다" 다.
+      console.log("  이 수는 시간이 지나도 안 줄어든다. 한 번 들어간 문안은 덮어쓰이지 않는다.");
+    }
     if (unknown)
       console.log(`※ 문안 출처가 안 적힌 덩어리 ${unknown}개도 뺐다 — 무엇으로 만든 문안인지 몰라 기준선을 믿을 수 없다.`);
     console.log("  그 기준선은 영어 목소리가 읽은 한국어일 수 있어 거리에 뜻이 없다. 재만남 쪽은 그대로 센다.");
