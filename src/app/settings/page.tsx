@@ -54,7 +54,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         28 을 쓰는 것은 홈(F01)뿐이다 — F03 에서 고친 것과 같은 자리다.
       */}
       <Title>켠 언어와 내 데이터</Title>
-      <Space h={22} />
+      {/* 제목 26 → 18 → 카드 (design/screens/F16.html 을 열어 읽은 값: `height: 24px` · 26px · `height: 18px`).
+          22 였을 때 카드가 4px 아래에 서서 아래 전부가 그만큼 밀렸다. */}
+      <Space h={18} />
       {/*
         카드 꼴은 F03 과 같다 — 참고가 `padding: 4px 20px` · 라벨 `padding-top: 14px` · 행 `14px 0`
         으로 똑같이 그려져 있다. 열어서 확인했다.
