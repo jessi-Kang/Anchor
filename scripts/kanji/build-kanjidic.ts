@@ -99,18 +99,7 @@ async function main() {
         out.push(c);
       }
     }
-    /*
-      **그릴 수 없는 부품은 내보내지 않는다** (design/SCREENS.md 2026-09-20 결정).
-      IDS 에는 BMP 밖(CJK 확장 B, U+20000~) 문자가 섞여 있는데 Noto Sans JP 가 못 그려서
-      부품 칸이 빈 네모(□)로 뜬다. 추측할 재료를 안 주고 추측하라는 화면이 되므로 원칙 1 에 걸린다.
-      폰트를 하나 더 얹는 길은 디자인이 재어 보고 버렸다 — 얹어도 나오는 건 한국어 한자음도 뜻도
-      없는 획 모양이라 그래프의 앵커가 못 된다. 두부는 폰트 사고가 아니라 **가르칠 수 없는 것이
-      부품 칸에 들어와 있다는 신호**였다.
-      제 한자로 바꿔 끼울 수 있는 것(𧾷→足, 𦍌→羊, 𧘇→衣)은 parts-ko.json 의 expand 가 위에서
-      이미 갈아 끼웠으므로 여기 남지 않는다. 부품이 0개가 되는 한자는 이미 서 있는 길로 간다 —
-      부품이 없으면 한자를 통째로 세우고 "이 모양이면 무슨 뜻이 될까?" 로 묻는다.
-    */
-    return out.filter((p) => Array.from(p).every((ch) => (ch.codePointAt(0) ?? 0) <= 0xffff));
+    return out;
   };
 
   const chars = xml.split("<character>").slice(1);
