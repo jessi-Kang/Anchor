@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/recordings  (multipart: card_id **또는** chunk_id, pitch(json), target_pitch(json, 선택),
- *                         duration_ms, audio(blob, 선택))
+ *                         duration_ms, audio(blob, 선택), client_id(uuid, 선택))
  * 피치 곡선은 브라우저에서 뽑아 DB 에 보관하고, 원본 오디오는 계정 전용 비공개 Blob 에
  * users.voice_retention_days(기본 30일) 동안만 둔다 (CLAUDE.md 데이터 원칙).
  * 만료 삭제는 /api/cron/voice 가 한다.
@@ -31,6 +31,18 @@ export async function POST(req: Request) {
   const cardId = String(form.get("card_id") ?? "");
   const chunkId = String(form.get("chunk_id") ?? "");
   const durationMs = Number(form.get("duration_ms") ?? 0);
+  /*
+    **같은 녹음을 다시 보내도 회차가 안 늘게 하는 키** (0008). 브라우저가 녹음을 만든 그 순간에
+    붙이고, 재전송해도 같은 값이다. 아래 회차 세기가 `count(*)+1` 이라 이게 없으면 **서버는
+    성공했는데 응답이 끊긴 건**이 새 회차로 앉는다 — 5회차 자리에 4회차 소리가 앉으면 곡선 통과
+    기준이 그 자리에서 아무 말도 안 하게 된다 (docs/MEASURE.md 2장).
+
+    모양이 아니면 **없는 것으로 친다. 거절하지 않는다** — 키 하나 때문에 녹음을 버리면 막으려던
+    유실을 우리가 만드는 꼴이다 (README "녹음 한 번도 잃지 않는다").
+  */
+  const rawClientId = String(form.get("client_id") ?? "").trim();
+  const clientId = /^[0-9a-fA-F-]{8,64}$/.test(rawClientId) ? rawClientId : null;
+  if (rawClientId && !clientId) console.error("[recordings] client_id 모양이 아니라 무시한다");
   let pitch: unknown;
   try {
     pitch = JSON.parse(String(form.get("pitch") ?? "[]"));
@@ -75,6 +87,29 @@ export async function POST(req: Request) {
   const ownId = own.id;
   const ownCardId = cardId ? ownId : null;
   const ownChunkId = cardId ? null : ownId;
+
+  /*
+    **이미 받은 녹음인가.** 오디오를 올리기 전에 본다 — 중복이면 Blob 도 안 쓰고 행도 안 만든다.
+    아래 INSERT 의 유니크 제약이 마지막 방어선이고, 여기는 그 앞에서 값싸게 걸러 내는 자리다.
+  */
+  if (clientId) {
+    const existing = await withUser(user.id, async (tx) => {
+      const { rows } = await tx.query<{ id: string; target_pitch: unknown; audio_object_key: string | null }>(
+        "SELECT id, target_pitch, audio_object_key FROM recordings WHERE user_id = $1 AND client_id = $2",
+        [user.id, clientId],
+      );
+      return rows[0] ?? null;
+    }).catch(() => null);
+    if (existing) {
+      return Response.json({
+        ok: true,
+        id: existing.id,
+        audio_saved: Boolean(existing.audio_object_key),
+        target_saved: Boolean(existing.target_pitch),
+        duplicate: true,
+      });
+    }
+  }
 
   const audio = form.get("audio");
   let audioKey: string | null = null;
@@ -144,9 +179,15 @@ export async function POST(req: Request) {
             }
           : null))
       : null;
+    /*
+      두 요청이 같은 키로 동시에 들어오면 위 확인은 둘 다 빠져나간다. 제약이 두 번째를 막고,
+      막힌 쪽은 **먼저 들어간 행을 돌려준다** — 재전송의 답은 "이미 있다" 지 오류가 아니다.
+    */
     const { rows } = await tx.query<{ id: string }>(
-      `INSERT INTO recordings (user_id, card_id, chunk_id, attempt, pitch, target_pitch, duration_ms, audio_object_key, audio_expires_at, target_voice_kind, target_voice_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+      `INSERT INTO recordings (user_id, card_id, chunk_id, attempt, pitch, target_pitch, duration_ms, audio_object_key, audio_expires_at, target_voice_kind, target_voice_id, client_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (user_id, client_id) WHERE client_id IS NOT NULL DO NOTHING
+       RETURNING id`,
       [
         user.id,
         ownCardId,
@@ -159,9 +200,21 @@ export async function POST(req: Request) {
         expiresAt,
         voice?.kind ?? null,
         voice?.id ?? null,
+        clientId,
       ],
     );
-    return { id: rows[0].id, target: Boolean(target) };
+    if (rows[0]) return { id: rows[0].id, target: Boolean(target), duplicate: false };
+    const { rows: won } = await tx.query<{ id: string; target_pitch: unknown }>(
+      "SELECT id, target_pitch FROM recordings WHERE user_id = $1 AND client_id = $2",
+      [user.id, clientId],
+    );
+    return { id: won[0].id, target: Boolean(won[0].target_pitch), duplicate: true };
   });
-  return Response.json({ ok: true, id: saved.id, audio_saved: Boolean(audioKey), target_saved: saved.target });
+  return Response.json({
+    ok: true,
+    id: saved.id,
+    audio_saved: Boolean(audioKey),
+    target_saved: saved.target,
+    ...(saved.duplicate ? { duplicate: true } : {}),
+  });
 }
