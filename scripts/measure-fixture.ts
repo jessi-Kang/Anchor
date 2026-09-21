@@ -268,6 +268,33 @@ async function main() {
     );
     await attempts({ chunk: noSrc[0].id }, [0.5, 0.4, 0.3, 0.2, 0.05], LANG_VOICE, 77, 7);
 
+    /*
+      **실패 케이스 10 — 어느 언어 묶음에도 안 드는 대상.** 아래 표는 `lang` 으로 en·ja 를 고르므로
+      스페인어 덩어리는 두 표 어디에도 안 뜬다. 안 뜨는 것까지는 맞는데 **아무 말 없이 사라지면**
+      없는 계정이 "표본 없음" 으로 보이던 것과 같은 종류다. 머리말이 수를 내야 한다.
+      (출처는 `authored` 로 적는다 — 안 적으면 허용 목록에서 먼저 걸려 이 갈래를 못 밟는다.)
+    */
+    const { rows: es } = await client.query<{ id: string }>(
+      `INSERT INTO chunks (user_id, lang, situation, text, created_at, meta)
+       VALUES ($1, 'es', '합성 상황', $2, $3, jsonb_build_object('content_source', 'authored')) RETURNING id`,
+      [USER_ID, "vamos a dejarlo para", daysAgo(7)],
+    );
+    await attempts({ chunk: es[0].id }, [0.5, 0.4, 0.3, 0.2, 0.05], LANG_VOICE, 88, 7);
+
+    /*
+      **실패 케이스 11 — 회차 번호가 겹친다.** 회차는 서버가 `count(*)+1` 로 세는데 제약이 없어서
+      동시 요청 둘이 같은 수를 받을 수 있다. 그러면 세는 쪽의 `at(1)` 이 둘 중 아무거나 집고,
+      **표에는 멀쩡한 거리가 뜨는데 어느 회차를 잰 값인지는 모른다.** 조용히 틀리는 자리다.
+    */
+    const clash = await chunk("let us take this offline", "en", 7);
+    await attempts({ chunk: clash }, [0.5, 0.4, 0.3, 0.2, 0.05], LANG_VOICE, 99, 7);
+    await client.query(
+      `INSERT INTO recordings (user_id, chunk_id, attempt, pitch, target_pitch, duration_ms, created_at, target_voice_kind, target_voice_id)
+       SELECT user_id, chunk_id, 1, pitch, target_pitch, duration_ms, created_at, target_voice_kind, target_voice_id
+         FROM recordings WHERE user_id = $1 AND chunk_id = $2 AND attempt = 1`,
+      [USER_ID, clash],
+    );
+
     // **실패 케이스 6 — 일본어.** 계산은 하지만 M4 판정에는 안 들어간다. 영어와 합치면 그 결정이 사라진다.
     // 위에서 이미 착지한 카드에 회차를 매단다 — 곡선용 카드를 따로 만들면 "착지한 한자" 수가
     // 실제보다 하나 늘어, 재만남 쪽 참고 숫자가 틀린다. 화면에서도 F10 은 그 카드에서 말한다.
@@ -283,8 +310,10 @@ async function main() {
   console.log("          판정 불가 2자 — 읽기 없는 자료 2자 · 일부 빈 자료 1자. 합이 총계보다 큰 것까지 말해야 한다");
   console.log("          支 는 \"열었다\" 여야 한다 — 재투입(D-6, 안 열었다)이 아니라 진짜 새 자료(D-4)를 세야 맞다.");
   console.log("          거꾸로 거르면 支 를 잃고 분모 9 · 분자 7 = 77.8% 가 나온다 — 비율이 위로 부푼다");
-    console.log("  곡선 영어: 가까워진 대상 1 / 2   (3회차뿐인 것 · 겨눈 곡선이 없는 것 · 폴백 문안은 빠진다)");
+    console.log("  곡선 영어: 가까워진 대상 2 / 3   (3회차뿐인 것 · 겨눈 곡선이 없는 것 · 폴백 문안 · 스페인어는 빠진다)");
+  console.log("          회차가 겹치는 대상은 표에 남는다 — 거리가 멀쩡해 보이는 게 이 사고의 모양이라, 머리말이 대신 말한다");
   console.log("          폴백 문안이라 뺀 대상 1개 · 문안 출처가 안 적힌 대상 1개");
+  console.log("          어느 언어 묶음에도 안 든 대상 1개(es) · 회차가 겹치는 대상 1개 — 둘 다 머리말에 떠야 한다");
     console.log("          기준선 출처가 안 남은 대상 1개");
     console.log("  곡선 일본어: 가까워진 대상 1 / 1  (따로 적히고 통과·미달에 안 들어간다)");
   } finally {
