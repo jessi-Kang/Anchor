@@ -33,11 +33,39 @@ export const BACKUP_TABLES = [
 ] as const;
 
 /**
- * **뜨는 것과 되돌리는 것은 다른 목록이다.** 복구(`scripts/backup/restore-json.ts`)는 FK 순서대로
- * 넣어야 해서 제 `ORDER` 를 따로 들고 있고, **그쪽에도 `node_cards` 가 없다.** 여기만 고치면
- * 백업 파일에는 담기는데 복구가 그 표를 안 넣는다 — 구멍이 반만 막힌다. 그 파일은 내 자리가
- * 아니라 **적어만 둔다**(PM 에게 올렸다). 그쪽이 고쳐지면 이 문단을 지운다.
+ * **되돌리는 순서.** 복구(`scripts/backup/restore-json.ts`)가 이 차례대로 넣는다 — 위 목록과
+ * 달리 **순서가 뜻을 가진다.** 외래키를 가리키는 쪽이 가리켜지는 쪽보다 뒤에 와야 한다
+ * (`node_cards.node_id → nodes.id` 라서 `nodes` 바로 뒤다).
+ *
+ * **뜨는 목록과 되돌리는 목록은 따로 샌다.** 백업에만 넣으면 파일에는 담기는데 복구가 그 표를
+ * 건너뛰고, 그러면 **복구 리허설이 「됐다」고 말하면서 표 하나를 빼먹는다** — `docs/BACKUP.md` 가
+ * 재는 바로 그 자리다. 그래서 둘을 한 파일에 두고 `scripts/test/backup-tables.test.ts` 가
+ * **같은 잣대로, 그리고 서로도** 견준다.
  */
+export const RESTORE_ORDER = [
+  "users",
+  "inputs",
+  "nodes",
+  "node_cards",
+  "edges",
+  "user_node_state",
+  "cards",
+  "chunks",
+  "recordings",
+  "encounters",
+  "account_deletions",
+] as const;
+
+/**
+ * **뜨지만 되돌리지 않는 표.** 백업 목록과 복구 목록이 어긋나는 자리는 여기뿐이다.
+ */
+export const RESTORE_EXCEPTIONS: Record<string, string> = {
+  schema_migrations:
+    "원장은 러너가 쓰는 기록이다. 복구는 `pnpm db:migrate` 로 스키마를 세운 뒤 행만 넣는 절차라" +
+    "(`docs/BACKUP.md` 절차 C), 그 DB 의 원장은 **거기서 실제로 돌린 것**을 이미 적고 있다." +
+    "백업 속 원장을 덧씌우면 그 기록이 남의 기록으로 바뀌고, 옛 사본에 원장에만 있는 줄이 있으면" +
+    "그것까지 같이 들어간다. 뜨기는 한다 — 사고 뒤에 「그 DB 가 무엇을 돌렸었나」 를 읽을 데가 있어야 한다",
+};
 
 /**
  * **선언된 차이.** `public` 의 BASE TABLE 과 위 목록이 어긋나는 자리는 여기뿐이고, 각각 이유가 있다.
