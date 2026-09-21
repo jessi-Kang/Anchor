@@ -24,13 +24,20 @@ export default async function InputPage({ params, searchParams }: { params: Prom
   const { fixed } = await searchParams;
 
   if (isDesignPreview()) {
+    /*
+      **부제는 앵커 낱말 표(`db/seed/kanji-ko.json`)에서 읽은 값이다.** 참고 화면과 쪽지를 보고
+      옮겨 적으면 안 된다 — 그림이 `妥` 를 둘째 묶음에 `타` 로, `開` 를 `개발의 개` 로 그려 놨었고
+      **그 그림에서 베낀 이 상수가 같이 틀렸다.** 표는 `妥 → 타협`(그래서 **첫 묶음**), `開 → 개시`
+      라고 말한다. 둘째 묶음을 채우는 것은 표에 **아예 없는** 글자다 — `条`(조).
+      `docs/FLOW.md` 97: 눈으로 고르면 틀린다.
+    */
     const anchored: JudgeItem[] = [
       { nodeId: "a", kanji: "協", sub: "협력의 협", hasWord: true, hasSound: true, known: null },
-      { nodeId: "b", kanji: "開", sub: "개발의 개", hasWord: true, hasSound: true, known: null },
-      { nodeId: "c", kanji: "基", sub: "기반의 기", hasWord: true, hasSound: true, known: null },
+      { nodeId: "b", kanji: "基", sub: "기반의 기", hasWord: true, hasSound: true, known: null },
+      { nodeId: "c", kanji: "妥", sub: "타협의 타", hasWord: true, hasSound: true, known: null },
     ];
     // 낱말은 없고 소리만 있는 행 — 부제는 한국 한자음 한 글자다 (docs/FLOW.md 1장 F03 행).
-    const bare: JudgeItem[] = [{ nodeId: "d", kanji: "妥", sub: "타", hasWord: false, hasSound: true, known: null }];
+    const bare: JudgeItem[] = [{ nodeId: "d", kanji: "条", sub: "조", hasWord: false, hasSound: true, known: null }];
     return (
       <Screen where="아침 기사" up="/today" aside="오전 8:42" fixed={fixed === "1"}>
         <Space h={28} />

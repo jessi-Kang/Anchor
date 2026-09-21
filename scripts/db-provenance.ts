@@ -10,7 +10,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { loadEnv } from "./lib/load-env";
 import { adminClient } from "./lib/admin-client";
-import { describeMigrations } from "./lib/migration-state";
+import { describeMigrations } from "../src/lib/db/migration-state";
 
 loadEnv();
 
