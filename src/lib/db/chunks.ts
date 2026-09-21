@@ -95,6 +95,11 @@ export async function countChunks(userId: string, lang: Lang3 = "en"): Promise<n
  * 추측만 저장되고 문장이 안 들어가면 F14 가 또 추측 화면으로 되돌린다.
  * 이미 문장이 있으면(뒤로 가기로 F17 을 다시 지나온 경우) 덮어쓰지 않는다. 같은 상황에 매번 다른
  * 영어가 나오면 "그때 그 말" 이 아니게 된다.
+ *
+ * **그리고 이건 측정의 전제이기도 하다.** 곡선 기준선은 1회차에 뽑아 고정한다(`docs/MEASURE.md`
+ * 2장). 나중에 누가 이 문장을 고치면 **옛 문장의 기준선과 새 문장을 말한 내 곡선**을 겨누게 되고,
+ * 화면에는 멀쩡한 숫자가 뜬다 — 조용히 깨지는 종류다. 그래서 `btrim(text) = ''` 조건은 화면 편의가
+ * 아니라 **불변 조건**이다. 문장을 고칠 길을 내려면 그 대상의 회차를 어떻게 할지 같이 정해야 한다.
  */
 export async function saveGuessAndEnglish(
   userId: string,
