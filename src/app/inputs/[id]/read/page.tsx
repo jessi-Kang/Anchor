@@ -120,9 +120,18 @@ export default async function ReadPage({
           이미 만난 글자를 짚어 주는 한 줄. 한 낱말 안에 만난 것과 아직인 것이 같이 있는 자리를 고른다 —
           "妥協, 협은 방금 봤지" 가 이 화면이 하려는 말 그대로다.
         */}
-        {mixed && (
+        {/*
+          **부를 소리가 없으면 이 줄을 아예 안 낸다.** 전에는 `sounds.get(...) ?? mixed.met[0]` 이라
+          한국 한자음이 없는 글자(収 枠 塡 頰 𠮟 剝 여섯)에서 **"妥協, 는 방금 봤지"** 가 떴다 —
+          주어가 비고 조사만 남은 문장이다. `sounds` 가 없는 값을 `""` 로 채워서 `??` 가 안 걸렸다.
+
+          글자로 떨어뜨리는 것도 답이 아니다. 한국어 문장 안에 일본 글자를 넣는 것이고, 조사를 고를
+          소리가 없어 `withParticle` 도 찍을 수 없다 — Scene2 의 `pt.name ?? pt.ch` 와 같은 자리다.
+          **짚을 수 없으면 안 짚는다.** 아래 개수 한 줄이 남아 화면이 비지 않는다.
+        */}
+        {mixed && sounds.get(mixed.met[0]) && (
           <span className={s.metFootWord}>
-            {mixed.text}, {withParticle({ text: sounds.get(mixed.met[0]) ?? mixed.met[0], sound: null }, "은는")} 방금 봤지
+            {mixed.text}, {withParticle({ text: sounds.get(mixed.met[0]) as string, sound: null }, "은는")} 방금 봤지
           </span>
         )}
         <span className={s.metFootLine}>
