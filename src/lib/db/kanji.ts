@@ -26,18 +26,21 @@ export type KanjiMeta = {
   kun?: string[];
   ko_sound?: string | null;
   /**
-   * 이미 아는 한국어 한자어 (앵커). 2,136자 중 653자에만 있다.
+   * 이미 아는 한국어 한자어 (앵커). 2,136자 중 641자에만 있다.
    * **이 칸이 F03 의 두 묶음을 가른다** — 없으면 「부를 낱말이 아직 없어」 쪽이다.
+   *
+   * **`null` 과 없는 것이 같다.** 적재는 앵커가 없으면 `null` 을 적는다 — 칸을 빼면 jsonb `||` 가
+   * 옛 값을 살려서 표에서 뺀 낱말이 DB 에 남는다(`scripts/seed.ts`). 읽는 쪽은 둘을 안 가른다.
    */
-  ko_word?: string;
+  ko_word?: string | null;
   meanings?: string[];
   parts?: string[];
   grade?: number;
   freq?: number | null;
-  card?: CardContent;
-  example?: string;
-  example_reading?: string;
-  pattern?: string;
+  card?: CardContent | null;
+  example?: string | null;
+  example_reading?: string | null;
+  pattern?: string | null;
 };
 
 export type KanjiNode = {
