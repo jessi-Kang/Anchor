@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { createChunk, getChunk, hasEnglish, saveGuessAndEnglish } from "@/lib/db/chunks";
+import { createChunk, getChunk, hasEnglish, saveEnglish, saveGuess } from "@/lib/db/chunks";
 import { getSettings } from "@/lib/db/settings";
 import { enabledLanguages } from "@/lib/languages";
 import { getChunkContent } from "@/lib/talk/chunk-content";
@@ -60,12 +60,48 @@ export async function submitGuess(id: string, guess: string) {
   // 말한 덩어리가 발밑에서 바뀌면 "같은 덩어리 5회차" 를 잴 수 없다 (docs/SPEC.md 9장).
   if (row.meta.guess !== undefined || hasEnglish(row)) redirect(`/talk/${id}`);
 
-  const { content, source } = await getChunkContent(row.situation);
-  await saveGuessAndEnglish(user.id, id, line, {
-    text: content.english,
-    attitude: content.attitude,
-    chunk: content.chunk,
-    source,
+  /*
+    **추측을 먼저 저장한다.** 문안 생성이 그 앞에 있으면, 생성이 실패했을 때 추측까지 안 써진다.
+    그런데 `guess-form` 은 보내기 전에 기기 임시본을 지우므로 **그 줄이 통째로 사라진다** —
+    데이터 원칙("추측 한 번도 유실 없음")이 여기서 걸린다. 순서 하나가 그 원칙을 지킨다.
+  */
+  await saveGuess(user.id, id, line);
+
+  const made = await getChunkContent(row.situation);
+  // 못 만들었으면 **추측을 낸 자리에 그대로 세워 둔다.** F14 로 보내면 곡선·듣기·말하기가 할 일이
+  // 없어 껍데기가 된다. 여기 남으면 "없어졌다" 도 "답이 비었다" 도 아니고 "아직 확인 중" 으로 읽힌다.
+  if (!made) redirect(`/talk/${id}/guess`);
+  await saveEnglish(user.id, id, {
+    text: made.content.english,
+    attitude: made.content.attitude,
+    chunk: made.content.chunk,
+    source: made.source,
+  });
+  redirect(`/talk/${id}`);
+}
+
+/**
+ * F17a "다시 만들기". **추측은 안 건드리고 영어 문장만 채운다.**
+ *
+ * `submitGuess` 를 다시 부르면 안 되는 이유가 둘이다. 하나는 그 함수가 추측이 이미 있으면 F14 로
+ * 보내는데, 문장이 없는 F14 는 다시 F17 로 보내서 **두 화면이 끝없이 돈다.** 다른 하나는 화면의
+ * 추측 칸이 읽기 전용이어야 한다는 것 — 다시 누르는 건 **새 추측이 아니라 문장을 다시 만드는
+ * 것**이고, 추측을 같이 보내면 고쳐 쓴 줄이 첫 추측을 덮을 길이 생긴다(유실).
+ */
+export async function retryEnglish(id: string) {
+  const user = await requireEnglishUser();
+  const row = await getChunk(user.id, id);
+  if (!row) redirect("/talk");
+  // 이미 있으면 다시 만들지 않는다 — 발밑에서 덩어리가 바뀌면 "같은 덩어리 5회차" 를 못 잰다.
+  if (hasEnglish(row)) redirect(`/talk/${id}`);
+
+  const made = await getChunkContent(row.situation);
+  if (!made) redirect(`/talk/${id}/guess`);
+  await saveEnglish(user.id, id, {
+    text: made.content.english,
+    attitude: made.content.attitude,
+    chunk: made.content.chunk,
+    source: made.source,
   });
   redirect(`/talk/${id}`);
 }

@@ -31,16 +31,19 @@ export default async function GuessPage({
   const { fixed } = await searchParams;
   const preview = isDesignPreview();
   let situation = "이건 다음 스프린트로 미루죠";
+  // 추측이 이미 있으면 **못 만든 상태**다 (F17a). 위에서 문장이 있는 줄은 이미 나갔다.
+  let guess: string | null = null;
 
   if (!preview) {
     const user = await currentUser();
     if (!user) redirect("/");
     const row = await getSituation(user.id, id);
     if (!row) notFound();
-    // 이미 추측을 보낸 줄이면 여기 다시 서지 않는다. 빈 칸을 또 내밀면 덮어쓰게 되고,
-    // 덮어쓰기는 유실이다 (CLAUDE.md 데이터 원칙: "추측 한 번도 유실 없음").
+    // **영어 문장이 있을 때만** 여기서 나간다. 추측만 있고 문장이 없는 줄은 이 화면에 머문다 —
+    // 문안을 못 만든 상태이고, 다시 만들 수 있는 자리가 여기뿐이다 (design/screens/F17a.html).
     if (row.done) redirect(`/talk/${id}`);
     situation = row.situation;
+    guess = row.guess;
   }
 
   return (
@@ -51,14 +54,31 @@ export default async function GuessPage({
         <div className={s.talkSituation}>{situation}</div>
       </Card>
       <Space h={22} />
-      <Title lg>
-        영어로 뭐라고
-        <br />할 것 같아?
-      </Title>
-      <Space h={6} />
-      <Lead>틀려도 돼. 떠오르는 대로.</Lead>
+      {guess === null ? (
+        <>
+          <Title lg>
+            영어로 뭐라고
+            <br />할 것 같아?
+          </Title>
+          <Space h={6} />
+          <Lead>틀려도 돼. 떠오르는 대로.</Lead>
+        </>
+      ) : (
+        /*
+          **F17a — 문장을 못 만든 자리.** 기획 문구가 아직 안 와서 참고 화면(`F17a.html`)이 그린
+          `___` 를 그대로 둔다. **없는 말을 내가 짓지 않는다.** 문구가 오면 이 두 줄만 바뀐다.
+
+          자리가 안 바뀌는 것이 이 화면의 일이다 — 낸 추측이 그대로 있으면 "없어졌다" 도
+          "답이 비었다" 도 아니고 **"아직 확인 중"** 으로 읽힌다.
+        */
+        <>
+          <Title lg>___</Title>
+          <Space h={6} />
+          <Lead>___</Lead>
+        </>
+      )}
       <Grow />
-      <GuessForm chunkId={id} preview={preview} />
+      <GuessForm chunkId={id} preview={preview} saved={guess} />
     </Screen>
   );
 }
