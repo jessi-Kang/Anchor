@@ -19,6 +19,31 @@ import { chromium, type BrowserContext } from "playwright-core";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
 
+/**
+ * 지정한 글꼴로 그려졌는지 재는 조각. **화살표 함수가 아니라 문자열이다** — `tsx` 가 이름을 살려
+ * 두려고 `__name` 을 끼워 넣는데 브라우저에는 그 함수가 없어서 `evaluate` 가 죽는다.
+ */
+const FONT_PROBE = [
+  "(function(){",
+  " function w(fam, t){ var s=document.createElement('span'); s.textContent=t;",
+  "  s.style.cssText='position:absolute;visibility:hidden;white-space:nowrap;font-size:16px;font-family:'+fam;",
+  "  document.body.appendChild(s); var x=s.getBoundingClientRect().width; s.remove(); return Math.round(x*10)/10; }",
+  " var KR='협력의 협 다 만난 글자야', JP='NTT 協力 20 きょう';",
+  " var NONE='\"Definitely Not A Font 9x\", sans-serif';",
+  " // **글꼴은 쓰이는 순간에야 받아진다.** 일본어가 한 글자도 없는 화면(O01)에서는 JP 를 아무도",
+  " // 안 써서 받아지지 않고, 재려고 만든 span 이 그제야 요청을 걸어 **덜 받은 채로 재진다.**",
+  " // 그래서 재기 전에 두 벌을 대놓고 부른다. `fonts.check` 와 달리 `load` 는 판정이 아니라",
+  " // 요청이라, 이 환경에서 `check` 가 거짓 양성을 내던 것과는 다른 일을 한다.",
+  " return Promise.all([document.fonts.load('16px \"Noto Sans KR\"', KR),",
+  "                     document.fonts.load('16px \"Noto Sans JP\"', JP)])",
+  "  .catch(function(){ return null; })",
+  "  .then(function(){ return document.fonts.ready; })",
+  "  .then(function(){ return { faces: document.fonts.size,",
+  "    kr:{ noto:w('\"Noto Sans KR\", sans-serif',KR), sans:w('sans-serif',KR), ctrl:w(NONE,KR) },",
+  "    jp:{ noto:w('\"Noto Sans JP\", sans-serif',JP), sans:w('sans-serif',JP), ctrl:w(NONE,JP) } }; });",
+  "})()",
+].join("\n");
+
 const W = 390;
 const H = 844;
 const outDir = path.resolve(process.cwd(), ".design-check");
@@ -161,31 +186,53 @@ async function main() {
 
     const ref = await ctx.newPage();
     /*
-      **글꼴이 안 실리면 여기서 멈춘다.** `document.fonts.ready` 는 스타일시트를 **못 받아도**
-      지켜진다 — 기다릴 것이 없으니 즉시 resolve 한다. 그러면 참고는 시스템 기본 sans 로 그려지고
-      구현은 자체 호스팅 Noto 로 그려져서, **글자가 있는 화면은 전부 다르게 나온다.** 그 값으로
-      "볼 차례" 를 정하면 순서 자체가 거짓이다.
+      **요청한 글꼴로 그려졌는지를 재서, 아니면 멈춘다.**
 
-      **안 보이는 오류를 보이는 오류로 바꾼다** — 그려서 틀린 수를 내놓느니 멈추고 왜인지 말한다.
-      자체 호스팅으로 옮긴 뒤에도 이 문이 필요하다: 파일 이름이나 경로가 어긋나는 날 **똑같이 조용히**
-      틀릴 자리이기 때문이다 (design/SCREENS.md).
+      처음엔 `document.fonts.ready` 만 기다렸다. 스타일시트를 **못 받아도** 그 약속은 지켜진다 —
+      기다릴 것이 없으니 즉시 resolve 한다. 그래서 참고는 시스템 기본 sans, 구현은 Noto 로 그려졌고
+      **글자가 있는 화면이 전부 달라졌다.** 그 값으로 "볼 차례" 를 정하면 순서 자체가 거짓이다.
+
+      다음엔 `document.fonts.size === 0` 으로 막았다. **그것도 샜다.** 자체 호스팅으로 옮긴 뒤
+      `@font-face` 를 써 놓으면 **파일을 못 받아도 face 는 등록된다** — 경로를 일부러 깨뜨려 보니
+      `size` 가 그대로 2 였다. 가드가 조용히 통과했다.
+
+      그래서 묻는 것을 바꿨다. **"글꼴이 실렸나" 가 아니라 "내가 지정한 그 글꼴로 그려졌나" 다.**
+      같은 글자를 `Noto` 지정과 `sans-serif` 지정으로 재서 **폭이 같으면 안 그려진 것**이다.
+
+      그리고 **대조군을 넣는다.** 없는 글꼴 이름으로도 한 번 재서, 그것이 `sans-serif` 와 **다르게**
+      나오면 재는 방법 자체가 망가진 것이므로 그때도 던진다 — 이 환경의 `document.fonts.check` 가
+      실제로 그랬다. **없는 글꼴을 "있다" 고 답했다.** 대조군이 없으면 그런 거짓 양성은 영영 안 보인다.
+      (`requestfailed` 와 `size` 는 값이 싸니 같이 보되 **그것만으로 통과시키지 않는다.**)
     */
     const fontFail: string[] = [];
     ref.on("requestfailed", (r) => {
-      if (/\.(woff2?|ttf|otf)(\?|$)/i.test(r.url()) || /fonts\./i.test(r.url())) fontFail.push(r.url());
+      if (/\.(woff2?|ttf|otf)(\?|$)/i.test(r.url()) || /fonts\./i.test(r.url())) {
+        fontFail.push(`${r.failure()?.errorText ?? "실패"} ${r.url().slice(-40)}`);
+      }
     });
     await ref.goto(`file://${refPath}`);
     await ref.waitForLoadState("networkidle").catch(() => undefined);
     await ref.evaluate(() => document.fonts.ready);
-    const faces = await ref.evaluate(() => document.fonts.size);
-    if (faces === 0 || fontFail.length > 0) {
+    const probe = (await ref.evaluate(FONT_PROBE)) as {
+      faces: number;
+      kr: { noto: number; sans: number; ctrl: number };
+      jp: { noto: number; sans: number; ctrl: number };
+    };
+    const broken = [
+      probe.kr.ctrl !== probe.kr.sans ? `대조군이 이상하다 — 없는 글꼴 폭 ${probe.kr.ctrl} ≠ sans ${probe.kr.sans}` : "",
+      probe.kr.noto === probe.kr.sans ? `'Noto Sans KR' 로 안 그려졌다 (폭이 sans-serif 와 같다: ${probe.kr.noto})` : "",
+      probe.jp.noto === probe.jp.sans ? `'Noto Sans JP' 로 안 그려졌다 (폭이 sans-serif 와 같다: ${probe.jp.noto})` : "",
+    ].filter(Boolean);
+    if (broken.length) {
       await ref.close();
       throw new Error(
-        `${id}: 참고 화면의 글꼴이 안 실렸다 (등록된 face ${faces}개` +
-          (fontFail.length ? `, 실패한 요청 ${fontFail.length}개: ${fontFail[0]}` : "") +
-          `).\n` +
-          `이대로 찍으면 참고는 시스템 기본 글꼴, 구현은 Noto 라 글자가 있는 화면이 전부 달라진다.\n` +
-          `차이값이 거짓이 되므로 멈춘다 — 망이 막혔는지 보거나, 참고를 자체 호스팅 글꼴로 옮겨라.`,
+        `${id}: 참고 화면이 지정한 글꼴로 안 그려졌다.\n  ` +
+          broken.join("\n  ") +
+          `\n  (등록된 face ${probe.faces}개` +
+          (fontFail.length ? `, 실패한 요청: ${fontFail[0]}` : ", 실패한 요청 없음") +
+          `)\n` +
+          `이대로 찍으면 참고와 구현이 다른 글꼴이라 글자가 있는 화면이 전부 달라진다.\n` +
+          `차이값이 거짓이 되므로 멈춘다 — design/fonts/ 의 파일과 화면의 @font-face 경로를 봐라.`,
       );
     }
     const refPng = await ref.screenshot({ clip: { x: 0, y: 0, width: W, height: H } });
