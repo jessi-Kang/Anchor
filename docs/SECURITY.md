@@ -4,7 +4,7 @@
 
 기능이 예쁜지, 코드가 깔끔한지는 여기서 보지 않는다. 보는 것은 셋이다. 데이터를 잃지 않는가, 남에게 새지 않는가, 지운다고 한 것이 실제로 지워지는가.
 
-점검 시각: 2026-09-20~21. 대상: `main` (`4c02ff5`) 과 프로덕션 배포(마이그레이션 `0006`).
+점검 시각: 2026-09-20~21. 대상: `main` (`096bded`) 과 프로덕션 배포(마이그레이션 `0008`).
 
 
 **2026-09-21 부터 프로덕션에 진짜 데이터가 쌓인다.** 그전까지는 시험 데이터였다. 등급의 뜻은 그대로지만 **잃음**의 값이 달라졌다 — 잃은 것을 다시 만들 방법이 2주를 다시 쓰는 것뿐이다. PITR 창은 6시간이고(`docs/BACKUP.md`), 그 안에 못 알아챈 사고는 매일 백업으로만 되돌아가며 최대 하루를 잃는다.
@@ -103,7 +103,7 @@ C6~C13 은 음성 원본에 대한 것이다. `/api/recordings` 가 들어오면
 | --- | --- | --- |
 | A1 | 돌림 (로컬) | 여덟 표 전부 `REFERENCES users(id) ON DELETE CASCADE`. 로컬 DB 에 마이그레이션을 적용하고 한 계정을 지워 여덟 표가 모두 0행이 되는 것을 봤다 |
 | A2 | 돌림 (프로덕션) | `/api/health` 200, `rls_all_enabled: true`, `node_cards` 를 포함한 표 11개 모두 `rowsecurity: true` |
-| A3 | 돌림 (프로덕션) | `/api/health` 응답의 `db_role: anchor_app`, `role_bypasses_rls: false`. 역할은 `0001` 이 `NOBYPASSRLS` 로 만든다. 소유자 역할은 `BYPASSRLS` 를 가지고 `anchor_app` 에 ADMIN 도 가지므로 언제든 앱 역할이 될 수 있다. 격리는 소유자를 막는 것이 아니라 앱이 소유자 연결을 쓰지 않는 것(A7)으로 선다 |
+| A3 | 돌림 (프로덕션) | `/api/health` 응답의 `db_role: anchor_app`, `role_bypasses_rls: false`. 프로덕션 `pg_roles` 를 직접 읽어도 `anchor_app` 은 `rolsuper`·`rolbypassrls` 둘 다 false 다. 역할은 `0001` 이 `NOBYPASSRLS` 로 만든다. 소유자 역할은 `BYPASSRLS` 를 가지고 `anchor_app` 에 ADMIN 도 가지므로 언제든 앱 역할이 될 수 있다. 격리는 소유자를 막는 것이 아니라 앱이 소유자 연결을 쓰지 않는 것(A7)으로 선다 |
 | A4 | 돌림 (임시 브랜치) | 부록 스크립트를 임시 브랜치에서 두 계정으로 돌렸다(2026-09-20, `0005` 기준). 14단계 전부 기대값과 같다. 컨텍스트 없이 0행, A 는 A 만, B 의 행은 id 를 알아도 0행, B 를 고치거나 지우면 0행, B 소유로 INSERT 는 `42501`, 삭제 원장 읽기는 `permission denied`, 공용 노드는 읽히고 만들 수는 없다 |
 | A5 | 읽음 | `withoutUser()` 를 쓰는 곳은 `/api/health` 하나다. 나머지 사용자 데이터 경로는 전부 `withUser()` |
 | A6 | 돌림 (로컬) | `node_cards` 만 `USING (true)` 를 쓰고 SELECT 전용이다. 로컬 DB 에서 `anchor_app` 으로 돌렸다 — 공용 노드에 쓰기는 되고, **내 개인 노드에 쓰면 `42501` 로 막히고**, 읽기와 공용 행 UPDATE 는 되고, DELETE 는 권한이 없다 |
@@ -116,12 +116,12 @@ C6~C13 은 음성 원본에 대한 것이다. `/api/recordings` 가 들어오면
 | B6 | 읽음 | 커밋 메시지 전문 검색에서 0건 |
 | C1 | 읽음 | `requireUser()` 로 401, `confirm: "삭제"` 아니면 400. 미들웨어가 `/api/account/*` 도 막고, 세션 없이 부르면 307 이다(프로덕션). HTTP 계층 전체를 돌려 보지는 못했다 — **이 항목이 한 번 거짓이었다.** 원장 INSERT 가 권한에 막혀 삭제가 500 으로 끝나던 것을 읽어서는 못 잡았다 |
 | C2 | 돌림 (로컬·임시 브랜치) | 한 계정을 지워 `inputs`·`cards`·`chunks`·`recordings`·`user_node_state`·`encounters`·개인 `nodes` 가 전부 0행이 되는 것을 봤다(로컬). 임시 브랜치에서는 같은 순간 다른 계정의 행이 그대로인 것도 확인했다 — CASCADE 가 계정 경계를 넘지 않는다 |
-| C3 | 돌림 (로컬) | 로컬 DB 에서 계정을 지운 뒤 **소유자 연결로 원장을 보니 그 행이 남아 있다**. `account_deletions` 는 `users` 를 참조하지 않아 CASCADE 에 딸려 가지 않는다. 앱 역할로는 원장을 읽지 못한다(`permission denied`, 같이 확인) |
+| C3 | 돌림 (로컬) | 로컬 DB 에서 계정을 지운 뒤 **소유자 연결로 원장을 보니 그 행이 남아 있다**. `account_deletions` 는 `users` 를 참조하지 않아 CASCADE 에 딸려 가지 않는다. 앱 역할로는 원장을 읽지 못한다(`permission denied`, 같이 확인). 프로덕션에서도 `anchor_app` 의 `account_deletions` 권한은 `INSERT` 하나뿐이다 |
 | C4 | **확인 못 함** | 코드 경로는 있다. 첫 백업이 2026-09-20 이라 35일 만료 삭제는 아직 한 번도 돌지 않았다. 2026-10-25 이후에 실제 파일 목록으로 확인한다 |
 | C5 | 읽음 | 삭제 요청 뒤의 백업에는 그 계정이 없다. 마지막 사본은 요청 직전 백업이고 `requested_at` 보다 이르다. 원장 표시 시각(`requested_at` + 보존 기간)이 그보다 늦다 |
 | C6 | 절반 | (읽음) `/api/recordings` 가 `access: "private"` 로 올리고, 키가 `voice/<user_id>/…` 라 계정별로 갈린다. DB 에는 URL 이 아니라 pathname 만 남는다. **못 돌린 쪽**: 올라간 오브젝트 URL 을 로그아웃 상태로 열어 막히는지. Blob 이 걸려 로컬로는 안 된다 |
 | C7 | 해당 없음 | 원본을 다시 들려주는 경로가 아직 없다. 생기는 순간 확인한다 |
-| C8 | 읽음 | 업로드가 그 사용자의 `voice_retention_days` 를 읽어 `audio_expires_at` 을 정한다. 30 은 행이 없을 때의 대비값일 뿐이다 |
+| C8 | 돌림 (프로덕션) | 프로덕션 `recordings` 두 행 모두 `audio_expires_at - created_at` 이 정확히 30일이고, `audio_object_key` 와 `pitch` 가 둘 다 있다. 업로드가 그 사용자의 `voice_retention_days` 를 읽어 정한다. 30 은 행이 없을 때의 대비값일 뿐이다 |
 | C9 | 읽음 | `/api/cron/voice` 가 매일 돈다. 오브젝트를 지운 뒤에만 `audio_object_key` 를 NULL 로 만들고, 실패한 건은 행을 남겨 다음 번에 다시 집는다. `CRON_SECRET` 없이 부르면 403(프로덕션에서 확인) |
 | C10 | 읽음 | `pitch` 는 `recordings` 행에 있고 오브젝트와 따로 산다 |
 | C11 | 해당 없음 | 설정에 보관 기간을 바꾸는 행이 아직 없다 |
@@ -135,14 +135,14 @@ C6~C13 은 음성 원본에 대한 것이다. `/api/recordings` 가 들어오면
 | E2 | 돌림 (프로덕션) | 헤더 없이 호출하면 403 |
 | E3 | 돌림 (로컬) | 백업 라우트와 같은 표 목록·컬럼 제한으로 덤프를 떠 보니 `neon_auth.account` 에 `id,accountId,providerId,userId,createdAt,updatedAt` 만 실리고 토큰 컬럼은 없다. 매일 JSON 백업은 매핑 컬럼만 뜨고, `pg_dump` 는 `--exclude-table-data='neon_auth.account'` 로 그 표의 행을 뺀다 |
 | E4 | 돌림 (로컬) | 빈 DB 에 `pnpm db:migrate` → `pnpm backup:restore` 를 실제로 돌렸다. `anchor_app` 이 `BYPASSRLS` 없이 되살아나고, 표 전부 RLS 가 켜지고, 정책 19개가 선다. 복원된 DB 에서 두 계정이 각자 자기 행만 본다. 절차 C 에서 역할·RLS 를 되살리는 것은 마이그레이션이다 — `db/recovery/reapply-roles-and-rls.sql` 은 pg_dump 경로용이라 아직 읽음 |
-| E5 | 돌림 (프로덕션) | `main` 과 프로덕션이 둘 다 `0006` 이다. `main` 을 체크아웃한 복구가 프로덕션 스키마를 그대로 다시 만든다 |
+| E5 | 돌림 (프로덕션) | 프로덕션 `schema_migrations` 8행과 `main` 의 `db/migrations/` 8개가 이름까지 같다(`0008_recordings_client_id.sql` 까지). `0007`·`0008` 은 2026-09-21 04:29 에 적용됐고 `main` 에 들어 있다 — 스키마가 `main` 보다 앞서 있지 않다. `main` 을 체크아웃한 복구가 프로덕션 스키마를 그대로 다시 만든다 |
 | E6 | **못 지킴** | 백업은 `neon_auth.user`·`account` 를 담지만 복원 스크립트는 `public.*` 만 넣는다 (3장 L2) |
 | E7 | **확인 못 함** | `docs/BACKUP.md` 의 리허설 표가 비어 있다. 백업에서 실제로 복구된 적이 없다 (3장 L3) |
 | F1 | **확인 못 함** | 로그인 시작이 내려주는 쿠키는 `__Secure-` 접두사에 `HttpOnly; Secure; SameSite=Lax; Path=/` 를 모두 갖는다. 로그인을 마친 뒤의 세션 쿠키는 실제 Google 로그인이 있어야 본다 |
 | F2 | 읽음 | `src/lib/env.ts` 가 32자 미만이면 시작 시점에 던진다 |
 | F3 | 돌림 (프로덕션) | 세션 없이 `/today`·`/settings`·`/onboarding/languages`·`/api/export`·`/api/account/delete` 가 모두 307 로 `/` 로 간다 |
 | F4 | 읽음 | `src/app/api/**` 와 `**/actions.ts` 를 훑어 `requireUser()`·`currentUser()` 가 없는 것을 찾으면 셋뿐이고 각각 이유가 있다 — 인증 프록시, `CRON_SECRET` 으로 막힌 크론 둘, 사용자 데이터가 없는 헬스체크. 나머지는 전부 먼저 부른다 |
-| F5 | 읽음 | matcher 에서 뺀 셋은 `/api/auth`(인증 자체), `/api/health`(사용자 데이터 없음), `/api/cron`(`CRON_SECRET` 으로 막힘) |
+| F5 | 돌림 (프로덕션) | matcher 에서 뺀 셋은 `/api/auth`(인증 자체), `/api/health`(사용자 데이터 없음), `/api/cron`(`CRON_SECRET` 으로 막힘)이다. **뺀 것은 경로 셋이 아니라 접두사 셋이다** — 프로덕션에서 `/api/authorize-test`·`/api/cron-admin`·`/api/healthz-internal`·`/api/auth-nope` 는 프록시를 타지 않고 404 로 가고, 보통의 없는 주소 `/api/definitely-not-a-route` 는 307 로 간다. 지금 그 자리에 사는 라우트가 없고 실제 라우트는 전부 `requireUser()` 를 스스로 부르므로 열린 곳은 없다 (3장 N7) |
 | F6 | 돌림 (프로덕션) | 시험 로그인은 세 겹으로 닫힌다. `next.config.ts` 가 `dev.ts` 를 `pageExtensions` 에 넣을 때만 라우트가 되고(`next build` 는 `NODE_ENV=production` 을 스스로 켠다), 부르는 쪽은 빌드 시점에 접히는 조건 안에서만 동적 import 하며, `testLoginEnabled()` 가 런타임에 다시 본다. 빌드 라우트 목록에 없고 `.next` 문자열 0건이며, 프로덕션에서 `/api/test-login` 은 없는 주소와 똑같이 307 이다 |
 
 ## 3. 못 지키는 것과 그 이유
@@ -236,19 +236,34 @@ WITH CHECK (user_id = app.current_user_id()
 
 그래서 이 항목은 코드를 읽어서는 끝나지 않는다. Jessi 가 두 곳을 한 번 확인하고 그 사실을 여기 적어야 판정이 닫힌다. 지금 사용자가 한 명이고 나가는 양이 적어 급하지는 않다.
 
+### N7 · 나중에 — 프록시 matcher 가 경로가 아니라 접두사를 뺀다
+
+`src/proxy.ts` 의 matcher 는 `"/api/((?!auth|health|cron).*)"` 다. 부정 전방탐색은 `/api/` 바로 뒤 한 자리에서 한 번 걸리므로, **이름이 `auth`·`health`·`cron` 으로 시작하기만 하면** 그 경로는 프록시를 타지 않는다. 뺀 것이 세 경로가 아니라 세 접두사다.
+
+프로덕션에서 그대로 보인다. `/api/authorize-test`·`/api/cron-admin`·`/api/healthz-internal`·`/api/auth-nope` 는 404 로 가고 프록시의 307 이 붙지 않는다. 같은 자리의 보통 주소 `/api/definitely-not-a-route` 는 307 이다.
+
+**지금 열린 곳은 없다.** 그 접두사로 시작하는 라우트는 `auth`·`health`·`cron` 셋뿐이고 전부 의도한 것이며, 나머지 라우트는 프록시와 별개로 `requireUser()` 를 스스로 부른다. 막는 것이 두 겹이라 한 겹이 비어도 데이터가 나가지 않는다.
+
+걸리는 날은 `/api/authorize`·`/api/cron-status` 같은 이름의 라우트를 새로 만들면서 `requireUser()` 를 빠뜨리는 날이다. 프록시가 막아 줄 것이라고 읽고 넘어가기 쉬운 자리다.
+
+제안: 경로 셋만 빼도록 경계를 박는다.
+
+```ts
+matcher: ["/api/((?!auth/|auth$|health$|cron/).*)"]
+```
+
 ## 4. 다음에 돌려 볼 것
 
 읽어서 내린 판정 중 **런타임에만 드러나는 성질**에 걸린 것들이다. 코드가 맞게 보여도 권한·정책·순서가 어긋나면 동작하지 않는다. 계정 삭제가 그렇게 한 번도 성공한 적이 없었다.
 
 | # | 무엇을 돌려야 하는가 |
 | --- | --- |
-| C1 | 로그인한 계정으로 `POST /api/account/delete` 를 실제로 눌러 200 이 오는지. 확인 문구 없이 400, 세션 없이 401 인지 |
+| C1 | 로그인한 계정으로 `POST /api/account/delete` 를 실제로 눌러 200 이 오는지. 확인 문구 없이 400, 세션 없이 401 인지. **Jessi 계정으로 누르지 않는다** — 프로덕션 `users` 는 1행이고 `account_deletions` 는 0행이라, 삭제는 한 번도 돈 적이 없고 여기서 돌리면 되돌릴 것이 그 계정뿐이다. 시험 계정으로 돌린다 |
 | C6 | 업로드된 오브젝트 URL 을 로그아웃 상태로 열어 막히는지 |
-| C8 | 업로드 뒤 `audio_expires_at` 이 그 사용자의 보관 기간으로 실제로 찍히는지 |
 | C9 | 만료된 행을 만들어 크론을 돌려 오브젝트가 사라지고 키가 NULL 이 되는지. 삭제가 실패했을 때 행이 남는지 |
 | C12 | 녹음이 있는 계정을 지워 오브젝트가 실제로 사라지는지. 스토리지 삭제가 실패할 때 DB 가 남는지 |
 | C13 | 남의 `card_id` 로 녹음을 올려 실제로 거부되는지 |
-| C5 | 보존 기간이 지난 뒤 원장의 `backups_purged_at` 이 채워지는지 (2026-10-25 이후) |
+| C5 | 보존 기간이 지난 뒤 원장의 `backups_purged_at` 이 채워지는지 (2026-10-25 이후). 프로덕션 원장이 0행이라 아직 채워질 행 자체가 없다 |
 | E1 | 백업 Blob 이 실제로 비공개인지 (URL 을 인증 없이 열어 본다) |
 | F4 | 미들웨어를 우회한 요청이 라우트 자체에서 막히는지 |
 
@@ -260,7 +275,10 @@ WITH CHECK (user_id = app.current_user_id()
 
 - `src/app/api/test-login/route.dev.ts` 만 `safeNext` 를 쓰지 않고 옛 가드를 그대로 둔다. 그 라우트는 프로덕션 빌드에 없어 지금 뚫릴 곳이 아니다. 파일 이름이나 빌드 조건이 바뀌는 날 같이 본다.
 - 소유자 역할 `neondb_owner` 는 `BYPASSRLS` 가 **있다**. 앱이 소유자 연결을 쓰면 RLS 가 통째로 무력화된다 — A7 이 협상 불가인 이유다. `anchor_app` 은 `BYPASSRLS`·`SUPERUSER` 둘 다 없다.
-- 프로덕션 DB 에는 이 세션이 닿지 못한다(SQL 실행 거부, 5432 막힘, 자격증명 취급 차단). 프로덕션에서만 드러나는 것은 DB 에 닿는 세션이 돌리고 출력을 받아 판정한다. **로컬 Postgres 로 되는 것은 직접 돌린다.**
+- **이 세션이 프로덕션 DB 를 조회로 읽는다.** Neon MCP `run_sql` 이 `autumn-tooth-07283388` / `br-round-scene-b39mbs9g` / `neondb` 에 붙는다. 붙는 역할은 `neondb_owner` 라 RLS 를 통과해 전부 읽으므로, **RLS 가 실제로 막는지는 이 길로 검증되지 않는다** — 그건 `anchor_app` 으로 붙거나 `SET LOCAL ROLE anchor_app` 을 걸어야 한다. 조회만 한다. 쓰기·DDL·삭제·복원은 하지 않는다.
+- 연결 문자열은 여전히 얻지 않는다. `get_connection_string` 과 `list_credentials` 는 하네스가 막고(Credential Materialization·Credential Exploration), 막힌 채로 둔다. 필요가 없다 — `run_sql` 은 자격증명 없이 돌고, 앱이 어느 역할로 붙어 있는지는 `/api/health` 가 밖에서 답한다.
+- Neon `query_logs` 는 이 브랜치에서 빈 배열을 돌려준다(텔레메트리 미설정). 어느 역할이 언제 붙었는지를 로그로 확인하는 길은 없다.
+- **로컬 Postgres 로 되는 것은 직접 돌린다.**
 
 ## 부록. A4 검증 스크립트 (두 계정 RLS)
 
