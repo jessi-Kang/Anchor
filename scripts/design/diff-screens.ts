@@ -160,9 +160,34 @@ async function main() {
     }
 
     const ref = await ctx.newPage();
+    /*
+      **글꼴이 안 실리면 여기서 멈춘다.** `document.fonts.ready` 는 스타일시트를 **못 받아도**
+      지켜진다 — 기다릴 것이 없으니 즉시 resolve 한다. 그러면 참고는 시스템 기본 sans 로 그려지고
+      구현은 자체 호스팅 Noto 로 그려져서, **글자가 있는 화면은 전부 다르게 나온다.** 그 값으로
+      "볼 차례" 를 정하면 순서 자체가 거짓이다.
+
+      **안 보이는 오류를 보이는 오류로 바꾼다** — 그려서 틀린 수를 내놓느니 멈추고 왜인지 말한다.
+      자체 호스팅으로 옮긴 뒤에도 이 문이 필요하다: 파일 이름이나 경로가 어긋나는 날 **똑같이 조용히**
+      틀릴 자리이기 때문이다 (design/SCREENS.md).
+    */
+    const fontFail: string[] = [];
+    ref.on("requestfailed", (r) => {
+      if (/\.(woff2?|ttf|otf)(\?|$)/i.test(r.url()) || /fonts\./i.test(r.url())) fontFail.push(r.url());
+    });
     await ref.goto(`file://${refPath}`);
     await ref.waitForLoadState("networkidle").catch(() => undefined);
     await ref.evaluate(() => document.fonts.ready);
+    const faces = await ref.evaluate(() => document.fonts.size);
+    if (faces === 0 || fontFail.length > 0) {
+      await ref.close();
+      throw new Error(
+        `${id}: 참고 화면의 글꼴이 안 실렸다 (등록된 face ${faces}개` +
+          (fontFail.length ? `, 실패한 요청 ${fontFail.length}개: ${fontFail[0]}` : "") +
+          `).\n` +
+          `이대로 찍으면 참고는 시스템 기본 글꼴, 구현은 Noto 라 글자가 있는 화면이 전부 달라진다.\n` +
+          `차이값이 거짓이 되므로 멈춘다 — 망이 막혔는지 보거나, 참고를 자체 호스팅 글꼴로 옮겨라.`,
+      );
+    }
     const refPng = await ref.screenshot({ clip: { x: 0, y: 0, width: W, height: H } });
     await ref.close();
 
