@@ -7,7 +7,7 @@ import { countChunks } from "@/lib/db/chunks";
 import { KNEW_VERB } from "@/lib/cards/progress";
 import { inputRowData, toInputRow, splitForHome } from "@/lib/cards/input-rows";
 import { inputFrom } from "@/lib/input-name";
-import { enabledLanguages, homeRedirect, inputPath, LANG_LABEL, LANG_START } from "@/lib/languages";
+import { enabledLanguages, homeRedirect, inputPath, LANG_LABEL, LANG_START, talkPath } from "@/lib/languages";
 import { withParticle } from "@/lib/ko";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Title, Lead, Card, Label, Grow, Button, Ghost } from "@/components/ui";
@@ -117,7 +117,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           title: "못 한 말",
           sub: talkCount > 0 ? `${talkCount}개` : "한 줄이면 돼",
           next: null,
-          href: talkCount > 0 ? "/talk/past" : "/talk",
+          href: talkPath(talkCount),
         },
       ]
     : [];
