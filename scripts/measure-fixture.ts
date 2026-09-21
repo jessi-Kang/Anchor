@@ -195,10 +195,16 @@ async function main() {
     );
 
     // ── 곡선 ──────────────────────────────────────────────────────────────────
-    const chunk = async (text: string, lang: "en" | "ja", ago: number) => {
+    /*
+      **문안 출처를 `authored` 로 적는다.** 세는 쪽이 `claude`·`authored` 만 곡선에 넣으므로, 안 적으면
+      시드가 만든 덩어리가 통째로 걸러져 "5회차 없음" 이 뜬다 — 배관이 도는지를 못 보게 된다.
+      `claude` 로 적지 않는 이유는 따로다: 그러면 시드 문안과 진짜 생성 문안을 못 가른다.
+    */
+    const chunk = async (text: string, lang: "en" | "ja", ago: number, source = "authored") => {
       const { rows } = await client.query<{ id: string }>(
-        "INSERT INTO chunks (user_id, lang, situation, text, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-        [USER_ID, lang, "합성 상황", text, daysAgo(ago)],
+        `INSERT INTO chunks (user_id, lang, situation, text, created_at, meta)
+         VALUES ($1, $2, $3, $4, $5, jsonb_build_object('content_source', $6::text)) RETURNING id`,
+        [USER_ID, lang, "합성 상황", text, daysAgo(ago), source],
       );
       return rows[0].id;
     };
@@ -220,9 +226,19 @@ async function main() {
       **기준선이 영어 목소리가 읽은 한국어**라 그 숫자에 뜻이 없다. 곡선 집계에서 빠지고 대신
       머리말에 세어져야 한다 — 안 보이게 빼면 표본이 왜 작은지를 못 가른다.
     */
-    const bad = await chunk("이건 다음 스프린트로 미루죠", "en", 7);
-    await client.query("UPDATE chunks SET meta = meta || '{\"content_source\":\"fallback\"}'::jsonb WHERE id = $1", [bad]);
+    const bad = await chunk("이건 다음 스프린트로 미루죠", "en", 7, "fallback");
     await attempts({ chunk: bad }, [0.5, 0.4, 0.3, 0.2, 0.05], LANG_VOICE, 66, 7);
+
+    /*
+      **실패 케이스 9 — 문안 출처가 아예 안 적힌 덩어리.** `content_source` 는 optional 이라 값이
+      없는 행이 실제로 있다. "fallback 이면 뺀다" 는 이걸 조용히 통과시키므로 허용 목록으로 거른다.
+      폴백과 따로 세어져야 한다 — 신호가 다르다.
+    */
+    const { rows: noSrc } = await client.query<{ id: string }>(
+      "INSERT INTO chunks (user_id, lang, situation, text, created_at) VALUES ($1, 'en', '합성 상황', $2, $3) RETURNING id",
+      [USER_ID, "sounds good to me", daysAgo(7)],
+    );
+    await attempts({ chunk: noSrc[0].id }, [0.5, 0.4, 0.3, 0.2, 0.05], LANG_VOICE, 77, 7);
 
     // **실패 케이스 6 — 일본어.** 계산은 하지만 M4 판정에는 안 들어간다. 영어와 합치면 그 결정이 사라진다.
     // 위에서 이미 착지한 카드에 회차를 매단다 — 곡선용 카드를 따로 만들면 "착지한 한자" 수가
@@ -239,7 +255,7 @@ async function main() {
   console.log("          支 는 \"열었다\" 여야 한다 — 재투입(D-6, 안 열었다)이 아니라 진짜 새 자료(D-4)를 세야 맞다.");
   console.log("          거꾸로 거르면 支 를 잃고 분모 9 · 분자 7 = 77.8% 가 나온다 — 비율이 위로 부푼다");
     console.log("  곡선 영어: 가까워진 대상 1 / 2   (3회차뿐인 것 · 겨눈 곡선이 없는 것 · 폴백 문안은 빠진다)");
-  console.log("          폴백 문안이라 뺀 대상 1개");
+  console.log("          폴백 문안이라 뺀 대상 1개 · 문안 출처가 안 적힌 대상 1개");
     console.log("          기준선 출처가 안 남은 대상 1개");
     console.log("  곡선 일본어: 가까워진 대상 1 / 1  (따로 적히고 통과·미달에 안 들어간다)");
   } finally {
