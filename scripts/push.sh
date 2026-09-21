@@ -37,6 +37,15 @@ if ! git merge origin/main -m "chore: main 을 가져와 합친다 — 밀기 �
   exit 1
 fi
 
+# **main 이 무엇을 받는지 찍는다. 묻지도 멈추지도 않는다.**
+# 기계는 이 가지가 무엇을 일부러 붙들고 있는지 모른다 — 막게 만들면 언젠가 멀쩡한 밀기를 막고,
+# 그때 사람이 이 명령을 안 쓰게 된다. 대신 **미는 수 옆에 무엇을 미는지**를 같이 둔다.
+# 자리가 ② 앞인 것도 일부러다: verify 가 도는 몇 분이 이 목록을 읽을 시간이다.
+if [ "$to_main" = yes ]; then
+  step "① ′ main 이 받을 커밋"
+  git log --oneline origin/main..HEAD || true
+fi
+
 step "② 잰다 — 합친 나무를. 종료 코드 하나"
 if ! pnpm verify >"$log" 2>&1; then
   printf '빨강이다. 안 민다.\n\n'
@@ -56,7 +65,15 @@ git push -u origin "$branch"
 
 if [ "$to_main" = yes ]; then
   step "④ 민다 — main"
-  git push origin HEAD:main
+  # **거부되면 한 줄 찍고 죽는다. 여기서 되풀이하지 않는다.**
+  # 안에서 다시 걸면 「몇 번까지」라는 값이 새로 생기고, 새 값은 또 틀릴 자리다.
+  # 안 찍으면 다음 사람이 `git push` 를 손으로 치는데, **그러면 ②가 통째로 빠진다** — 그게
+  # 오늘 `merge: main` 이 난 길이다. 다시 돌리면 ①부터라 그새 들어온 것까지 합쳐서 다시 잰다.
+  if ! git push origin HEAD:main; then
+    printf '\nmain 이 그새 움직였다. **같은 명령을 다시 돌려라** — ①부터 다시 합치고 다시 잰다.\n'
+    printf '손으로 `git push` 하지 마라. 그러면 ②(재기)가 빠진다.\n'
+    exit 1
+  fi
 fi
 
 printf '\n끝. 잰 나무 그대로 밀었다.\n'
