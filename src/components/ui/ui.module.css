@@ -225,7 +225,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja);
   font-size: var(--font-size-kanji-sm);
   font-weight: 700;
   color: var(--color-text1);
@@ -343,7 +343,7 @@ a.row,
   border: 0;
   background: transparent;
   resize: vertical;
-  font-family: var(--font-jp), var(--font-kr), "Noto Sans JP", sans-serif;
+  font-family: "AnchorParts", var(--font-jp), var(--font-kr), "Noto Sans JP", sans-serif;
   font-size: 16px;
   font-weight: 500;
   line-height: 1.8;
@@ -357,7 +357,7 @@ a.row,
 
 /* 일본어 글자. 목록 행(30px) / 44px / 84px / 132px, 카드 출처 문장 30px */
 .ja {
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja);
   font-weight: 700;
 }
 /* 뽑기(F03) 행의 한자. 행 제목 크기(18px)로 두면 한글 부제와 구별이 안 가고 참고 화면보다 작다.
@@ -424,7 +424,7 @@ a.row,
 /* 출처 문장 30px (F04) */
 .source {
   margin: 0;
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja);
   font-size: 30px;
   font-weight: 700;
   line-height: 1.5;
@@ -456,7 +456,7 @@ a.row,
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja);
   font-size: 68px;
   font-weight: 700;
   line-height: 1;
@@ -521,7 +521,7 @@ a.row,
   justify-content: center;
 }
 .reading {
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja);
   font-size: 30px;
   font-weight: 700;
   color: var(--color-accent-dark);
@@ -559,7 +559,7 @@ a.row,
   gap: 6px;
 }
 .landingRuby {
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja);
   font-size: 17px;
   font-weight: 700;
   color: var(--color-accent-dark);
@@ -588,14 +588,14 @@ a.row,
 }
 .speakBig {
   margin: 0;
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja);
   font-size: 56px;
   font-weight: 700;
   line-height: 1;
   color: var(--color-text1);
 }
 .speakReading {
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja);
   font-size: 22px;
   font-weight: 700;
   color: var(--color-accent-dark);
@@ -690,7 +690,7 @@ a.row,
 
 /* F12 본문. 줄 간격이 넓은 건 ruby 가 줄 위로 올라가기 때문이다 (design/screens/F12.html). */
 .metBody {
-  font-family: var(--font-jp), "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja);
   font-size: 21px;
   font-weight: 500;
   line-height: 1.9;
