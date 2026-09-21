@@ -198,6 +198,26 @@ export function nextCandidates(prog: InputProgress, justLit?: string): Candidate
     // `openKanji`·`nextKanji` 와 같은 규칙으로 뺀다 — 셋이 갈리면 화면마다 다음이 달라진다.
     .filter((n) => Boolean(n.meta.ko_sound) && !known.has(n.key) && !landed.has(n.key))
     .map((n) => {
+      /*
+        **후보 자신의 key 는 `owner` 에서 안 찾는다. 빠뜨린 게 아니라 일부러다.**
+
+        `owner` 에는 방금 켠 한자의 **부품**도 들어간다(協 을 켜면 `十`·`力` 이 키가 된다). 그래서
+        후보의 `key` 까지 여기서 보면, **방금 카드가 부품으로 보여 준 글자**가 바로 다음 카드로
+        올라온다 — `協` 을 푼 직후의 `力` 이 그렇다.
+
+        **그러면 발견이 없다** (원칙 1). Scene2 가 이미 그 모양을 띄우고 이름까지 불렀는데, 다음
+        카드의 Scene1 이 "이 력, 한자로는 어떤 모양일까?" 를 묻는다. **답이 두 화면 전에 떠 있던**
+        물음이라 추측할 자리가 아니다. 「아는 것 + 1」의 +1 은 **새로 발견할 것**이지 방금 화면에
+        뜬 것이 아니다.
+
+        부품으로 본 글자를 다시 만나는 일은 카드가 아니라 **F12(재만남)** 가 맡는다 (원칙 4,
+        `docs/FLOW.md` 4장). 그래서 그 글자는 자료에 같이 나온 다른 글자들과 동점에서 출발하고,
+        순서는 자료에 나온 차례가 정한다.
+
+        **그래도 `owner` 에서 그 항목을 빼지는 않는다.** `力 → 協` 은 **`力` 을 부품으로 가진 다른
+        후보**(예: `助`)가 쓴다 — 그때 `shared = [力]` 이 되고 이유 한 줄의 주어가 `協` 으로 선다.
+        점수를 안 주는 것과 주어를 못 찾게 하는 것은 다른 일이다.
+      */
       const shared = [...new Set(n.meta.parts ?? [])].filter((part) => owner.has(part));
       const viaKanji = shared.length ? owner.get(shared[0])! : null;
       return {
