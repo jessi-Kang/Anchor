@@ -31,7 +31,11 @@ step() { printf '\n── %s\n' "$1"; }
 
 step "① 합친다 — main 을 가져와 이 자리에서"
 git fetch origin main
-git merge origin/main -m "chore: main 을 가져와 합친다 — 밀기 전 ① ($branch)"
+if ! git merge origin/main -m "chore: main 을 가져와 합친다 — 밀기 전 ① ($branch)"; then
+  printf '\n충돌이다. 풀고 **이 명령을 다시** 돌려라 — 풀어 둔 채로 두지 말고.\n'
+  printf '풀어 놓고 나중에 미는 것이 곧 「미리 합쳐 둔 것」이다. 그 사이에 main 이 또 늙는다.\n'
+  exit 1
+fi
 
 step "② 잰다 — 합친 나무를. 종료 코드 하나"
 if ! pnpm verify >"$log" 2>&1; then

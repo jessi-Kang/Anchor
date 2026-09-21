@@ -131,7 +131,9 @@ export function MetText({
 
   return (
     <>
-      <Card>
+      {/* 덩어리 하나가 카드를 채우는 자리라 `whole` 이다 — 그래프(F11)와 같은 값이고, 전에는
+          F11 만 손으로 받아서 이 카드만 어긋나 있었다 (design/SCREENS.md 카드 여백 절). */}
+      <Card whole>
         {/* 화면마다 h1 하나 (CLAUDE.md). 상단 "지금 어디" 라벨은 제목이 아니다 — 이 화면의 제목은
             다시 읽는 그 자료의 이름이다. Scene1~5 가 같은 꼴로 카드 라벨을 h1 으로 쓴다. */}
         <Label as="h1">{name}</Label>
