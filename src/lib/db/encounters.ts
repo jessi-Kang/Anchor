@@ -20,7 +20,12 @@ import { withUser } from "@/lib/db";
  * 으로 고른다 (MEASURE 0′). 고쳐 쓰면 첫 판정이 사라지는데 **그 오차는 한쪽으로만 난다** —
  * 다시 읽으면 알아볼 확률이 언제나 올라가니 인식률이 위로만 부푼다.
  */
-export type EncounterRow = { nodeId: string; recognized: boolean };
+/**
+ * `recognized` 는 셋이다. **`null` 은 "안 적음" 이 아니라 "판정할 자리가 아니었다" 다**
+ * (`docs/MEASURE.md` 0′장). 아예 안 적으면 분모가 왜 작은지를 못 가른다 — 자료에 안 나와서 작은
+ * 것과, 안 만난 글자가 섞인 덩어리에 갇혀서 작은 것은 손쓸 방법이 다르다.
+ */
+export type EncounterRow = { nodeId: string; recognized: boolean | null };
 
 export function recordEncounters(userId: string, inputId: string, rows: EncounterRow[]) {
   if (rows.length === 0) return Promise.resolve();

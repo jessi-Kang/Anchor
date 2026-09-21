@@ -78,9 +78,11 @@ export async function startCard(inputId: string, kanji: string) {
  * 만난 한자는 전부 `recognized = false`, 안 연 덩어리의 만난 한자는 `true` 다 — 실제로 일어난
  * 행동 하나가 그것이다. 묻지 않았으니 자기 보고가 아니고, 점수도 정답도 없으니 시험이 아니다.
  *
- * **다 만난 덩어리만 적는다.** 妥協 처럼 안 만난 글자가 섞인 덩어리는 처음부터 열 수 없게 해 뒀으므로
- * (읽기를 열면 다음 카드의 답이 샌다) 그 안의 만난 글자에는 **판정이 일어난 적이 없다.** 그런 자리를
- * true 로 적으면 열어 볼 기회가 없던 것을 "열지 않고 읽었다" 로 세게 된다 — 분자를 부풀리는 값이다.
+ * **판정이 일어날 수 없었던 자리는 `null` 로 적는다.** 妥協 처럼 안 만난 글자가 섞인 덩어리에서는
+ * 그 안의 만난 글자에 **판정이 일어난 적이 없다.** true 로 적으면 기회가 없던 것을 "열지 않고
+ * 읽었다" 로 세게 되어 분자가 부푼다. 그렇다고 안 적으면 분모가 왜 작은지를 못 가른다 — 자료에 안
+ * 나와서 작은 것과 섞인 덩어리에 갇혀서 작은 것은 손쓸 방법이 다르다. 그래서 적되 분모에서 빼고,
+ * 그 수를 `pnpm measure` 가 따로 보여 준다 (`docs/MEASURE.md` 0′장).
  *
  * 화면을 그냥 떠나면 이 함수가 안 불린다. 반쯤 읽은 것을 판정으로 만들지 않는다.
  */
@@ -92,9 +94,21 @@ export async function finishRead(inputId: string, opened: number[]) {
     const nodeOf = new Map(prog.nodes.map((n) => [n.key, n.id]));
     const open = new Set(opened);
     const rows = runStates(input.body, prog.anchors)
-      .flatMap((run, i) => (run.allMet ? run.chars.map((c) => ({ ch: c, recognized: !open.has(i) })) : []))
-      // 같은 글자가 두 덩어리에 나오면 **연 적이 있는 쪽**을 남긴다. 한 번이라도 막혔으면 막힌 것이다.
-      .reduce<Map<string, boolean>>((acc, r) => acc.set(r.ch, (acc.get(r.ch) ?? true) && r.recognized), new Map());
+      .flatMap((run, i) =>
+        run.allMet
+          ? run.chars.map((c) => ({ ch: c, recognized: !open.has(i) as boolean | null }))
+          : // 안 만난 글자가 섞인 덩어리. 그 안의 **만난 글자**는 만나기는 했으나 판정이 일어날 수
+            // 없었으므로 null 로 적는다. 안 만난 글자는 애초에 이 지표의 대상이 아니라 안 적는다.
+            run.met.map((c) => ({ ch: c, recognized: null as boolean | null })),
+      )
+      // 같은 글자가 두 덩어리에 나오면 **판정이 일어난 쪽**이 이긴다 — 한 자리에서 실제로 읽어 낸
+      // 사실이 "판정할 자리가 아니었다" 보다 무겁다. 판정이 둘이면 **연 적이 있는 쪽**을 남긴다:
+      // 한 번이라도 막혔으면 막힌 것이다.
+      .reduce<Map<string, boolean | null>>((acc, r) => {
+        const had = acc.get(r.ch);
+        if (r.recognized === null) return acc.has(r.ch) ? acc : acc.set(r.ch, null);
+        return acc.set(r.ch, had === null || had === undefined ? r.recognized : had && r.recognized);
+      }, new Map());
     const payload = [...rows].flatMap(([ch, recognized]) => {
       const nodeId = nodeOf.get(ch);
       return nodeId ? [{ nodeId, recognized }] : [];
