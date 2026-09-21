@@ -77,6 +77,12 @@ export const HOME_MAX = 4;
  * 가는 길은 안 끊긴다.
  *
  * `rows` 는 최근 순으로 들어온다(`listInputs`). 자른 뒤에도 그 순서를 지킨다.
+ *
+ * **순수 함수지만 그게 안전을 뜻하지는 않는다.** 홈과 F19 가 이 함수를 같이 쓰는데 **넣는 목록이
+ * 다르면 같은 함수도 다른 답을 낸다.** 실제로 홈이 10개, F19 가 100개를 넣던 때 11번째 아래의
+ * 안 끝낸 자료가 **두 화면 어디에도 안 떴다** — F19 는 제가 계산한 `home` 에 그걸 넣고 "홈에 선
+ * 것은 여기 안 낸다" 며 빼고, 홈은 애초에 안 불러왔다. 그래서 목록 수는 `INPUT_LIST` 하나다
+ * (`lib/db/inputs.ts`). **이 함수를 부르는 두 곳은 같은 목록을 봐야 한다.**
  */
 export function splitForHome(all: InputRowData[]): { home: InputRowData[]; rest: InputRowData[] } {
   const home: InputRowData[] = [];

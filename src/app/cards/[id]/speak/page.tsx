@@ -54,7 +54,10 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
   }
 
   return (
-    <Screen where={where} up={`/cards/${id}`} aside={nowKST()} fixed={fixed === "1"}>
+    // 미리보기는 참고 화면과 맞대어 보는 자리라 시각도 그 그림의 값이다. `preview` 를 읽어 놓고
+    // 여기만 안 써서, 참고는 「점심 12:34」 인데 구현은 늘 현재 시각이었다 — 맞대기 도구가 그걸
+    // 디자인 어긋남으로 셌다 (`pnpm design:diff`).
+    <Screen where={where} up={`/cards/${id}`} aside={preview ? "점심 12:34" : nowKST()} fixed={fixed === "1"}>
       <Space h={28} />
       <Card style={{ padding: "26px 20px" }}>
         <div className={s.speakWord}>

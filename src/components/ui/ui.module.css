@@ -92,6 +92,17 @@
 .cardList {
   padding: 4px 20px;
 }
+/*
+  라벨 없이 행만 선 카드 (F15). 라벨이 있으면 그것이 위 간격을 만드는데, 빼면 카드 여백 18 에
+  첫 줄의 16 이 더해져 **위가 떠 보인다.** 첫 줄 위와 끝 줄 아래를 지워 카드 여백 18 로
+  양쪽을 맞춘다 (design/screens/F15.html 의 `0 0 16px 0` · `16px 0 0 0` 과 같은 값).
+*/
+.cardFlush > .row:first-child {
+  padding-top: 0;
+}
+.cardFlush > .row:last-child {
+  padding-bottom: 0;
+}
 
 .label {
   font-size: var(--font-size-label);
