@@ -16,6 +16,7 @@
  */
 import { loadEnv } from "./lib/load-env";
 import { adminClient } from "./lib/admin-client";
+import { isFixtureUser } from "./lib/fixture";
 import { pitchDistance, type PitchPoint } from "../src/lib/pitch/distance";
 
 loadEnv();
@@ -36,7 +37,6 @@ type EncounterRow = {
   display: string;
   recognized: boolean;
   gap_days: number;
-  synthetic: boolean;
 };
 type RecordingRow = {
   target_key: string;
@@ -47,7 +47,6 @@ type RecordingRow = {
   target_pitch: unknown;
   target_voice_kind: string | null;
   target_voice_id: string | null;
-  synthetic: boolean;
 };
 
 const n1 = (x: number) => x.toFixed(1);
@@ -104,17 +103,16 @@ async function main() {
                n.display,
                e.recognized,
                EXTRACT(EPOCH FROM (i.created_at - l.landed_at)) / 86400 AS gap_days,
-               (e.meta ->> 'synthetic' = 'true' OR i.meta ->> 'synthetic' = 'true') AS synthetic,
                row_number() OVER (PARTITION BY e.node_id ORDER BY e.created_at, e.id) AS rn
           FROM encounters e
           JOIN landed l ON l.node_id = e.node_id
-          JOIN inputs i ON i.id = e.input_id
-          JOIN nodes  n ON n.id = e.node_id
+          JOIN inputs i ON i.id = e.input_id AND i.user_id = $1
+          JOIN nodes  n ON n.id = e.node_id AND (n.user_id IS NULL OR n.user_id = $1)
          WHERE e.user_id = $1
            AND e.recognized IS NOT NULL
            AND i.created_at >= l.landed_at + make_interval(days => $2::int)
       )
-      SELECT node_id, display, recognized, gap_days, synthetic
+      SELECT node_id, display, recognized, gap_days
         FROM qualified WHERE rn = 1 ORDER BY gap_days
       `,
       [userId, QUALIFY_DAYS],
@@ -140,7 +138,7 @@ async function main() {
         (SELECT count(DISTINCT e.node_id)::text
            FROM encounters e
            JOIN landed l ON l.node_id = e.node_id
-           JOIN inputs i ON i.id = e.input_id
+           JOIN inputs i ON i.id = e.input_id AND i.user_id = $1
           WHERE e.user_id = $1 AND e.recognized IS NOT NULL
             AND i.created_at <  l.landed_at + make_interval(days => $2::int)) AS too_soon,
         (SELECT count(*)::text FROM landed) AS landed,
@@ -153,7 +151,7 @@ async function main() {
         (SELECT count(DISTINCT e.node_id)::text
            FROM encounters e
            JOIN landed l ON l.node_id = e.node_id
-           JOIN inputs i ON i.id = e.input_id
+           JOIN inputs i ON i.id = e.input_id AND i.user_id = $1
           WHERE e.user_id = $1 AND e.recognized IS NULL
             AND i.created_at >= l.landed_at + make_interval(days => $2::int)) AS no_judgement
       `,
@@ -171,12 +169,11 @@ async function main() {
       SELECT COALESCE('card:' || r.card_id::text, 'chunk:' || r.chunk_id::text) AS target_key,
              COALESCE(n.display, left(ch.text, 40))                             AS label,
              COALESCE(c.lang::text, ch.lang::text)                              AS lang,
-             r.attempt, r.pitch, r.target_pitch, r.target_voice_kind, r.target_voice_id,
-             (r.meta ->> 'synthetic' = 'true')                                  AS synthetic
+             r.attempt, r.pitch, r.target_pitch, r.target_voice_kind, r.target_voice_id
         FROM recordings r
-        LEFT JOIN cards  c  ON c.id  = r.card_id
-        LEFT JOIN nodes  n  ON n.id  = c.node_id
-        LEFT JOIN chunks ch ON ch.id = r.chunk_id
+        LEFT JOIN cards  c  ON c.id  = r.card_id  AND c.user_id  = $1
+        LEFT JOIN nodes  n  ON n.id  = c.node_id AND (n.user_id IS NULL OR n.user_id = $1)
+        LEFT JOIN chunks ch ON ch.id = r.chunk_id AND ch.user_id = $1
        WHERE r.user_id = $1
        ORDER BY target_key, r.attempt
       `,
@@ -195,20 +192,18 @@ function print(
   ctx: { too_soon: string; landed: string; never_back: string; no_judgement: string } | undefined,
   rec: RecordingRow[],
 ) {
-  const synthetic = enc.some((r) => r.synthetic) || rec.some((r) => r.synthetic);
   console.log(`Anchor 측정 — ${new Date().toISOString()}`);
   console.log(`사용자: ${userId}`);
   console.log("정의: docs/MEASURE.md. 이 출력과 그 문서가 어긋나면 문서가 맞다. 통과·미달 판정은 M4 가 한다.");
-  if (synthetic) {
-    /*
-      섞였다는 것만 말하고 빼지 않는다. 빼 버리면 배관을 확인하려고 만든 행이 출력에서 사라져
-      "스크립트가 도는가"를 이 출력으로 볼 수 없게 된다. 숫자를 읽는 사람이 알고 읽으면 된다.
-    */
-    const en = enc.filter((r) => r.synthetic).length;
-    const rn = new Set(rec.filter((r) => r.synthetic).map((r) => r.target_key)).size;
+  /*
+    **합성인지는 계정으로 안다.** 행마다 표식을 보지 않는다 — 이 스크립트는 인자로 받은 계정의
+    행만 읽고, 시드는 그 접두사 계정에만 넣는다. 그래서 "섞였는가" 라는 상태가 아예 없다.
+    머리말에서 말하는 것은 빼기 위해서가 아니라, 이 출력이 배관 확인이라는 것을 읽는 사람이
+    알아야 하기 때문이다.
+  */
+  if (isFixtureUser(userId)) {
     console.log("");
-    console.log(`※ 합성 행이 섞여 있다 — 재만남 ${en}자, 곡선 대상 ${rn}개. 이 숫자는 사람이 만든 것이 아니다.`);
-    console.log("  배관 확인용으로 넣은 행(meta.synthetic = true)이다. 판정에 쓰지 않는다.");
+    console.log("※ 이 계정은 배관 확인용 합성 데이터다. 사람이 만든 숫자가 아니고 판정에 쓰지 않는다.");
   }
 
   // ── 1 ──────────────────────────────────────────────────────────────────────
@@ -229,7 +224,7 @@ function print(
     console.log("");
     console.log("  글자   간격(일)  읽기를 열었나");
     for (const row of enc) {
-      console.log(`  ${row.display.padEnd(4)}  ${n1(Number(row.gap_days)).padStart(7)}  ${row.recognized ? "안 열었다" : "열었다"}${row.synthetic ? "  (합성)" : ""}`);
+      console.log(`  ${row.display.padEnd(4)}  ${n1(Number(row.gap_days)).padStart(7)}  ${row.recognized ? "안 열었다" : "열었다"}`);
     }
   }
   if (ctx) {
@@ -263,7 +258,6 @@ function print(
     d5: number | null;
     attempts: number;
     voice: string;
-    synthetic: boolean;
   };
   const results: Result[] = [];
   for (const [, rows] of byTarget) {
@@ -284,7 +278,6 @@ function print(
       // 기준선이 무엇으로 만들어졌는지. 안 남은 행은 "모름" 이다 — 0007 이전에 쌓인 회차이거나
       // 겨눈 소리가 아예 없던 회차다. 둘을 뭉개지 않게 목소리 ID 를 같이 낸다.
       voice: base.target_voice_kind ? `${base.target_voice_kind}/${base.target_voice_id ?? "?"}` : "모름",
-      synthetic: rows.some((r) => r.synthetic),
     });
   }
 
@@ -318,7 +311,7 @@ function print(
       const label = r.label.length > 38 ? r.label.slice(0, 37) + "…" : r.label;
       const c1 = r.d1 === null ? "  —  " : n3(r.d1).padStart(5);
       const c5 = r.d5 === null ? "  —  " : n3(r.d5).padStart(5);
-      console.log(`  ${label.padEnd(38)}  ${c1}   ${c5}   ${String(r.attempts).padStart(5)}  ${r.voice}${r.synthetic ? "  (합성)" : ""}`);
+      console.log(`  ${label.padEnd(38)}  ${c1}   ${c5}   ${String(r.attempts).padStart(5)}  ${r.voice}`);
     }
     if (paired.length === 0) {
       // 없는 것을 0 으로 쓰지 않는다 (MEASURE 3장).

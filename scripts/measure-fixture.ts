@@ -11,19 +11,18 @@
  * **무엇을 확인하는가.** `pnpm measure` 가 MEASURE 의 정의대로 **거르는가**. 값이 나오는지가
  * 아니라, 빠져야 할 것이 빠지는지다. 아래 여섯 케이스는 전부 "세면 안 되는데 세기 쉬운" 자리다.
  *
- * **안전.** 이 스크립트는 `fixture-` 로 시작하는 계정만 만들고 지운다. 다른 계정 id 를 주면
- * 아무것도 안 하고 멈춘다. 만든 행은 전부 `meta.synthetic = true` 라, 실수로 남아도
- * `pnpm measure` 가 머리말에서 그렇게 말한다.
+ * **안전은 계정 하나로 선다.** 이 스크립트는 `fixture-` 로 시작하는 계정만 만들고 지운다. 다른
+ * 계정 id 를 주면 아무것도 안 하고 멈추고, 실제 데이터가 있는 계정에는 **아무것도 안 만들어진다.**
+ * 행마다 표식을 달지 않는 이유는 `scripts/lib/fixture.ts` 에 있다.
  */
 import { loadEnv } from "./lib/load-env";
 import { adminClient } from "./lib/admin-client";
+import { FIXTURE_PREFIX } from "./lib/fixture";
 
 loadEnv();
 
-/** 이 접두사로 시작하지 않는 계정은 건드리지 않는다. 시드가 실제 데이터를 밀어내지 않게. */
-const FIXTURE_PREFIX = "fixture-";
+/** 이 접두사로 시작하지 않는 계정은 건드리지 않는다 (`scripts/lib/fixture.ts`). */
 const USER_ID = `${FIXTURE_PREFIX}measure`;
-const SYNTHETIC = JSON.stringify({ synthetic: true });
 
 const wipeOnly = process.argv.includes("--wipe");
 
@@ -84,31 +83,31 @@ async function main() {
       // 공용 노드(user_id IS NULL)를 만들지 않는다. 공용은 모든 계정의 화면에 뜨므로 시드가
       // 거기 들어가면 Jessi 의 뽑기 화면에 합성 한자가 나온다. 이 계정 것으로만 만든다.
       const { rows } = await client.query<{ id: string }>(
-        "INSERT INTO nodes (user_id, lang, kind, key, display, meta) VALUES ($1, $2, $3, $4, $4, $5) RETURNING id",
-        [USER_ID, lang, kind, key, SYNTHETIC],
+        "INSERT INTO nodes (user_id, lang, kind, key, display) VALUES ($1, $2, $3, $4, $4) RETURNING id",
+        [USER_ID, lang, kind, key],
       );
       return rows[0].id;
     };
     const input = async (lang: "ja" | "en", title: string, body: string, ago: number) => {
       const { rows } = await client.query<{ id: string }>(
-        "INSERT INTO inputs (user_id, kind, lang, title, body, created_at, extracted_at, meta) VALUES ($1, 'paste', $2, $3, $4, $5, $5, $6) RETURNING id",
-        [USER_ID, lang, title, body, daysAgo(ago), SYNTHETIC],
+        "INSERT INTO inputs (user_id, kind, lang, title, body, created_at, extracted_at) VALUES ($1, 'paste', $2, $3, $4, $5, $5) RETURNING id",
+        [USER_ID, lang, title, body, daysAgo(ago)],
       );
       return rows[0].id;
     };
     const card = async (nodeId: string, inputId: string, landedAgo: number) => {
       const at = daysAgo(landedAgo);
       const { rows } = await client.query<{ id: string }>(
-        `INSERT INTO cards (user_id, kind, lang, node_id, input_id, payload, guess, guess_at, guess_correct, revealed_at, landed_at, created_at, meta)
-         VALUES ($1, 'discover', 'ja', $2, $3, '{}'::jsonb, '추측', $4, true, $4, $4, $4, $5) RETURNING id`,
-        [USER_ID, nodeId, inputId, at, SYNTHETIC],
+        `INSERT INTO cards (user_id, kind, lang, node_id, input_id, payload, guess, guess_at, guess_correct, revealed_at, landed_at, created_at)
+         VALUES ($1, 'discover', 'ja', $2, $3, '{}'::jsonb, '추측', $4, true, $4, $4, $4) RETURNING id`,
+        [USER_ID, nodeId, inputId, at],
       );
       return rows[0].id;
     };
     const encounter = (nodeId: string, inputId: string, recognized: boolean, ago: number) =>
       client.query(
-        "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at, meta) VALUES ($1, $2, $3, $4, $5, $6)",
-        [USER_ID, nodeId, inputId, recognized, daysAgo(ago), SYNTHETIC],
+        "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at) VALUES ($1, $2, $3, $4, $5)",
+        [USER_ID, nodeId, inputId, recognized, daysAgo(ago)],
       );
     /** 같은 대상에 회차를 쌓는다. 기준선은 1회차 것을 그대로 물려준다 — 앱이 하는 것과 같다. */
     const attempts = async (
@@ -121,8 +120,8 @@ async function main() {
       const base = voice ? curve(seed, 0) : null;
       for (let i = 0; i < wobbles.length; i++) {
         await client.query(
-          `INSERT INTO recordings (user_id, card_id, chunk_id, attempt, pitch, target_pitch, duration_ms, created_at, target_voice_kind, target_voice_id, meta)
-           VALUES ($1, $2, $3, $4, $5, $6, 3000, $7, $8, $9, $10)`,
+          `INSERT INTO recordings (user_id, card_id, chunk_id, attempt, pitch, target_pitch, duration_ms, created_at, target_voice_kind, target_voice_id)
+           VALUES ($1, $2, $3, $4, $5, $6, 3000, $7, $8, $9)`,
           [
             USER_ID,
             "card" in target ? target.card : null,
@@ -133,7 +132,6 @@ async function main() {
             daysAgo(Math.max(0, startAgo - i)),
             voice?.kind ?? null,
             voice?.id ?? null,
-            SYNTHETIC,
           ],
         );
       }
@@ -173,15 +171,15 @@ async function main() {
     const noJudge = await node("妥", "ja", "kanji");
     await card(noJudge, src, 12);
     await client.query(
-      "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at, meta) VALUES ($1, $2, $3, NULL, $4, $5)",
-      [USER_ID, noJudge, again, daysAgo(4), SYNTHETIC],
+      "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at) VALUES ($1, $2, $3, NULL, $4)",
+      [USER_ID, noJudge, again, daysAgo(4)],
     );
 
     // ── 곡선 ──────────────────────────────────────────────────────────────────
     const chunk = async (text: string, lang: "en" | "ja", ago: number) => {
       const { rows } = await client.query<{ id: string }>(
-        "INSERT INTO chunks (user_id, lang, situation, text, created_at, meta) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-        [USER_ID, lang, "합성 상황", text, daysAgo(ago), SYNTHETIC],
+        "INSERT INTO chunks (user_id, lang, situation, text, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [USER_ID, lang, "합성 상황", text, daysAgo(ago)],
       );
       return rows[0].id;
     };
@@ -202,7 +200,7 @@ async function main() {
     // 실제보다 하나 늘어, 재만남 쪽 참고 숫자가 틀린다. 화면에서도 F10 은 그 카드에서 말한다.
     await attempts({ card: cardOf.get("協")! }, [0.5, 0.4, 0.3, 0.2, 0.1], CLONE, 55, 10);
 
-    console.log(`넣었다: 계정 ${USER_ID} (모든 행 meta.synthetic = true)`);
+    console.log(`넣었다: 계정 ${USER_ID} — 이 계정 하나가 합성과 실데이터의 경계다.`);
     console.log("");
     console.log(`  pnpm measure ${USER_ID}`);
     console.log("");
