@@ -7,8 +7,10 @@ import { judge, startCard } from "./actions";
 export type JudgeItem = {
   nodeId: string;
   kanji: string;
-  /** "협력의 협" 또는 null(발판 없음) */
-  anchor: string | null;
+  /** 행 부제. 낱말이 있으면 "협력의 협", 없으면 한국 한자음 한 글자("선"), 그것도 없으면 null */
+  sub: string | null;
+  /** 이 글자를 부를 한국어 낱말을 우리가 골라 뒀는가. **두 묶음을 가르는 축이 이것이다** */
+  hasWord: boolean;
   known: boolean | null;
 };
 
@@ -40,7 +42,9 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
     <Row
       key={i.nodeId}
       title={<Ja>{i.kanji}</Ja>}
-      sub={i.anchor ?? "아직 아는 소리가 없음"}
+      // 없으면 아예 안 낸다. "아직 아는 소리가 없음" 은 거짓이었다 — 소리는 거의 다 있고
+      // 없는 것은 낱말이다. 그리고 묶음 제목이 이미 한 말을 행이 되풀이하지 않는다 (docs/FLOW.md 1장).
+      sub={i.sub ?? undefined}
       right={
         <ChoiceRow>
           <Choice on={known[i.nodeId] === true} onClick={() => set(i.nodeId, true)}>
@@ -68,14 +72,17 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
       <Space h={22} />
       {queueA.length > 0 && (
         <Card>
-          <Label>아는 소리에서 시작</Label>
+          {/* 가르는 축은 낱말이라 "아는 소리에서 시작" 이 아니다 — 소리는 양쪽 다 있다 */}
+          <Label>아는 낱말에서 시작</Label>
           {queueA.map(row)}
         </Card>
       )}
       {queueA.length > 0 && queueB.length > 0 && <Space h={12} />}
       {queueB.length > 0 && (
         <Card>
-          <Label>발판 없음</Label>
+          {/* "발판" 은 우리끼리 쓰는 말이라 화면에 안 쓴다. 그리고 주어는 사용자가 아니라 앱이다 —
+              그 소리를 모르는 게 아니라, 그 글자를 부를 낱말을 우리가 아직 못 골랐다. */}
+          <Label>부를 낱말이 아직 없어</Label>
           {queueB.map(row)}
         </Card>
       )}
