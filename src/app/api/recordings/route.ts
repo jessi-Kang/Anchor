@@ -2,6 +2,7 @@ import { put } from "@vercel/blob";
 import { requireUser } from "@/lib/auth/server";
 import { withUser } from "@/lib/db";
 import { targetVoiceId } from "@/lib/tts-voice";
+import { voicePrefix } from "@/lib/voice-storage";
 
 export const dynamic = "force-dynamic";
 
@@ -121,7 +122,9 @@ export async function POST(req: Request) {
         const { rows } = await tx.query<{ voice_retention_days: number }>("SELECT voice_retention_days FROM users WHERE id = $1", [user.id]);
         return rows[0]?.voice_retention_days ?? 30;
       });
-      const key = `voice/${user.id}/${ownId}-${Date.now()}.webm`;
+      // 접두사는 `voicePrefix()` 한 곳에서만 만든다. 계정 삭제가 같은 접두사로 훑으므로
+      // 여기 문자열을 손으로 한 벌 더 적으면 **두 벌이 갈리는 날 원본이 스토리지에 남는다.**
+      const key = `${voicePrefix(user.id)}${ownId}-${Date.now()}.webm`;
       const blob = await put(key, audio, { access: "private", token, addRandomSuffix: false, contentType: audio.type || "audio/webm" });
       audioKey = blob.pathname;
       expiresAt = new Date(Date.now() + days * 86_400_000).toISOString();
