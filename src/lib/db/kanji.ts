@@ -82,23 +82,19 @@ export async function getKanjiNodeById(id: string): Promise<KanjiNode | null> {
  *  2. 없으면 **그 글자 자체의 한국 한자음** ("리") — 부품이 그 자체로 한자면 사용자가 이미 아는
  *     소리가 있다(원칙 2). 使 = 亻 + 吏 의 吏 가 그 경우다.
  *
- * 씨앗이 부품을 거르는 기준과 **같은 기준**이어야 한다 (`scripts/kanji/build-kanjidic.ts`).
- * 여기가 더 좁으면 씨앗이 남긴 부품을 화면이 부를 이름 없이 받게 되고, 그 자리에서 다시
- * "𠂒와 어진사람" 이 나온다.
+ * 둘을 고르는 일은 **씨앗이 적재할 때 이미 끝난다**(`scripts/seed.ts`) — 여기서 또 고르면 두 곳이
+ * 되고, 한쪽만 고쳐지는 순간 씨앗이 남긴 부품을 화면이 이름 없이 받아 "𠂒와 어진사람" 이 다시 난다.
+ * 그래서 여기는 노드에 적힌 이름을 읽기만 한다.
  */
 export async function getPartNames(chars: string[]): Promise<Map<string, string>> {
   if (chars.length === 0) return new Map();
   return withoutUser(async (tx) => {
-    const { rows } = await tx.query<{ key: string; name: string | null; sound: string | null }>(
-      `SELECT key,
-              max(meta->>'ko_name')  FILTER (WHERE kind = 'radical') AS name,
-              max(meta->>'ko_sound') FILTER (WHERE kind = 'kanji')   AS sound
-         FROM nodes
-        WHERE user_id IS NULL AND lang = 'ja' AND kind IN ('radical', 'kanji') AND key = ANY($1::text[])
-        GROUP BY key`,
+    const { rows } = await tx.query<{ key: string; name: string | null }>(
+      `SELECT key, meta->>'ko_name' AS name FROM nodes
+       WHERE user_id IS NULL AND lang = 'ja' AND kind = 'radical' AND key = ANY($1::text[])`,
       [chars],
     );
-    return new Map(rows.flatMap((r) => (r.name || r.sound ? [[r.key, (r.name || r.sound) as string] as const] : [])));
+    return new Map(rows.flatMap((r) => (r.name ? [[r.key, r.name] as const] : [])));
   });
 }
 

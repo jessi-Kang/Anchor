@@ -76,18 +76,33 @@ async function main() {
     }
     console.log(`en-seed: ${en.length} 노드`);
 
-    // 2. 부품 (radical). 이름이 있는 것 + kanji.json 부품에 나오는 이름 없는 것
+    // 2. 부품 (radical). 이름이 있는 것 + kanji.json 부품에 나오는 것
     const partChars = new Set<string>(Object.keys(partsKo));
     for (const it of kanji) for (const p of it.parts) partChars.add(p);
+    /*
+      **부를 이름이 없으면 그 글자의 한국 한자음으로 떨어진다.**
+      `parts-ko.json` 은 부수·구성요소의 훈("열 십")만 갖고 있어서, **그 자체가 상용한자인 부품**
+      (不·与·丘·先·保·倉·光·兵·前·北·南… 112종)이 "이름 없음" 으로 취급되고 있었다. 씨앗에 한국
+      한자음이 이미 있는데도다. 그대로 두면 "이름 없는 부품은 뺀다" 규칙이 그 112종을 같이 버려서
+      한자 143자가 괜히 「부품 없음」으로 간다.
+
+      소리 한 글자가 훈보다 덜 주는 것이라 규칙에도 맞다 — "판정 자리에는 발판을 주되 가장 적게,
+      소리만 주는 쪽이 낱말까지 주는 쪽보다 덜 준다" (커밋 `00f3b7b`, docs/FLOW.md 4장).
+
+      여기 한 곳에서 채운다. 화면(`getPartNames`)은 노드의 `ko_name` 만 읽으면 되고, 씨앗을 다시
+      적재해도 살아남는다.
+    */
+    const koSoundOf = new Map(kanji.filter((it) => it.ko).map((it) => [it.kanji, it.ko as string]));
     const partId = new Map<string, string>();
     for (const ch of partChars) {
+      const name = partsKo[ch] ?? koSoundOf.get(ch);
       const { rows } = await client.query<{ id: string }>(
         `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
          VALUES (NULL, 'ja', 'radical', $1, $1, $2)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
          DO UPDATE SET meta = nodes.meta || EXCLUDED.meta
          RETURNING id`,
-        [ch, JSON.stringify(partsKo[ch] ? { ko_name: partsKo[ch] } : {})],
+        [ch, JSON.stringify(name ? { ko_name: name } : {})],
       );
       partId.set(ch, rows[0].id);
     }
