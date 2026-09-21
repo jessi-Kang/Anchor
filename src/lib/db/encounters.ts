@@ -21,6 +21,14 @@ export type EncounterRow = { nodeId: string; recognized: boolean };
 export function recordEncounters(userId: string, inputId: string, rows: EncounterRow[]) {
   if (rows.length === 0) return Promise.resolve();
   return withUser(userId, async (tx) => {
+    /*
+      **그 자료가 내 것인지 먼저 본다** (보안 C13). RLS 는 `user_id` 만 보는데 이 함수는 `input_id`·
+      `node_id` 를 밖에서 받는다 — 남의 자료 id 로도 내 이름의 행이 만들어질 수 있고, 그러면 남의
+      자료를 읽었다는 기록이 내 인식률에 섞인다. `node_id` 는 공용 참조 노드라 주인이 없지만,
+      아래 INSERT 는 외래키가 있는 값만 받으므로 없는 노드로는 행이 안 생긴다.
+    */
+    const { rowCount: mine } = await tx.query("SELECT 1 FROM inputs WHERE id = $1 AND user_id = $2", [inputId, userId]);
+    if (!mine) throw new Error("그런 자료가 없다");
     for (const r of rows) {
       // 자료 하나에 한 글자당 한 줄. 같은 자료를 다시 읽으면 그 줄의 값을 고친다 — 읽은 횟수가
       // 아니라 **그 자료에서 그 글자를 어떻게 만났는가**를 세는 표다. 처음 만난 시각은 그대로 둔다.
