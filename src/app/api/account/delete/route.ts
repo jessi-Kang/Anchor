@@ -66,20 +66,43 @@ export async function POST(req: Request) {
 
   /*
     **이 수는 블록 밖에 있어야 한다.** 여기서부터 뒤로는 실패하더라도 **음성 원본은 이미 사라진
-    뒤다.** 그 상태에서 "데이터는 그대로 있다" 고 말하면 사용자는 아무 일도 없었다고 믿고 나가고,
+    뒤다.** 그 상태에서 아무 일도 없었던 것처럼 말하면 사용자는 그대로 믿고 나가고,
     **자기 녹음이 전부 소리가 안 나는 계정을 갖게 된다. 그 말을 아무도 안 해 준 채로.**
     되돌릴 수 없는 일이 이미 일어났으면 그걸 일어났다고 말하는 것이 이 수가 하는 일이다.
     (순서 자체는 그대로 둔다 — 키가 먼저 사라지면 오브젝트를 영영 못 지운다.)
   */
   let removed = 0;
+  /*
+    **`removed` 와 다른 질문이다.** `removed` 는 "이번 요청에서 몇 개" 고, 이건 "훑기가 끝까지
+    갔나" 다. 요청을 건너면 둘이 갈린다 — 1차에서 열 개를 다 지운 뒤 마지막 커서에서 던지면
+    (502, `removed = 10`) 2차에서는 지울 게 없어 `removed = 0` 이 된다. 그때 `removed` 로 갈라
+    판단하면 **이미 사라진 열 개를 없는 셈 치게 된다.**
+  */
+  let swept = false;
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (token) {
     try {
       await deleteVoiceObjects(user.id, token, (n) => (removed += n));
+      swept = true;
       if (removed) console.log("[account delete] 음성 원본 삭제", { userId: user.id, removed });
     } catch (e) {
-      // 여러 쪽에 걸쳐 지우므로 중간에 실패하면 앞쪽은 이미 없다. 몇 개가 사라졌는지 같이 말한다.
-      console.error("[account delete] 음성 원본 삭제 실패", { userId: user.id, removed, e });
+      /*
+        여러 쪽에 걸쳐 지우므로 중간에 실패하면 앞쪽은 이미 없다. 몇 개가 사라졌는지 같이 말한다.
+
+        **여기서 키를 떼지 않는다 — 접두사로 유추해서 떼는 것은 금지다.** 훑기가 안 끝났으니
+        어느 오브젝트가 남았는지 모르고, 살아 있는 오브젝트의 키를 떼면 그 원본은 **영영 못
+        지운다.** "계정 삭제 시 백업 사본까지 삭제"(CLAUDE.md)가 조용히 깨지는 쪽이다.
+        안 떼면 표가 "오디오 있다" 고 말해 재생이 실패하는데, 그건 **보이고 재시도로 낫는다.**
+        두 오류가 대칭이 아니라 보이는 쪽으로 틀린다.
+
+        떼려면 `deleteVoiceObjects` 가 **실제로 지운 키 목록**을 돌려주고 그것만 떼야 한다.
+        지금 안 하는 이유는 이 창이 측정을 하나도 안 깎기 때문이다 — 곡선은 `pitch` ·
+        `target_pitch` 에 따로 있고(`0001_init.sql:190-191`) `scripts/measure.ts` 는
+        `audio_object_key` 를 한 번도 안 읽는다. 잃는 것은 다시 들어볼 원본이지 재 볼 값이 아니다.
+        **다시 볼 때:** 로그에 `voiceRemoved > 0` 인 이 줄이 한 번이라도 찍히면 그때 배선한다.
+        그때는 빈도도 폭도 값으로 아니까. 그전엔 안 나는 일에 표를 더 건드리는 것이다.
+      */
+      console.error("[account delete] 음성 원본 삭제 실패", { userId: user.id, voiceRemoved: removed, e });
       return Response.json(
         {
           error:
@@ -144,15 +167,17 @@ export async function POST(req: Request) {
   });
   if (!deleted) {
     /*
-      **여기서 "데이터는 그대로 있다" 는 `removed === 0` 일 때만 참이다.** 위 훑기가 끝까지 갔으면
-      이 계정의 음성 원본은 전부 사라졌다 — DB 를 되돌려도 그건 안 돌아온다.
+      **훑기가 끝났으면 몇 개를 지웠든 이 계정 오브젝트는 전부 없다.** 그래서 게이트가 `removed`
+      가 아니라 `swept` 다 — 0개를 지운 요청이어도 표는 사실에 맞춰야 한다. 앞선 요청이 지우고
+      마지막 커서에서 던졌으면 이번 `removed` 는 0 인데 오브젝트는 이미 없기 때문이다.
 
-      돌아오지 않는 것을 DB 가 계속 가리키게 두지도 않는다. 훑기가 끝났으니 이 계정 키는 전부
-      없는 오브젝트를 가리키고, 그 상태로 두면 표가 "오디오가 있다" 고 말한다 —
-      크론이 이미 같은 짝을 지킨다(`/api/cron/voice`: 오브젝트를 지운 것만 키를 뗀다).
+      돌아오지 않는 것을 DB 가 계속 가리키게 두지 않는다. 그 상태로 두면 표가 "오디오가 있다" 고
+      말한다 — 크론이 이미 같은 짝을 지킨다(`/api/cron/voice`: 오브젝트를 지운 것만 키를 뗀다).
       이건 되돌리기가 아니라 **표를 사실에 맞추는 것**이라 실패해도 로그만 남기고 넘어간다.
+      (훑기가 끝났는데도 오브젝트가 남아 있을 수 있다면 성공 경로가 이미 같은 위험을 진다 —
+      거기서는 CASCADE 가 키째로 지운다. 여기가 더 무는 것은 없다.)
     */
-    if (removed > 0) {
+    if (swept) {
       await withUser(user.id, (tx) =>
         tx.query(
           "UPDATE recordings SET audio_object_key = NULL, audio_expires_at = NULL WHERE user_id = $1 AND audio_object_key IS NOT NULL",
@@ -162,10 +187,16 @@ export async function POST(req: Request) {
     }
     return Response.json(
       {
+        /*
+          **이번 요청에 대해서만 단정한다.** 전에 쓰던 "데이터는 그대로 있다" 는 과거까지 걸고
+          하는 말이라 지킬 수 없다 — 앞선 요청이 원본을 지우고 DB 에서 멈췄을 수 있다.
+          "계정과 학습 기록은 그대로다" 는 언제나 참이고(트랜잭션이 되돌아갔다), 이번에 사라진
+          수는 `voice_removed` 가 말한다.
+        */
         error:
           removed > 0
             ? `삭제하지 못했다. 다만 음성 원본 ${removed}개는 이미 지워졌고 돌아오지 않는다. 계정과 학습 기록은 그대로다. 다시 시도해 달라.`
-            : "삭제하지 못했다. 데이터는 그대로 있다. 다시 시도해 달라.",
+            : "삭제하지 못했다. 계정과 학습 기록은 그대로다. 다시 시도해 달라.",
         voice_removed: removed,
       },
       { status: 500 },
