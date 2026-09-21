@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, Label, Lead, Space, Grow, Button, ButtonRow, Ghost, uiStyles as s } from "@/components/ui";
 
 import { pitchTrack, type PitchPoint as Point } from "@/lib/pitch/track";
+import { flushRecordings, sendRecording } from "@/lib/outbox";
 
 /**
  * 겨눌 소리가 없을 때의 한 줄. **수치를 내지 않는다** — 내 소리끼리의 일치도는 정확도가 아니라
@@ -95,6 +96,19 @@ export function PitchLoop({
   const [playNote, setPlayNote] = useState(false);
 
   const audioCtx = () => (ctxRef.current ??= new AudioContext());
+
+  /*
+    **남아 있던 녹음을 조용히 올린다.** 이 화면이 열릴 때 한 번, 연결이 돌아올 때 한 번.
+    여기가 자리인 이유는 **녹음이 생기는 곳이 여기뿐**이기 때문이다 — 큐에 무엇이 들어가는지 아는
+    화면이 그걸 비우는 것도 맡는다. 화면에는 아무 말도 안 뜬다 (docs/FLOW.md 4장).
+  */
+  useEffect(() => {
+    if (preview) return;
+    void flushRecordings();
+    const again = () => void flushRecordings();
+    window.addEventListener("online", again);
+    return () => window.removeEventListener("online", again);
+  }, [preview]);
 
   const listen = async () => {
     if (state !== "idle" || preview) return;
@@ -194,21 +208,28 @@ export function PitchLoop({
         return curve;
       });
       setAttempt((a) => a + 1);
-      const form = new FormData();
-      if ("card" in target) form.set("card_id", target.card);
-      else form.set("chunk_id", target.chunk);
-      form.set("pitch", JSON.stringify(curve));
-      // 이 회차가 **겨눈 상대**. 들려준 소리가 있었으면 그 곡선이고, 없었으면 안 보낸다 —
-      // 없었다는 사실도 값이라 억지로 내 앞 회차를 채워 넣지 않는다. 나중에 일치도를 계산할 때
-      // 겨눈 상대가 무엇이었는지가 남아 있어야 한다 (api/recordings/route.ts).
-      if (heard?.length) form.set("target_pitch", JSON.stringify(heard));
-      form.set("duration_ms", String(durationMs));
-      form.set("audio", blob, "voice.webm");
-      const res = await fetch("/api/recordings", { method: "POST", body: form });
-      // 실패해도 화면은 앞으로 간다 (docs/FLOW.md 4장). "저장이 안 됐어" 를 내지 않는다 — 곡선은
-      // 이미 화면에 있고 사용자가 할 일이 없다. 알릴 수 없는 일을 알리면 상태 어휘만 늘어난다.
-      // (못 보낸 것을 기기에 남겼다 다시 올리는 일은 재전송이 설 때 여기에 붙는다.)
-      if (!res.ok) console.error("[recordings] 저장 실패", res.status);
+      /*
+        **이름표는 여기서 붙인다.** 녹음을 만든 그 자리, 보내기 전이다. 서버가 붙이면 재전송마다
+        달라져 멱등 키 노릇을 못 하고, 그러면 **끊긴 응답 하나가 새 회차로 앉는다** — 5회차 자리에
+        4회차 소리가 앉으면 곡선 통과 기준이 그 자리에서 아무 말도 못 한다 (docs/MEASURE.md 2장).
+      */
+      const pending = {
+        clientId: crypto.randomUUID(),
+        ...("card" in target ? { cardId: target.card } : { chunkId: target.chunk }),
+        pitch: JSON.stringify(curve),
+        // 이 회차가 **겨눈 상대**. 들려준 소리가 있었으면 그 곡선이고, 없었으면 안 보낸다 —
+        // 없었다는 사실도 값이라 억지로 내 앞 회차를 채워 넣지 않는다. 나중에 일치도를 계산할 때
+        // 겨눈 상대가 무엇이었는지가 남아 있어야 한다 (api/recordings/route.ts).
+        ...(heard?.length ? { targetPitch: JSON.stringify(heard) } : {}),
+        durationMs,
+        audio: blob,
+      };
+      /*
+        **기다리지 않는다.** 실패해도 화면은 앞으로 가고(docs/FLOW.md 4장) 못 보낸 것은 기기에
+        남았다가 다음에 조용히 올라간다. "저장 중"·"저장 실패" 를 안 쓰는 이유도 같다 — 곡선은
+        이미 화면에 있고 사용자가 할 일이 없다.
+      */
+      void sendRecording(pending);
       setNote("곡선을 봐. 한 번 더.");
     } catch (e) {
       console.error(e);
