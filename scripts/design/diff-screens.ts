@@ -106,6 +106,8 @@ const SKIP: Record<string, string> = {
   // 섞인 낱말이 없으니 "협은 방금 봤지" 줄은 안 난다 (`inputs/[id]/read/page.tsx`).
   F12b: "같은 라우트의 다른 상태(다 만난 자료의 F12) — 데이터가 정하는 상태라 URL 로 못 부른다",
   F17a: "같은 라우트의 다른 상태(영어 문장을 못 만들어 추측이 칸에 남은 F17)",
+  F03c: "같은 라우트의 다른 상태(그 자료의 한자를 전부 알아로 고른 F03) — 데이터가 정하는 상태라 URL 로 못 부른다",
+  Scene1a: "같은 라우트의 다른 상태(부를 낱말이 없는 한자의 Scene1) — 어느 카드냐가 정하는 상태라 URL 로 못 부른다",
   // F19 는 `/inputs` 로 정해져 위 ROUTES 에 있다 (SKIP 의 "아직 안 정해졌다" 줄은 그래서 뺐다).
   X01: "라우트가 아니라 not-found 화면",
   X02: "라우트가 아니라 error 화면",
@@ -180,8 +182,11 @@ async function main() {
    * Sitemap.html 은 화면이 아니라 라우트 그림이라 뺀다(`design:lint` 도 같은 이유로 뺀다).
    */
   const listed = new Set([...Object.keys(ROUTES), ...Object.keys(SKIP)]);
-  const missing = readdirSync(path.resolve(process.cwd(), "design/screens"))
-    .filter((f) => f.endsWith(".html") && f !== "Sitemap.html")
+  // `archive/` 는 여기서도 명시적으로 뺀다 — 버린 화면을 "목록에 없다" 고 세면 매번 두 줄이
+  // 뜨고, 매번 뜨는 줄은 곧 안 읽는 줄이 된다 (lint 쪽에 같은 주석).
+  const missing = readdirSync(path.resolve(process.cwd(), "design/screens"), { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith(".html") && e.name !== "Sitemap.html")
+    .map((e) => e.name)
     .map((f) => f.replace(/\.html$/, ""))
     .filter((id) => !listed.has(id));
 
