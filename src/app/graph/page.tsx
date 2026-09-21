@@ -81,7 +81,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
         <Space h={6} />
         <Lead>協을 맞혔으니 助·加가 가장 가까워. 다음 카드는 이 둘 중 하나.</Lead>
         <Space h={18} />
-        <Card style={{ padding: "20px 20px" }}>
+        <Card whole>
           <Graph g={{ center: { text: "協", sound: "협" }, known: ["開", "基"], next: [{ text: "助", sound: "조" }, { text: "加", sound: "가" }] }} />
           <Legend />
         </Card>
@@ -132,7 +132,7 @@ export default async function GraphPage({ searchParams }: { searchParams: Promis
       <Space h={6} />
       <Lead>{lead}</Lead>
       <Space h={18} />
-      <Card style={{ padding: "20px 20px" }}>
+      <Card whole>
         <Graph g={{ center: { text: p.kanji, sound: p.sound }, known: known.slice(0, 2), next: cands.map((c) => ({ text: c.kanji, sound: c.koSound })) }} />
         <Legend />
       </Card>

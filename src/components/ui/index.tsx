@@ -88,6 +88,8 @@ export function Card({
   list,
   group,
   flush,
+  whole,
+  glyph,
   style,
 }: {
   children: ReactNode;
@@ -99,10 +101,25 @@ export function Card({
   group?: boolean;
   /** 라벨 없이 행만 서는 카드. 첫 줄 위·끝 줄 아래를 카드 여백에 맞춰 대칭으로 만든다. */
   flush?: boolean;
+  /** 덩어리 하나가 카드를 채우는 카드 (F11 그래프 · F12 본문). 줄 여럿이 아니라 한 덩어리다. */
+  whole?: boolean;
+  /** 큰 한자(132px)가 든 카드 (F10 말하기). */
+  glyph?: boolean;
   style?: CSSProperties;
 }) {
   return (
-    <section className={cx(s.card, tint && s.cardTint, list && s.cardList, group && s.cardGroup, flush && s.cardFlush)} style={style}>
+    <section
+      className={cx(
+        s.card,
+        tint && s.cardTint,
+        list && s.cardList,
+        group && s.cardGroup,
+        flush && s.cardFlush,
+        whole && s.cardWhole,
+        glyph && s.cardGlyph,
+      )}
+      style={style}
+    >
       {children}
     </section>
   );
