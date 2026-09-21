@@ -5,6 +5,7 @@ import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Title, Lead, Card, Label, Grow, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
 import { GuessForm } from "./guess-form";
+import { RetryButton } from "./retry-button";
 
 export const dynamic = "force-dynamic";
 
@@ -62,23 +63,39 @@ export default async function GuessPage({
           </Title>
           <Space h={6} />
           <Lead>틀려도 돼. 떠오르는 대로.</Lead>
+          <Grow />
+          <GuessForm chunkId={id} preview={preview} />
         </>
       ) : (
         /*
-          **F17a — 문장을 못 만든 자리.** 기획 문구가 아직 안 와서 참고 화면(`F17a.html`)이 그린
-          `___` 를 그대로 둔다. **없는 말을 내가 짓지 않는다.** 문구가 오면 이 두 줄만 바뀐다.
+          **F17a — 문장을 못 만든 자리.** 쓴 줄은 **입력 칸이 아니라 카드로** 보여 준다
+          (design/screens/F17a.html, F14 의 "내가 쓴 것" 과 같은 꼴).
 
-          자리가 안 바뀌는 것이 이 화면의 일이다 — 낸 추측이 그대로 있으면 "없어졌다" 도
-          "답이 비었다" 도 아니고 **"아직 확인 중"** 으로 읽힌다.
+          칸으로 두면 두 가지가 깨진다. 하나는 모양이 거짓말을 하는 것 — 칸은 "여기 쓰라" 는
+          모양인데 못 쓰게 막아 두면 그렇다. 다른 하나는 **버튼의 뜻**이다. 칸이 있으면 다시
+          누르는 것이 "새 추측" 으로 읽히고, 그 줄이 첫 추측을 덮을 길이 생긴다(유실).
+          칸이 없으면 그 버튼의 뜻이 "문장을 다시 만들어 보기" 하나로 좁혀진다.
         */
         <>
-          <Title lg>___</Title>
+          <Title lg>
+            지금은 영어를
+            <br />못 만들었어.
+          </Title>
           <Space h={6} />
-          <Lead>___</Lead>
+          <Lead>쓴 건 저장했어.</Lead>
+          <Space h={18} />
+          <Card>
+            <div className={s.talkPair}>
+              <Label>내가 쓴 것</Label>
+              <p className={s.talkLine} lang="en">
+                {guess}
+              </p>
+            </div>
+          </Card>
+          <Grow />
+          <RetryButton chunkId={id} preview={preview} />
         </>
       )}
-      <Grow />
-      <GuessForm chunkId={id} preview={preview} saved={guess} />
     </Screen>
   );
 }
