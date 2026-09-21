@@ -32,7 +32,7 @@ su postgres -c "/usr/lib/postgresql/16/bin/initdb -D /var/lib/postgresql/anchor/
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /var/lib/postgresql/anchor/data \
   -o \"-k /var/lib/postgresql/anchor -p 5433 -c listen_addresses=127.0.0.1\" \
   -l /var/lib/postgresql/anchor/log start -w"
-# 2. DB 이름은 반드시 neondb (0001 이 GRANT CONNECT ON DATABASE neondb 를 박아 둬서 다른 이름이면 멈춘다)
+# 2. DB 이름은 아무거나 된다 (0001 이 current_database() 를 쓴다, 88ab8f0). 아래 이름을 바꾸면 3번의 연결 문자열도 같이 바꾼다
 createdb -h 127.0.0.1 -p 5433 -U postgres neondb
 # 3. 환경 변수 파일 (값은 전부 로컬 더미. ANCHOR_APP_PASSWORD 와 ANCHOR_DATABASE_URL 의 비밀번호는 같아야 하고, 쿠키 비밀값은 32자 이상)
 #    DATABASE_URL_ADMIN=postgresql://postgres@127.0.0.1:5433/neondb

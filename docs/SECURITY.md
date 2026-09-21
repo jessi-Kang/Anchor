@@ -271,7 +271,7 @@ matcher: ["/api/((?!auth/|auth$|health$|cron/).*)"]
 
 ## 4-1. 그 밖에 볼 것
 
-- **`0001` 이 데이터베이스 이름을 `neondb` 로 박아 두었다.** `GRANT CONNECT ON DATABASE neondb TO anchor_app` 한 줄 때문에, 이름이 다른 빈 DB 에 `pnpm db:migrate` 를 돌리면 `database "neondb" does not exist` 로 `0001` 에서 멈춘다(로컬에서 확인). Neon 이 기본으로 `neondb` 를 주므로 대개는 걸리지 않지만, 사고가 난 날 이름이 다른 DB 를 만들면 복구 첫 단계에서 막힌다. `docs/BACKUP.md` 절차 C 에 "새 DB 의 이름은 `neondb` 여야 한다"를 적거나, 그 GRANT 가 현재 DB 를 가리키게 고치면 된다.
+- ~~**`0001` 이 데이터베이스 이름을 `neondb` 로 박아 두었다.**~~ **닫혔다 — `88ab8f0`.** 그 줄은 이제 `GRANT CONNECT ON DATABASE %I`(`current_database()`)라, **이름이 무엇이든 선다.** 사고 난 날 복구 DB 이름을 맞추느라 막히는 자리가 없어졌다. 고친 쪽은 두 갈래 중 「GRANT 가 현재 DB 를 가리키게」였고, `docs/BACKUP.md` 에 이름 규칙을 적는 갈래는 **안 갔다**(적었으면 지금 낡아 있었을 줄이다).
 
 - `src/app/api/test-login/route.dev.ts` 만 `safeNext` 를 쓰지 않고 옛 가드를 그대로 둔다. 그 라우트는 프로덕션 빌드에 없어 지금 뚫릴 곳이 아니다. 파일 이름이나 빌드 조건이 바뀌는 날 같이 본다.
 - 소유자 역할 `neondb_owner` 는 `BYPASSRLS` 가 **있다**. 앱이 소유자 연결을 쓰면 RLS 가 통째로 무력화된다 — A7 이 협상 불가인 이유다. `anchor_app` 은 `BYPASSRLS`·`SUPERUSER` 둘 다 없다.
