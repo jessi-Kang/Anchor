@@ -243,11 +243,26 @@ async function main() {
           `차이값이 거짓이 되므로 멈춘다 — design/fonts/ 의 파일과 화면의 @font-face 경로를 봐라.`,
       );
     }
-    const refPng = await ref.screenshot({ clip: { x: 0, y: 0, width: W, height: H } });
+    /**
+     * **자르는 높이는 참고가 선언한 틀에서 읽는다.** 844 를 박아 두면 설정(F16)처럼 제 높이를
+     * 선언한 화면에서 **참고의 주 버튼만 잘려 나간다** — 참고는 제 틀 바닥에 버튼을 붙이는데
+     * 844 로 자르면 그 버튼이 화면 밖이다. 내용으로는 못 줄이는 차이라 퍼센트가 거짓이 된다.
+     * `design:lint` 는 이미 **선언한 틀**을 기준으로 넘침을 재는데(`lint-screens.ts` 의 같은 주석)
+     * 여기가 안 따라와서 **한 레포에서 「틀」의 뜻이 둘**이었다.
+     */
+    const refH = await ref.evaluate(`(() => {
+      const f = [...document.querySelectorAll("div")].find((d) => /width:\\s*390px/.test(d.getAttribute("style") || ""));
+      return f ? Math.round(f.getBoundingClientRect().height) : 0;
+    })()`);
+    const cutH = typeof refH === "number" && refH > H ? refH : H;
+    if (cutH > H) await ref.setViewportSize({ width: W, height: cutH });
+    const refPng = await ref.screenshot({ clip: { x: 0, y: 0, width: W, height: cutH } });
     await ref.close();
 
     const app = await ctx.newPage();
-    const url = `${base}${route}${route.includes("?") ? "&" : "?"}fixed=1`;
+    // 틀이 844 보다 큰 화면은 `fixed=1` 을 안 건다 — 그걸 걸면 앱이 844 에 갇혀 **여백이 눌린 채**
+    // 찍히고(`.screenFixed` 가 844 를 박아 둔다), 참고와 견줄 수 없는 그림이 된다.
+    const url = cutH > H ? `${base}${route}` : `${base}${route}${route.includes("?") ? "&" : "?"}fixed=1`;
     const res = await app.goto(url, { waitUntil: "networkidle" }).catch(() => null);
     const landed = app.url();
     if (!res || !res.ok() || !landed.includes(route.split("?")[0])) {
@@ -257,15 +272,16 @@ async function main() {
       continue;
     }
     await app.evaluate(() => document.fonts.ready);
-    const appPng = await app.screenshot({ clip: { x: 0, y: 0, width: W, height: H } });
+    if (cutH > H) await app.setViewportSize({ width: W, height: cutH });
+    const appPng = await app.screenshot({ clip: { x: 0, y: 0, width: W, height: cutH } });
     await app.close();
 
     writeFileSync(path.join(outDir, `${id}-ref.png`), refPng);
     writeFileSync(path.join(outDir, `${id}-app.png`), appPng);
     const a = PNG.sync.read(refPng);
     const b = PNG.sync.read(appPng);
-    const diff = new PNG({ width: W, height: H });
-    const n = pixelmatch(a.data, b.data, diff.data, W, H, { threshold: 0.1 });
+    const diff = new PNG({ width: W, height: cutH });
+    const n = pixelmatch(a.data, b.data, diff.data, W, cutH, { threshold: 0.1 });
     const diffPng = PNG.sync.write(diff);
     writeFileSync(path.join(outDir, `${id}-diff.png`), diffPng);
     await writeStrip(ctx, id, refPng, appPng, diffPng);
