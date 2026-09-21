@@ -6,18 +6,21 @@ import { Card, Label, Lead, Space, Grow, Button, ButtonRow, Ghost, uiStyles as s
 import { pitchTrack, type PitchPoint as Point } from "@/lib/pitch/track";
 
 /**
- * 원어민 음성이 없을 때의 한 줄. **수치를 내지 않는다** — 내 소리끼리의 일치도는 정확도가 아니라
+ * 겨눌 소리가 없을 때의 한 줄. **수치를 내지 않는다** — 내 소리끼리의 일치도는 정확도가 아니라
  * 일관성이라, 같은 발음을 다섯 번 똑같이 틀려도 그 숫자는 올라간다 (design/SCREENS.md).
+ *
+ * **"원어민" 이라고 안 쓴다.** 겨눌 소리는 언어별 음성일 수도 Jessi 목소리 클론일 수도 있어서,
+ * 사람을 가리키는 이름은 출처가 바뀌는 순간 사실이 아닌 말이 된다 (`docs/FLOW.md` 1′장 F14 행).
  */
-const NO_NATIVE_NOTE = "아직 견줄 원어민 소리가 없어. 지금은 내 소리끼리 겹쳐 봐.";
+const NO_TARGET_NOTE = "아직 견줄 소리가 없어.";
 
-const legendAria = (noTarget: boolean) => (noTarget ? "앞 회차와 이번 내 억양 곡선" : "원어민과 내 억양 곡선");
+const legendAria = (noTarget: boolean) => (noTarget ? "앞 회차와 이번 내 억양 곡선" : "들려준 소리와 내 억양 곡선");
 
 /**
  * 듣기 → 따라 말하기 → 곡선. 한자 카드(F10)와 대화 덩어리(F14)가 같은 루프를 쓴다.
- * 곡선은 늘 둘이고 범례도 늘 둘이다 — 원어민 음성이 있으면 "원어민 / 나, N회차", 없으면 앞 회차가
+ * 곡선은 늘 둘이고 범례도 늘 둘이다 — 겨눌 소리가 있으면 "들려준 소리 / 나, N회차", 없으면 앞 회차가
  * 그 빈 자리를 대신해 "나, N-1회차 / 나, N회차" (docs/FLOW.md 1′장 F14 행. F10 도 같은 규칙).
- * - 듣기: /api/tts (ElevenLabs). 204 면 브라우저 음성으로. 재생한 오디오에서 피치를 뽑아 "원어민" 곡선으로 쓴다.
+ * - 듣기: /api/tts (ElevenLabs). 204 면 브라우저 음성으로. 재생한 오디오에서 피치를 뽑아 겨눌 곡선으로 쓴다.
  * - 말하기: 마이크는 버튼을 누른 뒤에만. 3초 녹음 → 브라우저에서 피치(자기상관) → /api/recordings.
  * 설명 텍스트 없음: 곡선과 한 줄뿐 (CLAUDE.md 원칙 3). 연음·억양을 글로 설명하지 않는다.
  *
@@ -52,12 +55,12 @@ export function PitchLoop({
    */
   targetVoice?: boolean;
   /**
-   * 쌓여 있던 마지막 회차의 곡선 (DB 에서 읽어 온다). 원어민 음성이 없을 때 겹칠 상대다 —
+   * 쌓여 있던 마지막 회차의 곡선 (DB 에서 읽어 온다). 겨눌 소리가 없을 때 겹칠 상대다 —
    * 이게 없으면 화면을 다시 연 사람의 첫 녹음은 겹칠 것이 없다 (`lib/db/recordings.ts`).
    */
   startPrev?: Point[] | null;
 }) {
-  const [native, setNative] = useState<Point[] | null>(() => (preview ? demoCurve(0) : null));
+  const [heard, setHeard] = useState<Point[] | null>(() => (preview ? demoCurve(0) : null));
   // 쌓여 있던 마지막 곡선은 **`mine`** 에 넣는다. `prevMine` 에 넣으면 범례가 그걸 "나, N-1회차" 라고
   // 부르는데 실제로는 N회차 곡선이다 — 화면이 곡선에 틀린 회차를 붙이게 된다. 다시 녹음하면 이게
   // prevMine 으로 밀려나면서 그때 비로소 N-1 이 된다.
@@ -67,7 +70,7 @@ export function PitchLoop({
   const [attempt, setAttempt] = useState(preview ? 3 : startAttempt);
   const [state, setState] = useState<"idle" | "playing" | "recording" | "saving">("idle");
   const noTarget = targetVoice === false;
-  const [note, setNote] = useState<string>(noTarget ? NO_NATIVE_NOTE : firstNote);
+  const [note, setNote] = useState<string>(noTarget ? NO_TARGET_NOTE : firstNote);
   const ctxRef = useRef<AudioContext | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -82,7 +85,7 @@ export function PitchLoop({
         const buf = await res.arrayBuffer();
         const ctx = audioCtx();
         const audio = await ctx.decodeAudioData(buf.slice(0));
-        setNative(pitchTrack(audio.getChannelData(0), audio.sampleRate));
+        setHeard(pitchTrack(audio.getChannelData(0), audio.sampleRate));
         const src = ctx.createBufferSource();
         src.buffer = audio;
         src.connect(ctx.destination);
@@ -103,7 +106,7 @@ export function PitchLoop({
         // 여기로 왔다는 건 목표 발음 음성이 안 왔다는 뜻이다 — `noTarget` 으로 들어왔든 이번에 못 받았든
         // 화면에 벌어진 일은 같다. 그러니 FLOW 가 정한 그 한 줄을 쓴다. 전에는 "목소리 키를 넣으면"
         // 이라고 했는데, 그건 Jessi 가 배포에 넣는 환경변수라 읽은 사람이 설정에서 찾을 수 없다.
-        setNote(NO_NATIVE_NOTE);
+        setNote(NO_TARGET_NOTE);
       }
     } catch (e) {
       console.error(e);
@@ -154,10 +157,10 @@ export function PitchLoop({
       if ("card" in target) form.set("card_id", target.card);
       else form.set("chunk_id", target.chunk);
       form.set("pitch", JSON.stringify(curve));
-      // 이 회차가 **겨눈 상대**. 원어민 음성을 들었으면 그 곡선이고, 없었으면 안 보낸다 —
+      // 이 회차가 **겨눈 상대**. 들려준 소리가 있었으면 그 곡선이고, 없었으면 안 보낸다 —
       // 없었다는 사실도 값이라 억지로 내 앞 회차를 채워 넣지 않는다. 나중에 일치도를 계산할 때
       // 겨눈 상대가 무엇이었는지가 남아 있어야 한다 (api/recordings/route.ts).
-      if (native?.length) form.set("target_pitch", JSON.stringify(native));
+      if (heard?.length) form.set("target_pitch", JSON.stringify(heard));
       form.set("duration_ms", String(durationMs));
       form.set("audio", blob, "voice.webm");
       const res = await fetch("/api/recordings", { method: "POST", body: form });
@@ -178,10 +181,14 @@ export function PitchLoop({
     <>
       <Card>
         <Label>억양 비교</Label>
-        <Curves native={noTarget ? prevMine : native} mine={mine} label={legendAria(noTarget)} />
+        <Curves heard={noTarget ? prevMine : heard} mine={mine} label={legendAria(noTarget)} />
         {/*
-          범례는 늘 있다 (CLAUDE.md). 원어민 소리가 없으면 검정 선은 **원어민이 아니라 직전 회차**다 —
+          범례는 늘 있다 (CLAUDE.md). 겨눌 소리가 없으면 검정 선은 **들려준 소리가 아니라 직전 회차**다 —
           같은 선을 두고 이름만 바꾸면 거짓말이 되므로, 그릴 것이 없으면 그 항목 자체를 안 낸다.
+
+          그리고 있을 때도 **"원어민" 이라고 부르지 않는다.** 그 소리를 내는 것은 ElevenLabs 의
+          언어별 음성이거나 Jessi 목소리 클론이라, 사람을 가리키는 이름은 지금도 사실이 아니다.
+          이름은 그게 **무엇인지**로 짓는다 — 듣기를 눌렀을 때 들려준 소리 (docs/FLOW.md 1′장).
         */}
         <div className={s.legend}>
           {noTarget ? (
@@ -203,7 +210,7 @@ export function PitchLoop({
           ) : (
             <span className={s.legendItem}>
               <span className={s.legendLine} style={{ background: "var(--curve-native)" }} />
-              원어민
+              들려준 소리
             </span>
           )}
           <span className={s.legendItem}>
@@ -240,7 +247,7 @@ export function PitchLoop({
 }
 
 /** 두 곡선. 범례는 항상 (CLAUDE.md). 데이터가 없으면 축만. */
-function Curves({ native, mine, label }: { native: Point[] | null; mine: Point[] | null; label: string }) {
+function Curves({ heard, mine, label }: { heard: Point[] | null; mine: Point[] | null; label: string }) {
   const W = 316;
   const H = 100;
   const path = (pts: Point[] | null) => {
@@ -262,7 +269,7 @@ function Curves({ native, mine, label }: { native: Point[] | null; mine: Point[]
   };
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} style={{ maxWidth: "100%" }}>
-      <path d={path(native)} fill="none" stroke="var(--curve-native)" strokeWidth={4} strokeLinecap="round" />
+      <path d={path(heard)} fill="none" stroke="var(--curve-native)" strokeWidth={4} strokeLinecap="round" />
       <path d={path(mine)} fill="none" stroke="var(--curve-me)" strokeWidth={4} strokeLinecap="round" strokeDasharray="8 7" />
     </svg>
   );

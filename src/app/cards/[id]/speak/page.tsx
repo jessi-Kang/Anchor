@@ -23,7 +23,7 @@ export default async function SpeakPage({ params, searchParams }: { params: Prom
   let where = "카드 1 / 4";
   let word = "協力";
   let reading = "きょうりょく";
-  // 루프가 받을 것(회차·마지막 곡선·원어민 음성 유무)은 한 군데에서 푼다 (lib/speak-loop.ts).
+  // 루프가 받을 것(회차·마지막 곡선·겨눌 소리 유무)은 한 군데에서 푼다 (lib/speak-loop.ts).
   // 여기서 회차만 읽고 마지막 곡선을 두고 와서, 다시 열면 "나, 3회차" 라고 써 놓고 곡선이 없었다.
   let loop: SpeakLoopData = { startAttempt: 0, startPrev: null, targetVoice: true };
 

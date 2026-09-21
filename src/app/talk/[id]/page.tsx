@@ -49,7 +49,7 @@ export default async function TalkChunkPage({
   const { fixed, native } = await searchParams;
   const preview = isDesignPreview();
   let chunk = PREVIEW;
-  // 루프가 받을 것(회차·마지막 곡선·원어민 음성 유무)은 한 군데에서 푼다 (lib/speak-loop.ts).
+  // 루프가 받을 것(회차·마지막 곡선·겨눌 소리 유무)은 한 군데에서 푼다 (lib/speak-loop.ts).
   // 페이지마다 따로 고르다가 F10 이 곡선을 두고 왔다 — 범례는 회차를 말하는데 곡선이 없었다.
   let loop: SpeakLoopData = { startAttempt: 0, startPrev: null, targetVoice: true };
 
@@ -66,7 +66,7 @@ export default async function TalkChunkPage({
   }
 
   const highlight = chunk.meta.chunk ?? chunk.text;
-  // 디자인 미리보기에서만 `?native=0` 으로 F14a(원어민 소리 없음)를 띄운다 — 참고 화면이 둘이라
+  // 디자인 미리보기에서만 `?native=0` 으로 F14a(겨눌 소리 없음)를 띄운다 — 참고 화면이 둘이라
   // 둘 다 눈으로 견줄 수 있어야 한다. 실제 화면은 이 파라미터를 보지 않는다.
   const targetVoice = preview ? native !== "0" : loop.targetVoice;
 
