@@ -28,13 +28,14 @@ export ANCHOR_APP_PASSWORD='<16자 이상>'
 pnpm db:migrate && pnpm db:seed
 ```
 
-**걸리는 자리 셋** — 셋 다 오류 메시지가 원인을 안 말해 준다:
+**걸리는 자리 넷** — 넷 다 오류 메시지가 원인을 안 말해 준다:
 
 | 증상 | 까닭 |
 | --- | --- |
 | `SASL: client password must be a string` | 소켓이 아니라 TCP 로 붙어서 **`postgres` 역할에 비밀번호가 있어야** 한다 |
 | `0001_init.sql: ANCHOR_APP_PASSWORD (16자 이상) 가 필요하다` | 말 그대로 **16자 이상**이어야 한다 |
 | 시험 로그인이 `/` 로 튕김 | `ANCHOR_TEST_LOGIN=1` 만으로는 안 열린다. **`ANCHOR_TEST_USER_ID`** 가 있어야 하고(`src/lib/auth/test-login.ts`, 기본값 없음) 그 id 의 행이 `users` 에 있어야 한다 |
+| `pnpm verify` 가 DB 시험 **5개**만 빨강 | 마이그레이션만 하고 **`pnpm db:seed` 를 안 돌렸다.** 시험이 씨앗 행을 본다 — 코드가 깨진 게 아니다 |
 
 그 계정으로 `/today` 가 열리려면 `settings` 가 **중첩된 꼴**이어야 한다 — 평평한
 `{"languages":["ja"]}` 는 안 먹는다(`src/lib/db/settings.ts`):
