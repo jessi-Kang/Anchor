@@ -53,6 +53,20 @@ test("한 글자는 앵커 표에 한 번만 적혀 있다", () => {
   assert.equal(seen.size, Object.keys(words).length);
 });
 
+test("ja-seed 40자는 두 표가 같은 낱말을 말한다", () => {
+  /*
+    `seed.ts` 는 `koWords[…] ?? seed?.ko_word` 라 **`kanji-ko.json` 이 `ja-seed.json` 을 이긴다.**
+    그런데 `kanji-ko` 의 그 줄들은 겹쳐 적힌 순서로 밀려 들어온 값이었고, 그래서 적재 한 번이
+    Jessi 가 이미 본 40행 중 **스물셋의 낱말을 바꾸는** 상태였다(実 실제→과실, 入 입력→수입 …).
+    **이유가 적힌 쪽이 순서를 이긴다**(PM 판정): 40장은 예문·읽기·패턴까지 손으로 적힌 값이다.
+    값을 맞춰 두는 것으로는 다시 어긋나는 것을 못 막아서, 어긋나면 여기서 빨개지게 한다.
+  */
+  const ja = (JSON.parse(readFileSync("db/seed/ja-seed.json", "utf8")) as { items: { kanji: string; ko_word: string }[] }).items;
+  const off = ja.filter((it) => words[it.kanji] && words[it.kanji] !== it.ko_word)
+    .map((it) => `${it.kanji}: ja-seed=${it.ko_word} kanji-ko=${words[it.kanji]}`);
+  assert.deepEqual(off, [], `두 표가 다른 낱말을 말한다:\n  ${off.join("\n  ")}`);
+});
+
 test("앵커가 가리키는 글자는 모두 씨앗 안에 있다", () => {
   const seed = new Set(items.map((it) => it.kanji));
   assert.deepEqual(Object.keys(words).filter((k) => !seed.has(k)), []);
