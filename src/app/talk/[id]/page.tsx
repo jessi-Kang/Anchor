@@ -51,7 +51,7 @@ export default async function TalkChunkPage({
   let chunk = PREVIEW;
   // 루프가 받을 것(회차·마지막 곡선·원어민 음성 유무)은 한 군데에서 푼다 (lib/speak-loop.ts).
   // 페이지마다 따로 고르다가 F10 이 곡선을 두고 왔다 — 범례는 회차를 말하는데 곡선이 없었다.
-  let loop: SpeakLoopData = { startAttempt: 0, startPrev: null, nativeVoice: true };
+  let loop: SpeakLoopData = { startAttempt: 0, startPrev: null, targetVoice: true };
 
   if (!preview) {
     const user = await currentUser();
@@ -68,7 +68,7 @@ export default async function TalkChunkPage({
   const highlight = chunk.meta.chunk ?? chunk.text;
   // 디자인 미리보기에서만 `?native=0` 으로 F14a(원어민 소리 없음)를 띄운다 — 참고 화면이 둘이라
   // 둘 다 눈으로 견줄 수 있어야 한다. 실제 화면은 이 파라미터를 보지 않는다.
-  const nativeVoice = preview ? native !== "0" : loop.nativeVoice;
+  const targetVoice = preview ? native !== "0" : loop.targetVoice;
 
   return (
     <Screen where="못 한 말" up="/talk" aside={preview ? "오후 7:11" : nowKST()} fixed={fixed === "1"}>
@@ -104,7 +104,7 @@ export default async function TalkChunkPage({
         </div>
       </Card>
       <Space h={16} />
-      <TalkLoop chunkId={chunk.id} text={highlight} preview={preview} startAttempt={loop.startAttempt} nativeVoice={nativeVoice} startPrev={loop.startPrev} />
+      <TalkLoop chunkId={chunk.id} text={highlight} preview={preview} startAttempt={loop.startAttempt} targetVoice={targetVoice} startPrev={loop.startPrev} />
     </Screen>
   );
 }

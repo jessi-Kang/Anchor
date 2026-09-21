@@ -66,6 +66,23 @@ async function main() {
     const [, ch, seq] = line.split("\t");
     if (ch && seq) ids.set(ch, seq.replace(/\[[A-Za-z]+\]/g, ""));
   }
+  /*
+    **변형 문자는 정자로 되돌린다** (docs/FLOW.md 4장, 기획 결정).
+
+    이유는 폰트가 아니라 **원칙 2(소리)** 다. `𧾷` 은 그려 줘도 한국 한자음이 없어 부를 이름이
+    없고, 그래프에서 제 노드가 못 되며 다음 카드도 못 된다. `足`(족) 은 사용자가 이미 아는 소리이고
+    제 노드가 있다. 路 = 足 + 各 가 원래 설명이기도 하다. 24자에서 발판 없던 자리에 발판이 생긴다.
+
+    울타리 셋 — **손으로 확인한 목록만**(늘리려면 기획·PM 을 거친다), **자동 치환 금지**(모양이
+    비슷하다고, 코드포인트가 가깝다고 바꾸지 않는다), **정자가 씨앗에 있고 한국 한자음을 가질 때만**.
+    폰트가 그 글자를 그릴 수 있느냐와는 상관없이 적용한다.
+
+    자리를 여기 둔 이유: `parts-ko.json` 은 부품 **이름 사전**이라 거기에 치환 규칙을 얹으면 한
+    파일이 두 일을 하게 된다(`docs/TEAM.md` 10장). 그리고 산출물(`kanji.json`)만 고치면 다음
+    빌드에 조용히 되돌아간다. 규칙은 만드는 자리에 있어야 살아남는다.
+  */
+  const UPRIGHT: Record<string, string> = { "\u{27FB7}": "足", "\u{2634C}": "羊", "\u{27607}": "衣" };
+
   const directParts = (ch: string): string[] | null => {
     if (override[ch]) return Array.from(override[ch]);
     const seq = ids.get(ch);
@@ -73,7 +90,9 @@ async function main() {
     const cs = Array.from(seq).filter((c) => !IDC.has(c));
     if (cs.some((c) => !isCjk(c))) return null;
     if (cs.length === 0 || (cs.length === 1 && cs[0] === ch)) return null;
-    return cs;
+    // 쪼개자마자 되돌린다 — 뒤에서 하면 그 사이에 변형 문자가 이름·확장 판단을 한 번 거치게 되고,
+    // 이름 사전에서 그 줄을 지우는 순간 결과가 달라진다.
+    return cs.map((c) => UPRIGHT[c] ?? c);
   };
   /** 이름 있는 부품까지 펼친다 */
   const STROKES = new Set("一丨丿丶乀乚亅𠃌𠃊二");
@@ -99,7 +118,9 @@ async function main() {
         out.push(c);
       }
     }
-    return out;
+    // 제 자신은 제 부품이 아니다. 衣 를 정자로 되돌리면 衣 = 亠 + 𧘇 → 亠 + 衣 가 되어 카드가
+    // 자기 글자를 자기 부품으로 내보인다. 되돌리기가 만든 자리라 되돌린 뒤에 거른다.
+    return out.filter((c) => c !== ch);
   };
 
   const chars = xml.split("<character>").slice(1);

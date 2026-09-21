@@ -11,7 +11,7 @@ type Point = { t: number; f0: number };
  */
 const NO_NATIVE_NOTE = "아직 견줄 원어민 소리가 없어. 지금은 내 소리끼리 겹쳐 봐.";
 
-const legendAria = (noNative: boolean) => (noNative ? "앞 회차와 이번 내 억양 곡선" : "원어민과 내 억양 곡선");
+const legendAria = (noTarget: boolean) => (noTarget ? "앞 회차와 이번 내 억양 곡선" : "원어민과 내 억양 곡선");
 
 /**
  * 듣기 → 따라 말하기 → 곡선. 한자 카드(F10)와 대화 덩어리(F14)가 같은 루프를 쓴다.
@@ -33,7 +33,7 @@ export function PitchLoop({
   onDone,
   firstNote,
   startAttempt,
-  nativeVoice,
+  targetVoice,
   startPrev,
 }: {
   target: { card: string } | { chunk: string };
@@ -47,10 +47,10 @@ export function PitchLoop({
   /** 이미 쌓인 녹음 수. 범례의 회차는 화면 상태가 아니라 DB 의 사실이다 (docs/FLOW.md 1′장) */
   startAttempt: number;
   /**
-   * 이 언어의 원어민 음성이 있는가 (서버가 `lib/tts-voice.ts` 로 판단해 내려 준다).
-   * 없으면 F14a: 원어민 검정 선 없이 **내 소리끼리 회차를 겹쳐** 본다. 값이 채워지면 그 순간부터 F14 다.
+   * 이 언어로 들려줄 목표 발음이 있는가 (서버가 `lib/tts-voice.ts` 로 판단해 내려 준다).
+   * 없으면 F14a: 검정 선 없이 **내 소리끼리 회차를 겹쳐** 본다. 값이 채워지면 그 순간부터 F14 다.
    */
-  nativeVoice?: boolean;
+  targetVoice?: boolean;
   /**
    * 쌓여 있던 마지막 회차의 곡선 (DB 에서 읽어 온다). 원어민 음성이 없을 때 겹칠 상대다 —
    * 이게 없으면 화면을 다시 연 사람의 첫 녹음은 겹칠 것이 없다 (`lib/db/recordings.ts`).
@@ -62,12 +62,12 @@ export function PitchLoop({
   // 부르는데 실제로는 N회차 곡선이다 — 화면이 곡선에 틀린 회차를 붙이게 된다. 다시 녹음하면 이게
   // prevMine 으로 밀려나면서 그때 비로소 N-1 이 된다.
   const [mine, setMine] = useState<Point[] | null>(() => (preview ? demoCurve(1) : (startPrev ?? null)));
-  // 원어민 소리가 없을 때 겹칠 **직전 회차** 곡선. 있을 때는 안 쓴다.
-  const [prevMine, setPrevMine] = useState<Point[] | null>(() => (preview && nativeVoice === false ? demoCurve(0) : null));
+  // 들려줄 목표 발음이 없을 때 겹칠 **직전 회차** 곡선. 있을 때는 안 쓴다.
+  const [prevMine, setPrevMine] = useState<Point[] | null>(() => (preview && targetVoice === false ? demoCurve(0) : null));
   const [attempt, setAttempt] = useState(preview ? 3 : startAttempt);
   const [state, setState] = useState<"idle" | "playing" | "recording" | "saving">("idle");
-  const noNative = nativeVoice === false;
-  const [note, setNote] = useState<string>(noNative ? NO_NATIVE_NOTE : firstNote);
+  const noTarget = targetVoice === false;
+  const [note, setNote] = useState<string>(noTarget ? NO_NATIVE_NOTE : firstNote);
   const ctxRef = useRef<AudioContext | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -100,7 +100,7 @@ export function PitchLoop({
           window.speechSynthesis.cancel();
           window.speechSynthesis.speak(u);
         });
-        // 여기로 왔다는 건 원어민 음성이 안 왔다는 뜻이다 — `noNative` 로 들어왔든 이번에 못 받았든
+        // 여기로 왔다는 건 목표 발음 음성이 안 왔다는 뜻이다 — `noTarget` 으로 들어왔든 이번에 못 받았든
         // 화면에 벌어진 일은 같다. 그러니 FLOW 가 정한 그 한 줄을 쓴다. 전에는 "목소리 키를 넣으면"
         // 이라고 했는데, 그건 Jessi 가 배포에 넣는 환경변수라 읽은 사람이 설정에서 찾을 수 없다.
         setNote(NO_NATIVE_NOTE);
@@ -178,13 +178,13 @@ export function PitchLoop({
     <>
       <Card>
         <Label>억양 비교</Label>
-        <Curves native={noNative ? prevMine : native} mine={mine} label={legendAria(noNative)} />
+        <Curves native={noTarget ? prevMine : native} mine={mine} label={legendAria(noTarget)} />
         {/*
           범례는 늘 있다 (CLAUDE.md). 원어민 소리가 없으면 검정 선은 **원어민이 아니라 직전 회차**다 —
           같은 선을 두고 이름만 바꾸면 거짓말이 되므로, 그릴 것이 없으면 그 항목 자체를 안 낸다.
         */}
         <div className={s.legend}>
-          {noNative ? (
+          {noTarget ? (
             // 겹치는 것은 **직전 하나**다. 곡선도 범례도 늘 둘 — 열둘이 겹치면 읽을 수 없다.
             // 첫 회차라 앞 곡선이 없으면 이 항목은 아예 안 낸다. 없는 것을 범례에 적지 않는다.
             //
