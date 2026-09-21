@@ -9,14 +9,14 @@
  * **SQL 을 그날 손으로 조립하지 않는다** (MEASURE 3장). 손으로 짜면 그날의 정의가 되고, 문서와
  * 어긋나도 아무도 모른다. 그래서 한 줄로 돈다.
  *
- * **곡선 거리는 `src/lib/pitch/distance.ts` 하나만 부른다.** 화면도 같은 모듈을 부른다 — 같은
- * 계산이 두 군데 있으면 어느 숫자가 맞는지 알 방법이 없다.
+ * **곡선 거리는 `src/lib/pitch/distance.ts` 하나만 부른다.** 화면도 `pnpm pitch:baseline` 도 같은
+ * 모듈을 부른다 — 같은 계산이 두 군데 있으면 어느 숫자가 맞는지 알 방법이 없다.
  *
  * 읽기만 한다. 한 행도 쓰지 않는다.
  */
 import { loadEnv } from "./lib/load-env";
 import { adminClient } from "./lib/admin-client";
-import { curveDistance, toPoints, type PitchPoint } from "../src/lib/pitch/distance";
+import { pitchDistance, type PitchPoint } from "../src/lib/pitch/distance";
 
 loadEnv();
 
@@ -52,6 +52,23 @@ type RecordingRow = {
 
 const n1 = (x: number) => x.toFixed(1);
 const n3 = (x: number) => x.toFixed(3);
+
+/**
+ * `recordings.pitch` / `target_pitch` 의 jsonb 를 점 배열로 읽는다. 드라이버가 이미 객체로 주지만
+ * 모양까지 보장하지는 않아서, 거리 함수에 넣기 전에 여기서 한 번 거른다. 하나도 안 남으면 null 이다 —
+ * 빈 배열을 넘기면 거리 함수가 "못 잰다" 대신 뭔가를 계산할 여지가 생긴다.
+ */
+function toPoints(value: unknown): PitchPoint[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: PitchPoint[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const t = Number((raw as { t?: unknown }).t);
+    const f0 = Number((raw as { f0?: unknown }).f0);
+    if (Number.isFinite(t) && Number.isFinite(f0)) out.push({ t, f0 });
+  }
+  return out.length ? out : null;
+}
 
 async function main() {
   const userId = process.argv.slice(2).find((a) => !a.startsWith("-"));
@@ -235,8 +252,12 @@ function print(
   const results: Result[] = [];
   for (const [, rows] of byTarget) {
     const at = (a: number) => rows.find((r) => r.attempt === a);
-    const dist = (row: RecordingRow | undefined) =>
-      row ? curveDistance(toPoints(row.pitch) as PitchPoint[] | null, toPoints(row.target_pitch) as PitchPoint[] | null) : null;
+    const dist = (row: RecordingRow | undefined) => {
+      if (!row) return null;
+      const mine = toPoints(row.pitch);
+      const target = toPoints(row.target_pitch);
+      return mine && target ? pitchDistance(mine, target) : null;
+    };
     const base = rows.find((r) => r.target_voice_id) ?? rows[0];
     results.push({
       label: rows[0].label ?? "?",
@@ -259,11 +280,18 @@ function print(
   */
   for (const [lang, title] of [
     ["en", "영어 (M4 판정 대상)"],
-    ["ja", "일본어 (기준선이 맞는지 확인되지 않았다. 통과·미달에 넣지 않는다)"],
+    ["ja", "일본어 (판정에 안 쓴다 — 기준선이 맞는지 아직 확인 안 됐다)"],
   ] as const) {
     const group = results.filter((r) => r.lang === lang);
     console.log("");
     console.log(`### ${title}`);
+    /*
+      영어를 판정에 쓰는 근거도 **가정**이지 확인이 아니다 — "프리셋이 영어 원어민 모델이니 제대로
+      발음한다" 는 확인된 적이 없고, 일본어보다 덜 위험할 뿐이다. 오히려 검증이 더 쉬운 쪽은
+      일본어다(고저 악센트가 사전에 이산 라벨로 있고, 그 악센트가 곧 F0 다). M4 가 이 숫자를 읽을 때
+      그 점을 같이 말해야 하므로 출력이 매번 그렇게 말한다 (MEASURE 2장).
+    */
+    if (lang === "en") console.log("  ※ 이 숫자를 판정에 쓰는 근거는 가정이다 — 프리셋이 제대로 발음한다는 것은 확인되지 않았다.");
     if (group.length === 0) {
       console.log("  대상 없음.");
       continue;

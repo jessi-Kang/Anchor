@@ -58,7 +58,12 @@ async function writeCache(nodeId: string, card: CardContent, model: string) {
 function partsLine(node: KanjiNode, names: Map<string, string>): string {
   const counts = new Map<string, number>();
   for (const p of node.meta.parts ?? []) counts.set(p, (counts.get(p) ?? 0) + 1);
-  return [...counts.entries()].map(([ch, n]) => `${ch}(${names.get(ch) ?? "이름 없음"})${n > 1 ? `×${n}` : ""}`).join(" + ");
+  // **부를 이름이 없는 부품은 모델에게도 넘기지 않는다.** "𠂒(이름 없음)" 을 넘기면 모델이 그 글자를
+  // 그대로 문장에 써서 "𠂒와 어진사람이 모이면" 이 나온다. 씨앗이 이미 걸러 두지만 여기서도 막는다 —
+  // 규율로만 막으면 다음에 이름 없는 부품이 하나 들어오는 순간 다시 샌다.
+  return [...counts.entries()]
+    .flatMap(([ch, n]) => (names.get(ch) ? [`${ch}(${names.get(ch)})${n > 1 ? `×${n}` : ""}`] : []))
+    .join(" + ");
 }
 
 /** 사전 데이터만으로 만든 문안. 후킹은 아는 단어가 있으면 그것, 없으면 한국 한자음만. */
@@ -67,7 +72,13 @@ export function fallbackContent(node: KanjiNode, names: Map<string, string>): Ca
   const sound = m.ko_sound ?? node.key;
   const word = m.ko_word ?? sound;
   const uniq = [...new Set(m.parts ?? [])];
-  const partWords = uniq.map((p) => names.get(p)?.split(" ")[0] ?? p);
+  // **이름이 없으면 그 부품은 없는 것으로 친다.** 글자로 떨어뜨리면 사용자가 답할 수 없는 질문이 된다
+  // ("𠂒와 어진사람이 모이면 무슨 뜻이 될까?"). 남는 게 없으면 아래에서 "이 모양이면" 으로 간다 —
+  // 이미 351자가 가는 길이라 새 화면 상태가 생기지 않는다.
+  const partWords = uniq.flatMap((p) => {
+    const name = names.get(p)?.split(" ")[0];
+    return name ? [name] : [];
+  });
   // 이음말도 조사다. 앞말의 받침을 따른다 ("열과 힘", "나무와 힘") — src/lib/ko.ts 한 곳에서 고른다.
   const parts_meaning = partWords.length ? joinWaGwa(partWords) : `${node.key} 한 글자`;
   const landing = m.example && m.example_reading && m.ko_word ? [{ word: m.example, reading: m.example_reading, ko: m.ko_word }] : [];
