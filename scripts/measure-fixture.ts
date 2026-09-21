@@ -187,6 +187,8 @@ async function main() {
     // 열 수 없게 해 뒀으므로(읽기를 열면 다음 카드의 답이 샌다) 그 안의 만난 글자에는 "열었다 / 안
     // 열었다" 가 생기지 않는다 — `recognized` 가 NULL 이다. 분모에 넣으면 기회가 없던 것을 못 읽은
     // 것으로 세게 되니 빠져야 하고, 동시에 **얼마나 빠지는지는 보여야** 한다.
+    // 이 자료(`again`)에는 `meta.readings` 가 없다 — **읽기를 아예 못 만든 자료**다. 세는 쪽이
+    // 이걸 "고칠 일" 쪽으로 갈라야 한다.
     const noJudge = await node("妥", "ja", "kanji");
     await card(noJudge, src, 12);
     await client.query(
@@ -194,11 +196,34 @@ async function main() {
       [USER_ID, noJudge, again, daysAgo(4)],
     );
 
+    /*
+      **실패 케이스 3″ — 읽기가 일부만 비었다.** `alignReadings` 는 가나가 아니거나 터무니없이 긴
+      읽기를 그 덩어리만 비우고(`""`) 나머지를 돌려준다. 그러면 그 덩어리는 못 열고 나머지는 열린다.
+      읽기가 아예 없는 자료와 **손쓰는 법이 다르므로** 따로 세어져야 한다.
+    */
+    const partial = await input("ja", "읽기가 일부 빈 자료", "일부만 읽힌 글. 誓協.", 4);
+    await client.query("UPDATE inputs SET meta = meta || jsonb_build_object('readings', $2::jsonb) WHERE id = $1", [
+      partial,
+      JSON.stringify(["", "きょう"]),
+    ]);
+    const partialNode = await node("誓", "ja", "kanji");
+    await card(partialNode, src, 12);
+    await client.query(
+      "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at) VALUES ($1, $2, $3, NULL, $4)",
+      [USER_ID, partialNode, partial, daysAgo(4)],
+    );
+
     // ── 곡선 ──────────────────────────────────────────────────────────────────
-    const chunk = async (text: string, lang: "en" | "ja", ago: number) => {
+    /*
+      **문안 출처를 `authored` 로 적는다.** 세는 쪽이 `claude`·`authored` 만 곡선에 넣으므로, 안 적으면
+      시드가 만든 덩어리가 통째로 걸러져 "5회차 없음" 이 뜬다 — 배관이 도는지를 못 보게 된다.
+      `claude` 로 적지 않는 이유는 따로다: 그러면 시드 문안과 진짜 생성 문안을 못 가른다.
+    */
+    const chunk = async (text: string, lang: "en" | "ja", ago: number, source = "authored") => {
       const { rows } = await client.query<{ id: string }>(
-        "INSERT INTO chunks (user_id, lang, situation, text, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-        [USER_ID, lang, "합성 상황", text, daysAgo(ago)],
+        `INSERT INTO chunks (user_id, lang, situation, text, created_at, meta)
+         VALUES ($1, $2, $3, $4, $5, jsonb_build_object('content_source', $6::text)) RETURNING id`,
+        [USER_ID, lang, "합성 상황", text, daysAgo(ago), source],
       );
       return rows[0].id;
     };
@@ -220,9 +245,19 @@ async function main() {
       **기준선이 영어 목소리가 읽은 한국어**라 그 숫자에 뜻이 없다. 곡선 집계에서 빠지고 대신
       머리말에 세어져야 한다 — 안 보이게 빼면 표본이 왜 작은지를 못 가른다.
     */
-    const bad = await chunk("이건 다음 스프린트로 미루죠", "en", 7);
-    await client.query("UPDATE chunks SET meta = meta || '{\"content_source\":\"fallback\"}'::jsonb WHERE id = $1", [bad]);
+    const bad = await chunk("이건 다음 스프린트로 미루죠", "en", 7, "fallback");
     await attempts({ chunk: bad }, [0.5, 0.4, 0.3, 0.2, 0.05], LANG_VOICE, 66, 7);
+
+    /*
+      **실패 케이스 9 — 문안 출처가 아예 안 적힌 덩어리.** `content_source` 는 optional 이라 값이
+      없는 행이 실제로 있다. "fallback 이면 뺀다" 는 이걸 조용히 통과시키므로 허용 목록으로 거른다.
+      폴백과 따로 세어져야 한다 — 신호가 다르다.
+    */
+    const { rows: noSrc } = await client.query<{ id: string }>(
+      "INSERT INTO chunks (user_id, lang, situation, text, created_at) VALUES ($1, 'en', '합성 상황', $2, $3) RETURNING id",
+      [USER_ID, "sounds good to me", daysAgo(7)],
+    );
+    await attempts({ chunk: noSrc[0].id }, [0.5, 0.4, 0.3, 0.2, 0.05], LANG_VOICE, 77, 7);
 
     // **실패 케이스 6 — 일본어.** 계산은 하지만 M4 판정에는 안 들어간다. 영어와 합치면 그 결정이 사라진다.
     // 위에서 이미 착지한 카드에 회차를 매단다 — 곡선용 카드를 따로 만들면 "착지한 한자" 수가
@@ -235,11 +270,12 @@ async function main() {
     console.log("");
     console.log("배관이 맞으면 이렇게 나온다. 하나라도 다르면 스크립트가 정의대로 안 거른 것이다.");
     console.log("  재만남: 분모 10 · 분자 7 → 70.0%");
-    console.log("          참고 — 착지한 한자 14자 · 자격 미달 1자 · 다시 안 나온 한자 2자 · 판정 불가 1자 · 같은 글 재투입 1자");
+    console.log("          참고 — 착지한 한자 15자 · 자격 미달 1자 · 다시 안 나온 한자 2자 · 같은 글 재투입 1자");
+  console.log("          판정 불가 2자 — 읽기가 아예 없는 자료 1자 · 읽기가 일부 빈 자료 1자 (갈라져 나와야 한다)");
   console.log("          支 는 \"열었다\" 여야 한다 — 재투입(D-6, 안 열었다)이 아니라 진짜 새 자료(D-4)를 세야 맞다.");
   console.log("          거꾸로 거르면 支 를 잃고 분모 9 · 분자 7 = 77.8% 가 나온다 — 비율이 위로 부푼다");
     console.log("  곡선 영어: 가까워진 대상 1 / 2   (3회차뿐인 것 · 겨눈 곡선이 없는 것 · 폴백 문안은 빠진다)");
-  console.log("          폴백 문안이라 뺀 대상 1개");
+  console.log("          폴백 문안이라 뺀 대상 1개 · 문안 출처가 안 적힌 대상 1개");
     console.log("          기준선 출처가 안 남은 대상 1개");
     console.log("  곡선 일본어: 가까워진 대상 1 / 1  (따로 적히고 통과·미달에 안 들어간다)");
   } finally {
