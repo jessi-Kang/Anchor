@@ -12,13 +12,14 @@
  *     F17 은 done 이라 F14 로 보내고, F14 는 영어가 없다며 다시 F17 로 보낸다.
  *  3. `saveEnglish` 가 그 행에는 쓴다. 안 쓰면 다시 만들어도 제자리다.
  *  4. 멀쩡한 영어는 여전히 안 덮인다 — 그 조건의 원래 일이다.
+ *  5. 폴백 행은 「같은 덩어리」 후보가 아니다. 그 행의 덩어리는 아직 영어가 아니다.
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { loadEnv } from "../lib/load-env";
 import { adminClient } from "../lib/admin-client";
 import { FIXTURE_PREFIX } from "../lib/fixture";
-import { createChunk, getChunk, getSituation, hasEnglish, saveEnglish } from "../../src/lib/db/chunks";
+import { createChunk, findSameChunk, getChunk, getSituation, hasEnglish, saveEnglish } from "../../src/lib/db/chunks";
 
 loadEnv();
 
@@ -91,4 +92,17 @@ test("멀쩡한 영어는 여전히 안 덮인다", async () => {
   });
   const row = await getChunk(USER, realId);
   assert.equal(row?.text, "Let's wrap this up by Friday.", "덮으면 그 대상의 1회차 곡선 기준선이 딴 문장 것이 된다");
+});
+
+test("폴백 행은 같은 덩어리 후보가 아니다 — 그 덩어리는 아직 영어가 아니다", async () => {
+  const korean = await createChunk(USER, {
+    lang: "en",
+    situation: "아직 안 나은 행",
+    text: "회의를 다음 주로 미루죠",
+    attitude: null,
+    meta: { chunk: "회의를 다음 주로 미루죠", content_source: "fallback" },
+  });
+  const hit = await findSameChunk(USER, "en", "회의를 다음 주로 미루죠", "00000000-0000-0000-0000-000000000000");
+  assert.equal(hit, null, "후보로 두면 그 행이 나은 뒤 같은 덩어리의 첫 행이 둘이 된다");
+  await admin.query("DELETE FROM chunks WHERE id = $1", [korean]);
 });
