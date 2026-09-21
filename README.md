@@ -387,6 +387,20 @@ pnpm design:diff                             # 매핑된 화면을 전부 훑어
 curl localhost:3000/api/health               # DB 역할·RLS 상태 (rls_all_enabled 가 true, role_bypasses_rls 가 false 여야 한다)
 ```
 
+**빈 컨테이너에서는 `build` 가 코드 때문이 아니라 환경 때문에 빨갛다.** `/api/account/delete` 같은
+라우트가 모듈을 읽는 순간 `src/lib/env.ts` 가 값을 요구해서, 넷이 없으면 "페이지 데이터 수집 실패" 로
+멈춘다. **그 빨강을 내 변경으로 읽으면 없는 결함을 쫓게 된다.** 가짜 값으로 세우면 지나간다 — 붙는
+곳이 없으니 진짜 값일 필요가 없다 (`NEON_AUTH_COOKIE_SECRET` 만 길이 32자를 본다):
+
+```bash
+env ANCHOR_DATABASE_URL='postgres://x:x@localhost:5432/x' ANCHOR_APP_PASSWORD='x' \
+    NEON_AUTH_BASE_URL='https://example.invalid' \
+    NEON_AUTH_COOKIE_SECRET='0000000000000000000000000000000000000000' \
+    pnpm build
+```
+
+**`test:db` 는 이 방법으로 안 된다** — 그쪽은 진짜 Postgres 가 필요하다 (`db/README.md` 의 지역 조리법).
+
 **`pnpm verify` 가 따로 있는 이유는 종료 코드다.** 넷을 손으로 이어 돌리면서 결과를 파이프로 거르면
 (`pnpm test:db | grep "# pass"`) **앞 명령의 종료 코드가 버려진다** — `&&` 나 사람이 보는 것은 `grep` 의
 성공이고, `grep` 은 빨간 줄이 마흔여덟이어도 「pass」라는 글자만 찾으면 성공한다. 그러면 검사가
