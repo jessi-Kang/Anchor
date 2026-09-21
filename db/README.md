@@ -10,6 +10,55 @@ pnpm db:migrate            # 미적용 파일을 순서대로 적용 (각 파일
 pnpm db:migrate:status     # 적용 상태만 출력
 ```
 
+### 이 컨테이너에서 로컬 DB 를 세우는 법 (2026-09-21 에 실제로 세워 봄)
+
+Postgres 16 이 깔려 있지만 **안 떠 있고 `anchor` DB 도 없다.** 세션마다 새로 세운다 —
+`sudo -n` 이 통하므로 **기존 DB 를 건드릴 필요가 없다**(이름 바꾸기·지우기를 시도하면
+권한 가드에 걸린다. 걸리면 우회하지 말고 새로 만든다):
+
+```bash
+sudo -u postgres /usr/lib/postgresql/16/bin/pg_ctl -D /var/lib/postgresql/16/main \
+  -l /tmp/pg.log -o "-c config_file=/etc/postgresql/16/main/postgresql.conf" start
+sudo -u postgres psql -c "CREATE DATABASE anchor" -c "CREATE ROLE anchor_app LOGIN PASSWORD '<로컬용>'"
+sudo -u postgres psql -c "ALTER ROLE postgres PASSWORD '<로컬용>'"
+
+export DATABASE_URL_ADMIN="postgres://postgres:<로컬용>@localhost:5432/anchor"
+export ANCHOR_DATABASE_URL="postgres://anchor_app:<로컬용>@localhost:5432/anchor"
+export ANCHOR_APP_PASSWORD='<16자 이상>'
+pnpm db:migrate && pnpm db:seed
+```
+
+**걸리는 자리 셋** — 셋 다 오류 메시지가 원인을 안 말해 준다:
+
+| 증상 | 까닭 |
+| --- | --- |
+| `SASL: client password must be a string` | 소켓이 아니라 TCP 로 붙어서 **`postgres` 역할에 비밀번호가 있어야** 한다 |
+| `0001_init.sql: ANCHOR_APP_PASSWORD (16자 이상) 가 필요하다` | 말 그대로 **16자 이상**이어야 한다 |
+| 시험 로그인이 `/` 로 튕김 | `ANCHOR_TEST_LOGIN=1` 만으로는 안 열린다. **`ANCHOR_TEST_USER_ID`** 가 있어야 하고(`src/lib/auth/test-login.ts`, 기본값 없음) 그 id 의 행이 `users` 에 있어야 한다 |
+
+그 계정으로 `/today` 가 열리려면 `settings` 가 **중첩된 꼴**이어야 한다 — 평평한
+`{"languages":["ja"]}` 는 안 먹는다(`src/lib/db/settings.ts`):
+
+```sql
+UPDATE users SET settings = jsonb_build_object(
+  'languages', jsonb_build_object('ja', jsonb_build_object('enabled_at', now()))
+) WHERE id = '<시험 계정 id>';
+```
+
+**왜 여기 적나.** 이 셋은 2026-09-21 에 세 세션이 따로 막혔던 자리인데 **답이 쪽지에만
+있었다.** 쪽지는 세션과 함께 사라지고, 다음 사람은 `db/README.md` 를 연다.
+
+### 이력이 얕다 — 「그 커밋 없는데?」 는 십중팔구 이것
+
+이 컨테이너의 클론은 기본이 **shallow** 다(세션 시작 때 481 커밋). 경계 너머 커밋은
+`git log` 도 `git cat-file -e` 도 **「없다」**고 답한다. 잘리는 쪽이 오래된 쪽이라
+「마지막으로 건드린 커밋」류는 안 틀리지만, **「X 는 이력에 없다」류는 못 믿는다.**
+
+```bash
+git rev-parse --is-shallow-repository   # true 면 아래를 먼저
+git fetch --deepen=500 origin main
+```
+
 적용 기록은 `schema_migrations(name, applied_at, checksum)` 에 남는다. 이미 적용된 파일의 내용이 바뀌면 체크섬 불일치로 중단한다. 새 변경은 항상 새 파일로.
 
 ## 프로덕션에 올라간 마이그레이션
@@ -28,6 +77,29 @@ pnpm db:migrate:status     # 적용 상태만 출력
 **그 일이 실제로 났다** (2026-09-21, `d12d9fb`). 옛 값을 들고 있는 원장이 **개발 컨테이너에 한 대** 있고 거기서 `db:migrate` 가 0007 에서 멈춰 0008 까지 못 갔다. **그 대는 고치지 않고 표본으로 둔다** — 되돌리는 마이그레이션을 내지 않는다. 까닭은 이렇다: **처음부터 세운 DB 는 장부에 지금 파일의 체크섬을 그 자리에서 적으니 언제나 맞는다.** 그래서 `pnpm test:db` 의 `db-provenance` 가 초록인 것은 **어긋남이 없다는 뜻이 아니라 어긋날 수 있는 DB 가 아니라는 뜻**이고, 어긋남은 **옛 파일로 한 번 돌린 DB 에서만** 드러난다. 그 한 대가 그걸 볼 수 있는 유일한 자리다. 새로 세워 쓸 DB 는 따로 만든다.
 
 **위 표는 살아 있는 읽기가 아니라 2026-09-21 04:5x 에 읽어 적은 기록이다.** 프로덕션이 그 뒤로 움직였는지는 이 문서가 모른다. **이 물음이 다시 열리는 조건은 하나다** — 프로덕션에서 `pnpm db:migrate` 가 0007 에서 멈추는 것. 그때는 위 규칙대로 멈춘 채로 알리고, 이 표를 다시 읽어서 고친다.
+
+### 멈춘 DB 를 지나가게 하는 길 — 설계는 끝나 있고, 안 낸다
+
+멈춘 DB 를 지나가게 하려면 **둘이 한 쌍**이다.
+
+```
+① scripts/migrate.ts 의 INTENTIONAL_EDITS 에 0007 짝 하나   100f2d2c5a4d… → dc498df7fb86…
+② 새 마이그레이션: 옛 0007 이 만든 열 셋을 DROP COLUMN IF EXISTS
+     encounters.meta · recordings.meta · cards.meta  (셋 다 읽는 코드가 없다 — 재 봤다)
+```
+
+옛 판을 돌린 DB 는 ①로 지나가고 ②가 남은 열을 걷어내며, 지금 판을 돌린 DB 는 체크섬이 이미 맞고 ②가 `IF EXISTS` 라 아무것도 안 한다. **둘이 같은 자리에 선다.**
+
+**그런데 안 낸다.** 지금 옛 값을 들고 있는 건 **버려도 되는 작업용 DB 한 대**고, 그 대의 더 싼 길은 옆에 새 DB 를 세우는 것이다(이미 그렇게 했다). ①+②는 **레포에 영구 항목을 둘 남기는 거래**이고, 게다가 위에 적은 **표본 한 대를 지운다.**
+
+**다시 열 조건:** 언젠가 **다시 못 세우는 DB**(프로덕션이거나 진짜 사용자 행이 든 DB)가 `100f2d2c5a4d…` 를 들고 있는 것이 확인되면, **그때 ①+②가 답이고 설계는 위에 이미 끝나 있다.**
+
+**그리고 「0008 로 되돌리는 길」은 쓰지 마라.** `5b7968d` 커밋 본문이 *"이미 돌린 곳이 있으면 0008 로 되돌리는 쪽으로 낸다"* 고 적어 두었는데, **그건 그 줄을 쓸 때 참이었고 지금은 아니다** — 그 뒤로 **지금 판으로 이미 돌린 DB 가 생겨서**, 되돌리면 그쪽이 거꾸로 어긋난다. 위 ①+②가 그 자리를 대신한다.
+
+**규칙 둘 (여기 말고 다른 검사에도 선다):**
+
+- **검사에 예외를 선언하기 전에, 예외 없이 초록을 만드는 길이 있는지 먼저 본다.**
+- **①(체크섬 예외)은 ②(스키마를 실제로 맞추는 것) 없이 혼자 가지 않는다.** ①만 넣으면 그 DB 는 **어긋난 채로 영영 초록**이 되고, 그건 고친 게 아니라 **검사를 끈 것**이다.
 
 ## 프로덕션에 올라간 공용 씨앗
 
