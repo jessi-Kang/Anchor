@@ -18,10 +18,35 @@ export const dynamic = "force-dynamic";
 const PREVIEW = {
   name: "아침 기사",
   body: "トヨタとNTT、協力して次世代の車を開発。両社は20日、協力して車のデータ基盤を作ると発表した。条件をめぐって妥協が必要だったという。",
-  // 참고 화면과 같은 상태: 協力 은 만났고 基·妥 는 아직이다 (design/screens/F12.html).
-  met: new Set(["協", "力"]),
+  /*
+    참고 화면과 같은 상태 (design/screens/F12.html). **참고를 열어 틴트를 세어 넣는다** — 참고가
+    틴트하는 것은 `協力 · 協力 · 基 · 協` 넷이라 만난 글자는 `協 力 基` 셋이고, 아래 한 줄이
+    `새로 배울 건 妥 하나뿐.` 인 것과 들어맞는다.
+
+    **전에는 `基` 가 어느 쪽에도 없었다.** `met` 에서 빼 놓고 `fresh` 에도 안 넣어서, 화면에서
+    그 글자만 「만난 것」도 「새로 배울 것」도 아닌 게 됐다 — 참고는 제 안에서 맞는데 **붙박이
+    값이 스스로 어긋나 있었다.** 주석이 "基·妥 는 아직" 이라고 적혀 있던 것이 참고를 잘못 읽은
+    자리다 (docs/FLOW.md 97: 눈으로 고르면 틀린다).
+  */
+  met: new Set(["協", "力", "基"]),
   fresh: ["妥"],
   sounds: new Map([["妥", "타"], ["協", "협"], ["力", "력"], ["基", "기"]]),
+  /*
+    **읽기도 붙박이 값이다.** 없으면 이 화면은 ruby 를 한 글자도 못 그리는데, ruby 가 빠지면
+    줄 높이가 줄고 **줄바꿈 자리가 달라져 본문이 통째로 어긋나** 보인다 — 자리 문제로 읽히지만
+    자리 문제가 아니다. 키가 있느냐와도 상관없다: 미리보기는 `getFurigana` 까지 가지도 않는다.
+
+    **값은 참고에서 읽었다.** `kanjiRuns(body)` 와 길이·순서가 같아야 하는데(14개), 열린 상태를
+    그린 `design/screens/F12a.html` 이 그 열넷을 같은 차례로 다 적어 두었다. 그래서 지어낸 값이
+    하나도 없다 — 틴트 때문에 F12 에서 가려지는 `協力` 의 `きょうりょく` 까지 거기 있다.
+
+    `車` 가 두 번 다 `くるま` 인 것이 이 값이 사전 음이 아니라 **그 문장에서 실제로 읽히는 소리**
+    라는 표시다 (아래 실제 경로의 같은 주석).
+  */
+  readings: [
+    "きょうりょく", "じせだい", "くるま", "かいはつ", "りょうしゃ", "か", "きょうりょく",
+    "くるま", "きばん", "つく", "はっぴょう", "じょうけん", "だきょう", "ひつよう",
+  ],
 };
 
 /**
@@ -50,7 +75,7 @@ export default async function ReadPage({
   let body = PREVIEW.body;
   let met = PREVIEW.met;
   let fresh = PREVIEW.fresh;
-  let readings: string[] | undefined;
+  let readings: string[] | undefined = PREVIEW.readings;
   let sounds = PREVIEW.sounds;
   // 이 자료에서 **착지한 순서대로** 쌓인 한자 (`inputProgress` 가 `landed_at` 으로 정렬해 준다).
   // 미리보기는 빈 채로 둔다 — 아래에서 지금까지와 같은 줄로 떨어진다.
@@ -86,7 +111,20 @@ export default async function ReadPage({
 
   // 읽기·한국어 낱말·아래 한 줄이 모두 이 한 계산에서 나온다.
   const runs = runStates(body, met);
-  const mixed = runs.find((r) => r.met.length > 0 && r.fresh.length > 0) ?? null;
+  /*
+    **섞인 낱말은 「안 만난 글자」가 아니라 「셀 수 있는 새 글자」로 가른다.**
+
+    `RunState.fresh` 는 그냥 met 에 없는 글자라 **노드가 없는 글자까지 들어온다.** 그 값으로
+    고르면 `基盤` 이 섞인 낱말이 되어 아래 한 줄이 `基盤, 기는 방금 봤지` 가 되는데, 바로 밑
+    개수 줄은 `새로 배울 건 妥 하나뿐` 이라고 말한다 — 한 카드의 두 줄이 서로 다른 낱말을
+    가리킨다(`盤` 은 `freshKanji` 가 세지 않으니 배울 것에 없다).
+
+    참고가 그 답을 이미 그려 놨다: `design/screens/F12.html` 은 `基` 를 틴트하면서도 아래 줄을
+    `妥協, 협은 방금 봤지` 로 짚는다. 그러니 기준은 **개수 줄이 세는 그 목록**(`fresh`)이다.
+    두 줄이 같은 값을 보면 갈릴 자리가 없어진다.
+  */
+  const counted = new Set(fresh);
+  const mixed = runs.find((r) => r.met.length > 0 && r.chars.some((c) => counted.has(c))) ?? null;
   /*
     한국어 낱말이 붙는 낱말. 섞인 낱말이 있으면 그것 — 위 한 줄이 짚은 낱말이라 딴 낱말의 한국어를
     붙이면 화면이 두 낱말을 말하게 된다. 섞인 낱말은 `allMet` 이 거짓이라 아래에서 걸러진다.
