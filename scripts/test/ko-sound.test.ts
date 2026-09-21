@@ -15,18 +15,12 @@ type Item = { kanji: string; ko: string | null; ko_all: string[] };
 const items = (JSON.parse(readFileSync("db/seed/kanji.json", "utf8")) as { items: Item[] }).items;
 const words = (JSON.parse(readFileSync("db/seed/kanji-ko.json", "utf8")) as { words: Record<string, string> }).words;
 
-test("앵커 낱말은 그 글자의 한국 한자음을 품는다 (두음법칙 허용)", () => {
-  const bad = items
-    .filter((it) => words[it.kanji])
-    .filter((it) => {
-      const w = words[it.kanji];
-      if (!it.ko) return true; // 앵커는 있는데 소리가 없으면 "○○의 ?" 가 된다
-      return !Array.from(w).some((syl, i) => syl === it.ko || (i === 0 && headSound(it.ko!) === syl));
-    })
-    .map((it) => `${it.kanji} 앵커=${words[it.kanji]} 소리=${it.ko ?? "없음"} 목록=${JSON.stringify(it.ko_all)}`);
-  assert.deepEqual(bad, [], `앵커가 제 글자의 소리를 안 품는다:\n  ${bad.join("\n  ")}`);
-});
-
+/*
+  **「앵커가 그 글자의 소리를 품는가」는 여기서 안 잰다** — `anchor-shape.test.ts` 로 옮겼고,
+  거기서는 **두음법칙을 안 봐준다**(기획 `dfa1ea1`). 料/요리 는 소리를 "요" 로 부르는데 카드는
+  "료 りょう" 를 가르쳐서, 접어서 이어지는 것이 앵커로 서도 된다는 뜻은 아니기 때문이다.
+  이 파일이 재는 것은 **고르는 규칙**(여러 소리 중 어느 것)이고, 거기서는 접는 것이 여전히 맞다.
+*/
 test("고른 소리는 늘 KANJIDIC2 목록 안에 있다 — 지어낸 값이 없다", () => {
   const made = items.filter((it) => it.ko !== null && !it.ko_all.includes(it.ko));
   assert.deepEqual(made.map((it) => `${it.kanji} ${it.ko} ∉ ${JSON.stringify(it.ko_all)}`), []);
