@@ -7,7 +7,8 @@
 
 BEGIN;
 
--- 1. 돌리기 전에 — 실제로 바뀔 줄이 몇인가. 0 이면 이미 맞는 것이니 그대로 ROLLBACK 해도 된다.
+-- 1. 돌리기 전에 — 실제로 바뀔 줄이 몇인가.
+--    「노드가 없는 글자」가 0 이 아니면 **씨앗 적재가 먼저다.** 이 파일은 있는 행만 고친다.
   WITH want(key, parts) AS (VALUES
     ('日'::text, '[]'::jsonb),
     ('一', '[]'),
@@ -2146,10 +2147,11 @@ BEGIN;
     ('𠮟', '["口","七"]'),
     ('剝', '[]')
   )
-SELECT count(*) AS "바뀔 노드", 2136 AS "파일에 적힌 글자"
-    FROM nodes n JOIN want w ON w.key = n.key
-   WHERE n.user_id IS NULL AND n.lang = 'ja' AND n.kind = 'kanji'
-     AND n.meta -> 'parts' IS DISTINCT FROM w.parts
+SELECT count(*) FILTER (WHERE n.id IS NOT NULL AND n.meta -> 'parts' IS DISTINCT FROM w.parts) AS "바뀔 노드",
+       count(*) FILTER (WHERE n.id IS NULL) AS "노드가 없는 글자",
+       2136 AS "파일에 적힌 글자"
+    FROM want w LEFT JOIN nodes n
+      ON n.key = w.key AND n.user_id IS NULL AND n.lang = 'ja' AND n.kind = 'kanji'
 ;
 
 -- 2. 적용.
@@ -4298,7 +4300,9 @@ UPDATE nodes n SET meta = jsonb_set(n.meta, '{parts}', w.parts)
      AND n.key = w.key
 ;
 
--- 3. 확인 — 여기서 0 이 나와야 한다.
+-- 3. 확인 — 「아직 다른 노드」가 0 이어야 한다.
+--    그리고 「노드가 없는 글자」도 봐야 한다. 그게 0 이 아니면 이 0 은 «다 맞췄다» 가 아니라
+--    «있는 것만 맞췄다» 는 뜻이다.
   WITH want(key, parts) AS (VALUES
     ('日'::text, '[]'::jsonb),
     ('一', '[]'),
@@ -6437,10 +6441,11 @@ UPDATE nodes n SET meta = jsonb_set(n.meta, '{parts}', w.parts)
     ('𠮟', '["口","七"]'),
     ('剝', '[]')
   )
-SELECT count(*) AS "아직 다른 노드"
-    FROM nodes n JOIN want w ON w.key = n.key
-   WHERE n.user_id IS NULL AND n.lang = 'ja' AND n.kind = 'kanji'
-     AND n.meta -> 'parts' IS DISTINCT FROM w.parts
+SELECT count(*) FILTER (WHERE n.id IS NOT NULL AND n.meta -> 'parts' IS DISTINCT FROM w.parts) AS "아직 다른 노드",
+       count(*) FILTER (WHERE n.id IS NULL) AS "노드가 없는 글자",
+       2136 AS "파일에 적힌 글자"
+    FROM want w LEFT JOIN nodes n
+      ON n.key = w.key AND n.user_id IS NULL AND n.lang = 'ja' AND n.kind = 'kanji'
 ;
 
 COMMIT;
