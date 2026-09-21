@@ -9,7 +9,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { SOUND_ECHO_EXCEPTIONS, TWO_SYLLABLE_EXCEPTIONS } from "../../src/lib/kanji/anchor-shape";
+import { SOUND_ECHO_EXCEPTIONS, TWO_SYLLABLE_EXCEPTIONS, LITERAL_SOUND_EXCEPTIONS } from "../../src/lib/kanji/anchor-shape";
 
 const words = (JSON.parse(readFileSync("db/seed/kanji-ko.json", "utf8")) as { words: Record<string, string> }).words;
 const sound = new Map(
@@ -18,6 +18,11 @@ const sound = new Map(
 
 const echoes = (k: string) => words[k] === sound.get(k);
 const notTwo = (k: string) => Array.from(words[k]).length !== 2;
+/** 바뀐 꼴(두음법칙·사이시옷)은 안 친다 — 그 소리는 카드가 가르치는 소리와 다른 글자다. */
+const notLiteral = (k: string) => {
+  const s = sound.get(k);
+  return Boolean(s) && !Array.from(words[k]).includes(s!);
+};
 
 test("앵커 낱말은 그 글자의 한국 한자음과 같을 수 없다 (선언된 것 빼고)", () => {
   // 같으면 F03 부제가 "역의 역" 이 되고, 그 글자가 「아는 낱말에서 시작」 묶음에 선다 — 낱말이 없는데.
@@ -31,6 +36,22 @@ test("앵커 낱말은 두 글자다 (선언된 것 빼고)", () => {
   assert.deepEqual(off, [], `낱말이 두 글자가 아니다: ${off.map((k) => `${k}=${words[k]}`).join(", ")}. 고치거나 TWO_SYLLABLE_EXCEPTIONS 에 적어라`);
 });
 
+test("앵커 낱말은 그 글자의 한국 한자음을 글자 그대로 품는다 (선언된 것 빼고)", () => {
+  /*
+    두음법칙도 사이시옷도 **바뀐 소리**다. `料` 를 「요리」로 부르면 발판은 "요" 인데
+    Scene1 은 `ko_sound` 를 그대로 찍어 "이 료, 한자로는" 이라 하고 패턴 줄은 "료 りょう" 를
+    가르친다. **료 → りょう 는 맞고 요 → りょう 는 틀리다** — 원칙 2 의 다리가 거기서 끊긴다.
+    `ko-sound.ts` 가 접는 것은 "어느 소리인가" 이고 여기서 묻는 것은 "앵커로 서도 되나" 다.
+  */
+  const off = Object.keys(words).filter((k) => notLiteral(k) && !(k in LITERAL_SOUND_EXCEPTIONS));
+  assert.deepEqual(off, [], `낱말이 소리를 바뀐 꼴로만 품는다: ${off.map((k) => `${k}=${words[k]}(소리 ${sound.get(k)})`).join(", ")}. 고치거나 LITERAL_SOUND_EXCEPTIONS 에 적어라`);
+});
+
+test("앵커가 있는 글자는 소리도 있다 — 「○○의 ?」 가 되는 자리는 없다", () => {
+  const off = Object.keys(words).filter((k) => !sound.get(k));
+  assert.deepEqual(off, [], `앵커는 있는데 소리가 없다: ${off.join(", ")}`);
+});
+
 test("선언된 줄은 아직 어긋나 있다 — 고쳐졌으면 선언을 지운다", () => {
   const stale: string[] = [];
   const check = (list: Record<string, string>, name: string, broken: (k: string) => boolean, fixed: string) => {
@@ -42,6 +63,7 @@ test("선언된 줄은 아직 어긋나 있다 — 고쳐졌으면 선언을 지
   };
   check(SOUND_ECHO_EXCEPTIONS, "SOUND_ECHO", echoes, "이제 소리와 다르다");
   check(TWO_SYLLABLE_EXCEPTIONS, "TWO_SYLLABLE", notTwo, "이제 두 글자다");
+  check(LITERAL_SOUND_EXCEPTIONS, "LITERAL_SOUND", notLiteral, "이제 소리를 글자 그대로 품는다");
   assert.deepEqual(stale, [], `선언이 낡았다 — 줄을 지워라:\n  ${stale.join("\n  ")}`);
 });
 
