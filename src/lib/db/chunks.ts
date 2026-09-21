@@ -131,25 +131,36 @@ export async function getSituation(
 }
 
 /**
- * 홈의 "못 한 말" 행이 쓰는 개수. **영어 문장이 있는 것만 센다.**
+ * 홈의 "못 한 말" 행이 쓰는 개수. **세는 조건과 목록에 내는 조건은 하나다** (`docs/FLOW.md` 1′장).
  *
- * 이 수가 홈 행을 F18(목록)로 보낼지 F13(쓰기)으로 보낼지 가른다. 행 전체를 세면 F13 에서 한 줄
- * 쓰고 F17 에서 그만둔 사람이 **빈 목록으로 떨어진다** — 그 행은 F18 이 안 내기 때문이다.
- * 세는 조건과 목록에 내는 조건이 같아야 한다.
+ * 이 수가 홈 행을 F18(목록)로 보낼지 F13(쓰기)으로 보낼지 가른다. 전에는 영어 문장이 있는 것만
+ * 셌는데, `pastChunks` 가 문장 없는 행도 내게 되면서 **홈이 안 세는 행을 목록이 내는** 꼴이 됐다 —
+ * 그러면 홈이 "한 줄이면 돼" 라며 F13 으로 보내 **또 새 줄을 쓰게 한다.** 한쪽만 고치면 홈의 수와
+ * 목록의 행이 갈린다.
  */
 export async function countChunks(userId: string, lang: Lang3 = "en"): Promise<number> {
   return withUser(userId, async (tx) => {
     const { rows } = await tx.query<{ n: string }>(
       // **가리키는 행은 안 센다.** F18 이 그 행을 안 내므로, 세면 목록보다 큰 수가 홈에 뜬다.
+      // **그 밖에는 목록과 같은 조건이다** — 영어 문장이 없는 행도 F18 이 내니까 여기서도 센다.
       `SELECT count(*)::text AS n FROM chunks
-         WHERE user_id = $1 AND lang = $2 AND btrim(text) <> '' AND NOT (meta ? 'same_as')`,
+         WHERE user_id = $1 AND lang = $2 AND NOT (meta ? 'same_as')`,
       [userId, lang],
     );
     return Number(rows[0]?.n ?? 0);
   });
 }
 
-export type PastChunk = { id: string; situation: string; chunk: string };
+export type PastChunk = {
+  id: string;
+  situation: string;
+  chunk: string;
+  /**
+   * 영어 문장까지 갔는가. `false` 면 **F13 에 한 줄 쓰고 F17 에서 그만둔 줄**이라, 화면이 제목
+   * 자리에 한국어를 세우고 탭을 F17 로 보낸다. 판정 식은 `getSituation` 의 `done` 과 **같은 글자**다.
+   */
+  done: boolean;
+};
 
 /**
  * F18 목록. **마지막으로 말한 지 오래된 것이 위다** (`docs/FLOW.md` 1′장 F18 행).
@@ -160,8 +171,16 @@ export type PastChunk = { id: string; situation: string; chunk: string };
  * **한 번도 말 안 한 것이 맨 위다.** `NULLS FIRST` 를 명시하는 이유는 ASC 기본이 NULLS LAST 라,
  * 안 적으면 한 번도 안 말한 것이 **맨 뒤로** 가기 때문이다 — 규칙이 정확히 뒤집힌다.
  *
- * **영어 문장이 없는 행은 안 낸다.** F13 과 F17 사이에서 멈춘 것이라, 목록에 띄우면 추측을
- * 건너뛰고 답 없는 F14 로 들어간다.
+ * **영어 문장이 없는 행도 낸다.** F13 에 한 줄 쓰고 F17 에서 그만둔 줄이다. 전에는 안 냈는데,
+ * 홈도 F13 도 그 행을 모르므로 **어느 화면에도 문이 없는 행**이 남았다 — 주소를 이미 아는 사람만
+ * 닿았고, 같은 말을 다시 써도 새 행이 됐다. `docs/FLOW.md` 1′장 F18 행이 이름까지 대서 그걸
+ * 금지한다: *"이 행이 없으면 그 줄은 어느 화면에도 문이 없다."*
+ *
+ * **그래서 빼는 대신 `done` 을 같이 돌려준다.** 목록에 띄우고 추측을 건너뛰지 않으려면 화면이
+ * 목적지를 갈라야 하고, 가르는 값이 여기서 나가야 두 곳이 안 갈린다 (F17 로 보낸다 — F14 는
+ * 문장도 곡선도 없는 껍데기다).
+ *
+ * **줄 세우기 규칙은 안 늘린다.** 그런 행은 녹음이 없으니 `NULLS FIRST` 가 이미 맨 위 무리에 넣는다.
  */
 export async function pastChunks(userId: string, lang: Lang3 = "en"): Promise<PastChunk[]> {
   return withUser(userId, async (tx) => {
@@ -176,10 +195,11 @@ export async function pastChunks(userId: string, lang: Lang3 = "en"): Promise<Pa
               (SELECT s.situation FROM chunks s
                  WHERE s.user_id = $1 AND (s.id = c.id OR s.meta ->> 'same_as' = c.id::text)
                  ORDER BY s.created_at DESC LIMIT 1) AS situation,
-              coalesce(nullif(c.meta ->> 'chunk', ''), c.text) AS chunk
+              coalesce(nullif(c.meta ->> 'chunk', ''), c.text) AS chunk,
+              btrim(c.text) <> '' AND coalesce(c.meta ->> 'content_source', '') <> 'fallback' AS done
          FROM chunks c
          LEFT JOIN recordings r ON r.chunk_id = c.id AND r.user_id = $1
-        WHERE c.user_id = $1 AND c.lang = $2 AND btrim(c.text) <> '' AND NOT (c.meta ? 'same_as')
+        WHERE c.user_id = $1 AND c.lang = $2 AND NOT (c.meta ? 'same_as')
         GROUP BY c.id
         ORDER BY max(r.created_at) ASC NULLS FIRST, c.created_at ASC`,
       [userId, lang],
