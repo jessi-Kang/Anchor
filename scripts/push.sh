@@ -53,6 +53,12 @@ if ! pnpm verify >"$log" 2>&1; then
   printf '\n전체 로그: %s\n' "$log"
   # 기계가 방금 켜졌으면 DB 가 죽은 것이지 코드가 빨간 게 아니다 (db/README.md)
   printf '\n기계가 방금 켜졌나: %s\n' "$(uptime | sed 's/,.*//')"
+  # **까닭 옆에 다음 걸음을 같이 둔다.** 위 한 줄은 원인을 가리키는데, 읽은 사람은 **살리는 명령을
+  # 찾으러 문서를 열어야** 했다. 2026-09-21 하루에 여섯 번 났다 — 환경 성질이라 막지는 않고
+  # (`pg_isready` 같은 검사를 붙이면 그 검사가 또 틀릴 자리가 된다) **조건 없이 한 줄 더 찍는다.**
+  # 거부 가지에 「다시 돌려라」를 넣은 것과 같은 꼴이다.
+  printf '몇 분이면 Postgres 가 아니라 컨테이너가 회수된 것이다 — 살리고 이 명령을 다시 돌려라:\n'
+  printf '  pg_ctlcluster 16 main start        # 대마다 다르면 db/README.md 의 그 줄을 따른다\n'
   exit 1
 fi
 grep -E "^# (pass|fail)" "$log" || true
