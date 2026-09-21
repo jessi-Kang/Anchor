@@ -369,6 +369,13 @@ function print(
         console.log(`    그중 ${ctx.no_readings}자는 **읽기가 아예 없는 자료**에서 왔다 — 후리가나를 못 만든 것이다. 고칠 일이다.`);
       if (ctx.partial_readings !== "0")
         console.log(`    ${ctx.partial_readings}자는 읽기가 일부 빈 자료에서 왔다 (그 자료 안에서 섞인 덩어리에 갇힌 것과 겹칠 수 있는 상한).`);
+      /*
+        둘을 더하면 총계보다 클 수 있다. 셋 다 글자를 세는데(`count(DISTINCT node_id)`) 버킷은
+        **자료별로** 갈리기 때문이다 — 한 글자를 두 자료에서 만났고 한쪽은 읽기 키가 없고 한쪽은
+        일부만 비었으면 그 글자가 양쪽에 다 들어간다. 합을 맞춰 보는 사람이 반드시 나오므로 적어 둔다.
+      */
+      if (Number(ctx.no_readings) + Number(ctx.partial_readings) > Number(ctx.no_judgement))
+        console.log("    (두 줄의 합이 총계보다 크다 — 한 글자를 두 자료에서 만나면 양쪽에 다 센다.)");
     }
   }
 
