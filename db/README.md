@@ -23,11 +23,13 @@ pnpm db:migrate:status     # 적용 상태만 출력
 적용한 사람이 여기 커밋을 적는다. 그 뒤부터는 `pnpm seed:parts-sql --since <그 커밋>` 으로 바뀐 것만 찍는다.
 
 ```bash
-pnpm seed:parts-sql --all --out /tmp/parts.sql   # 접속하지 않는다. SQL 만 찍는다
+pnpm seed:parts-sql --all --out db/manual/parts-sync-<날짜>.sql   # 접속하지 않는다. SQL 만 찍는다
 # 받은 사람이 파일을 읽고 돌린다. 1번 질의가 실제로 바뀔 줄 수를 먼저 알려 준다.
 ```
 
 찍어낸 UPDATE 는 `meta->'parts'` 가 **실제로 다른 줄만** 건드린다. 두 번 돌리면 두 번째는 0 줄이다.
+
+`manual/` 은 마이그레이션이 아니다. `pnpm db:migrate` 가 안 본다. 한 번 손으로 돌리고 나면 위 표에 커밋을 적고 파일은 기록으로 남긴다.
 
 ## 두 개의 연결
 
@@ -48,7 +50,7 @@ pnpm test:db     # DATABASE_URL_ADMIN 과 ANCHOR_DATABASE_URL 둘 다 필요하�
 
 쓰는 계정은 `fixture-` 로 시작하는 것뿐이고 끝나면 지운다. **프로덕션 연결로 돌리지 않는다.** 로컬이나 일회용 DB 를 쓴다.
 
-지금 붙들어 두는 것은 `encounters` 가 덧붙이는가다. 이 표는 한 번 덮어쓰기로 돌아간 적이 있고, 그때 코드에는 반대로 적힌 주석이 또렷하게 달려 있었다. **틀려도 화면은 똑같이 돌고 인식률만 위로 부푼 채 D+14 까지 간다** — 그런 문장은 주석이 아니라 테스트로 적는다.
+붙들어 두는 것 둘. **재전송 멱등 키**(0008)가 스키마에 서 있는가 — 이게 빠지면 다시 보낸 녹음이 새 회차로 앉아 5회차 자리에 4회차 소리가 앉는다. 그리고 **`encounters` 가 덧붙이는가**. 뒤쪽은 한 번 덮어쓰기로 돌아간 적이 있고, 그때 코드에는 반대로 적힌 주석이 또렷하게 달려 있었다. **틀려도 화면은 똑같이 돌고 인식률만 위로 부푼 채 D+14 까지 간다** — 그런 문장은 주석이 아니라 테스트로 적는다.
 
 ## RLS 동작 방식
 
@@ -75,6 +77,6 @@ withUser(userId, tx => ...)
 | `user_node_state` | 안다의 3층: `knows_sound` / `knows_meaning` / `can_say` + confidence | |
 | `cards` | 발견 카드와 추측 기록 | CHECK: 정답 공개 전에 추측 또는 건너뛰기 필수 |
 | `chunks` | 대화 덩어리 (상황 → 덩어리, 태도, 강도) | |
-| `recordings` | 피치 곡선만. 원본 오디오는 key + 만료일만 | `target_voice_kind`·`target_voice_id` 는 그 회차가 겨눈 기준선을 무엇으로 만들었는지 (0007) |
+| `recordings` | 피치 곡선만. 원본 오디오는 key + 만료일만 | `target_voice_kind`·`target_voice_id` = 겨눈 기준선을 무엇으로 만들었는지 (0007). `client_id` = 재전송 멱등 키 (0008) |
 | `encounters` | 재만남 인식 기록 (지표용) | 읽을 때마다 **쌓는다**. `recognized` 는 셋: true·false·NULL(판정할 자리가 아니었다) |
 | `account_deletions` | 삭제 원장. 백업 복구 시 재삭제 근거 | 앱은 INSERT 만 |
