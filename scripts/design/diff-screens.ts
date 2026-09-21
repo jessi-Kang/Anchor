@@ -35,6 +35,9 @@ const ROUTES: Record<string, string> = {
   O03: "/onboarding/kana",
   O03b: "/onboarding/kana/module",
   F04: "/cards/x",
+  // 카드를 못 만든 자리. **주소로 부를 수 있어서** 여기 있다 — 카드 행을 안 만들기로 하면서
+  // `/cards/[id]` 가 될 수 없어 자료 밑에 제 라우트가 생겼고, 주소가 있는 상태는 맞대어 볼 수 있다.
+  F04a: "/inputs/x/no-card",
   Scene1: "/cards/x/1",
   Scene2: "/cards/x/2",
   Scene3: "/cards/x/3",
@@ -46,7 +49,9 @@ const ROUTES: Record<string, string> = {
   F13: "/talk",
   F17: "/talk/x/guess",
   F14: "/talk/x",
+  F18: "/talk/past",
   F01: "/today",
+  F19: "/inputs",
   F15: "/today/done",
   F16: "/settings",
   F16a: "/settings/delete",
@@ -58,7 +63,17 @@ const SKIP: Record<string, string> = {
   F03a: "같은 라우트의 다른 상태",
   O02b: "같은 라우트의 다른 상태(언어 추가 모드)",
   O03a: "같은 라우트의 다른 상태(읽는 중)",
-  F14a: "같은 라우트의 다른 상태(원어민 소리 없음)",
+  F14a: "같은 라우트의 다른 상태(겨눌 소리 없음)",
+  // 듣기를 누른 **뒤에야** 아는 상태(그 기기에 목소리가 없다)라 주소로 못 부른다.
+  // 한 장이 F10 과 F14 를 같이 덮는다 — 같은 상태를 두 번호로 그리면 한쪽만 고치는 날이 온다.
+  F10a: "같은 라우트의 다른 상태(겨눌 소리도 들려줄 소리도 없음) — 탭 뒤라 URL 로 못 부른다",
+  F12a: "같은 라우트의 다른 상태(틴트 덩어리를 탭해 읽기를 연 F12) — 탭 뒤라 URL 로 못 부른다",
+  // 자료를 다 만난 뒤의 F12. **데이터가 정하는 상태**라 주소로 못 부른다(그 자료의 한자를 전부
+  // 풀어야 선다). 화면 쪽은 이미 서 있다 — 바닥 줄이 "새로 배울 건 없어. 다 만난 글자야." 로 가고,
+  // 섞인 낱말이 없으니 "협은 방금 봤지" 줄은 안 난다 (`inputs/[id]/read/page.tsx`).
+  F12b: "같은 라우트의 다른 상태(다 만난 자료의 F12) — 데이터가 정하는 상태라 URL 로 못 부른다",
+  F17a: "같은 라우트의 다른 상태(영어 문장을 못 만들어 추측이 칸에 남은 F17)",
+  // F19 는 `/inputs` 로 정해져 위 ROUTES 에 있다 (SKIP 의 "아직 안 정해졌다" 줄은 그래서 뺐다).
   X01: "라우트가 아니라 not-found 화면",
   X02: "라우트가 아니라 error 화면",
   // E·S 는 **없는 화면이 아니다.** 영어 어근 카드(E01~E06)와 스페인어 소리 카드(S01~S04)는
@@ -145,9 +160,34 @@ async function main() {
     }
 
     const ref = await ctx.newPage();
+    /*
+      **글꼴이 안 실리면 여기서 멈춘다.** `document.fonts.ready` 는 스타일시트를 **못 받아도**
+      지켜진다 — 기다릴 것이 없으니 즉시 resolve 한다. 그러면 참고는 시스템 기본 sans 로 그려지고
+      구현은 자체 호스팅 Noto 로 그려져서, **글자가 있는 화면은 전부 다르게 나온다.** 그 값으로
+      "볼 차례" 를 정하면 순서 자체가 거짓이다.
+
+      **안 보이는 오류를 보이는 오류로 바꾼다** — 그려서 틀린 수를 내놓느니 멈추고 왜인지 말한다.
+      자체 호스팅으로 옮긴 뒤에도 이 문이 필요하다: 파일 이름이나 경로가 어긋나는 날 **똑같이 조용히**
+      틀릴 자리이기 때문이다 (design/SCREENS.md).
+    */
+    const fontFail: string[] = [];
+    ref.on("requestfailed", (r) => {
+      if (/\.(woff2?|ttf|otf)(\?|$)/i.test(r.url()) || /fonts\./i.test(r.url())) fontFail.push(r.url());
+    });
     await ref.goto(`file://${refPath}`);
     await ref.waitForLoadState("networkidle").catch(() => undefined);
     await ref.evaluate(() => document.fonts.ready);
+    const faces = await ref.evaluate(() => document.fonts.size);
+    if (faces === 0 || fontFail.length > 0) {
+      await ref.close();
+      throw new Error(
+        `${id}: 참고 화면의 글꼴이 안 실렸다 (등록된 face ${faces}개` +
+          (fontFail.length ? `, 실패한 요청 ${fontFail.length}개: ${fontFail[0]}` : "") +
+          `).\n` +
+          `이대로 찍으면 참고는 시스템 기본 글꼴, 구현은 Noto 라 글자가 있는 화면이 전부 달라진다.\n` +
+          `차이값이 거짓이 되므로 멈춘다 — 망이 막혔는지 보거나, 참고를 자체 호스팅 글꼴로 옮겨라.`,
+      );
+    }
     const refPng = await ref.screenshot({ clip: { x: 0, y: 0, width: W, height: H } });
     await ref.close();
 

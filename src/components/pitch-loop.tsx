@@ -1,23 +1,45 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, Label, Lead, Space, Grow, Button, ButtonRow, Ghost, uiStyles as s } from "@/components/ui";
 
-type Point = { t: number; f0: number };
+import { pitchTrack, type PitchPoint as Point } from "@/lib/pitch/track";
+import { flushRecordings, sendRecording } from "@/lib/outbox";
 
 /**
- * 원어민 음성이 없을 때의 한 줄. **수치를 내지 않는다** — 내 소리끼리의 일치도는 정확도가 아니라
+ * 겨눌 소리가 없을 때의 한 줄. **수치를 내지 않는다** — 내 소리끼리의 일치도는 정확도가 아니라
  * 일관성이라, 같은 발음을 다섯 번 똑같이 틀려도 그 숫자는 올라간다 (design/SCREENS.md).
+ *
+ * **"원어민" 이라고 안 쓴다.** 겨눌 소리는 언어별 음성일 수도 Jessi 목소리 클론일 수도 있어서,
+ * 사람을 가리키는 이름은 출처가 바뀌는 순간 사실이 아닌 말이 된다 (`docs/FLOW.md` 1′장 F14 행).
  */
-const NO_NATIVE_NOTE = "아직 견줄 원어민 소리가 없어. 지금은 내 소리끼리 겹쳐 봐.";
+/**
+ * 곡선 옆 한 줄. **겨눌 소리가 없어 곡선이 내 것끼리 겹치는 동안** 서 있는다 (docs/FLOW.md 1′장).
+ *
+ * 뒷문장을 한 번 떨어뜨렸다가 되돌렸다. "원어민" 을 빼면서 같이 잘랐는데, 앞문장만 남으면
+ * **무엇이 없다는 말만 하고 그래서 지금 화면이 무엇인지를 안 말한다.** 검정 선이 직전 회차라는
+ * 것을 말해 주는 게 뒷문장이다.
+ */
+const NO_TARGET_NOTE = "아직 견줄 소리가 없어. 지금은 내 소리끼리 겹쳐 봐.";
 
-const legendAria = (noTarget: boolean) => (noTarget ? "앞 회차와 이번 내 억양 곡선" : "원어민과 내 억양 곡선");
+/**
+ * 듣기 버튼 옆 한 줄. **방금 누른 듣기에서 소리가 안 났다**는 사실만 말한다.
+ *
+ * 위의 한 줄과 자리가 다른 이유는 **사실이 둘**이기 때문이다 (docs/FLOW.md 1′장). 겨눌 음성이
+ * 없어도 기기 목소리로 소리는 날 수 있어서 둘은 따로 참이 된다. 한 자리에 넣으면 그때 한쪽이
+ * 조용히 사라진다. 낱말도 갈린다 — **들려줄** 소리(재생)와 **견줄** 소리(곡선)는 다른 일이다.
+ *
+ * 방금 한 일의 결과라 **다음 동작에서 사라진다.**
+ */
+const NO_PLAY_NOTE = "지금은 들려줄 소리가 없어.";
+
+const legendAria = (noTarget: boolean) => (noTarget ? "앞 회차와 이번 내 억양 곡선" : "들려준 소리와 내 억양 곡선");
 
 /**
  * 듣기 → 따라 말하기 → 곡선. 한자 카드(F10)와 대화 덩어리(F14)가 같은 루프를 쓴다.
- * 곡선은 늘 둘이고 범례도 늘 둘이다 — 원어민 음성이 있으면 "원어민 / 나, N회차", 없으면 앞 회차가
+ * 곡선은 늘 둘이고 범례도 늘 둘이다 — 겨눌 소리가 있으면 "들려준 소리 / 나, N회차", 없으면 앞 회차가
  * 그 빈 자리를 대신해 "나, N-1회차 / 나, N회차" (docs/FLOW.md 1′장 F14 행. F10 도 같은 규칙).
- * - 듣기: /api/tts (ElevenLabs). 204 면 브라우저 음성으로. 재생한 오디오에서 피치를 뽑아 "원어민" 곡선으로 쓴다.
+ * - 듣기: /api/tts (ElevenLabs). 204 면 브라우저 음성으로. 재생한 오디오에서 피치를 뽑아 겨눌 곡선으로 쓴다.
  * - 말하기: 마이크는 버튼을 누른 뒤에만. 3초 녹음 → 브라우저에서 피치(자기상관) → /api/recordings.
  * 설명 텍스트 없음: 곡선과 한 줄뿐 (CLAUDE.md 원칙 3). 연음·억양을 글로 설명하지 않는다.
  *
@@ -52,12 +74,12 @@ export function PitchLoop({
    */
   targetVoice?: boolean;
   /**
-   * 쌓여 있던 마지막 회차의 곡선 (DB 에서 읽어 온다). 원어민 음성이 없을 때 겹칠 상대다 —
+   * 쌓여 있던 마지막 회차의 곡선 (DB 에서 읽어 온다). 겨눌 소리가 없을 때 겹칠 상대다 —
    * 이게 없으면 화면을 다시 연 사람의 첫 녹음은 겹칠 것이 없다 (`lib/db/recordings.ts`).
    */
   startPrev?: Point[] | null;
 }) {
-  const [native, setNative] = useState<Point[] | null>(() => (preview ? demoCurve(0) : null));
+  const [heard, setHeard] = useState<Point[] | null>(() => (preview ? demoCurve(0) : null));
   // 쌓여 있던 마지막 곡선은 **`mine`** 에 넣는다. `prevMine` 에 넣으면 범례가 그걸 "나, N-1회차" 라고
   // 부르는데 실제로는 N회차 곡선이다 — 화면이 곡선에 틀린 회차를 붙이게 된다. 다시 녹음하면 이게
   // prevMine 으로 밀려나면서 그때 비로소 N-1 이 된다.
@@ -67,14 +89,30 @@ export function PitchLoop({
   const [attempt, setAttempt] = useState(preview ? 3 : startAttempt);
   const [state, setState] = useState<"idle" | "playing" | "recording" | "saving">("idle");
   const noTarget = targetVoice === false;
-  const [note, setNote] = useState<string>(noTarget ? NO_NATIVE_NOTE : firstNote);
+  const [note, setNote] = useState<string>(noTarget ? NO_TARGET_NOTE : firstNote);
   const ctxRef = useRef<AudioContext | null>(null);
   const [pending, setPending] = useState(false);
+  // 방금 누른 듣기에서 소리가 안 났나. 다음 동작에서 지운다.
+  const [playNote, setPlayNote] = useState(false);
 
   const audioCtx = () => (ctxRef.current ??= new AudioContext());
 
+  /*
+    **남아 있던 녹음을 조용히 올린다.** 이 화면이 열릴 때 한 번, 연결이 돌아올 때 한 번.
+    여기가 자리인 이유는 **녹음이 생기는 곳이 여기뿐**이기 때문이다 — 큐에 무엇이 들어가는지 아는
+    화면이 그걸 비우는 것도 맡는다. 화면에는 아무 말도 안 뜬다 (docs/FLOW.md 4장).
+  */
+  useEffect(() => {
+    if (preview) return;
+    void flushRecordings();
+    const again = () => void flushRecordings();
+    window.addEventListener("online", again);
+    return () => window.removeEventListener("online", again);
+  }, [preview]);
+
   const listen = async () => {
     if (state !== "idle" || preview) return;
+    setPlayNote(false);
     setState("playing");
     try {
       const res = await fetch(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
@@ -82,7 +120,7 @@ export function PitchLoop({
         const buf = await res.arrayBuffer();
         const ctx = audioCtx();
         const audio = await ctx.decodeAudioData(buf.slice(0));
-        setNative(pitchTrack(audio.getChannelData(0), audio.sampleRate));
+        setHeard(pitchTrack(audio.getChannelData(0), audio.sampleRate));
         const src = ctx.createBufferSource();
         src.buffer = audio;
         src.connect(ctx.destination);
@@ -91,19 +129,38 @@ export function PitchLoop({
           src.start();
         });
       } else if ("speechSynthesis" in window) {
-        await new Promise<void>((resolve) => {
+        /*
+          **"소리를 냈다" 와 "냈는데 아무것도 안 나왔다" 를 가른다.**
+
+          전에는 `onend` 와 `onerror` 가 똑같이 성공으로 풀려서, 목소리가 하나도 없는 기기
+          (`getVoices().length === 0` — 헤드리스·최소 컨테이너의 기본값)에서도 앱은 재생했다고
+          여겼다. 사용자에게는 **눌렀는데 아무 일도 안 일어난** 것이고, 화면이 그걸 말해 주지 않았다.
+
+          판정은 **탭 시점**에 한다. 브라우저가 목소리를 비동기로 채워서(`voiceschanged`) 첫
+          렌더의 0 은 못 믿는다 — 누르기 전에 미리 말하려면 그 이벤트를 기다려야 하는데, 안 오는
+          기기도 있어 "아직 모름" 상태가 화면에 눌러앉는다. 실제로 못 냈을 때 말하는 쪽이 맞다.
+        */
+        const spoke = await new Promise<boolean>((resolve) => {
           const u = new SpeechSynthesisUtterance(text);
           u.lang = lang === "en" ? "en-US" : "ja-JP";
           u.rate = 0.9;
-          u.onend = () => resolve();
-          u.onerror = () => resolve();
+          u.onend = () => resolve(true);
+          u.onerror = () => resolve(false);
           window.speechSynthesis.cancel();
+          // 목소리가 하나도 없으면 `speak` 이 조용히 아무것도 안 하는 기기가 있다. 부르기 전에 본다.
+          if (window.speechSynthesis.getVoices().length === 0) return resolve(false);
           window.speechSynthesis.speak(u);
         });
         // 여기로 왔다는 건 목표 발음 음성이 안 왔다는 뜻이다 — `noTarget` 으로 들어왔든 이번에 못 받았든
-        // 화면에 벌어진 일은 같다. 그러니 FLOW 가 정한 그 한 줄을 쓴다. 전에는 "목소리 키를 넣으면"
-        // 이라고 했는데, 그건 Jessi 가 배포에 넣는 환경변수라 읽은 사람이 설정에서 찾을 수 없다.
-        setNote(NO_NATIVE_NOTE);
+        // 곡선에 벌어진 일은 같다. 그러니 FLOW 가 정한 그 한 줄을 곡선 옆에 쓴다. 전에는 "목소리 키를
+        // 넣으면" 이라고 했는데, 그건 Jessi 가 배포에 넣는 환경변수라 읽은 사람이 설정에서 찾을 수 없다.
+        setNote(NO_TARGET_NOTE);
+        // 소리가 **아예 안 난 것**은 다른 사실이라 다른 자리에 선다. 기기 목소리로 소리는 났는데
+        // 겨눌 음성만 없는 경우가 있어서, 둘을 한 줄로 합치면 그때 한쪽을 못 말한다.
+        if (!spoke) {
+          setPlayNote(true);
+          console.warn("[tts] 브라우저 음성이 소리를 못 냈다 (목소리 0개이거나 재생 실패)");
+        }
       }
     } catch (e) {
       console.error(e);
@@ -115,6 +172,7 @@ export function PitchLoop({
 
   const speak = async () => {
     if (state !== "idle" || preview) return;
+    setPlayNote(false);
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -150,21 +208,28 @@ export function PitchLoop({
         return curve;
       });
       setAttempt((a) => a + 1);
-      const form = new FormData();
-      if ("card" in target) form.set("card_id", target.card);
-      else form.set("chunk_id", target.chunk);
-      form.set("pitch", JSON.stringify(curve));
-      // 이 회차가 **겨눈 상대**. 원어민 음성을 들었으면 그 곡선이고, 없었으면 안 보낸다 —
-      // 없었다는 사실도 값이라 억지로 내 앞 회차를 채워 넣지 않는다. 나중에 일치도를 계산할 때
-      // 겨눈 상대가 무엇이었는지가 남아 있어야 한다 (api/recordings/route.ts).
-      if (native?.length) form.set("target_pitch", JSON.stringify(native));
-      form.set("duration_ms", String(durationMs));
-      form.set("audio", blob, "voice.webm");
-      const res = await fetch("/api/recordings", { method: "POST", body: form });
-      // 실패해도 화면은 앞으로 간다 (docs/FLOW.md 4장). "저장이 안 됐어" 를 내지 않는다 — 곡선은
-      // 이미 화면에 있고 사용자가 할 일이 없다. 알릴 수 없는 일을 알리면 상태 어휘만 늘어난다.
-      // (못 보낸 것을 기기에 남겼다 다시 올리는 일은 재전송이 설 때 여기에 붙는다.)
-      if (!res.ok) console.error("[recordings] 저장 실패", res.status);
+      /*
+        **이름표는 여기서 붙인다.** 녹음을 만든 그 자리, 보내기 전이다. 서버가 붙이면 재전송마다
+        달라져 멱등 키 노릇을 못 하고, 그러면 **끊긴 응답 하나가 새 회차로 앉는다** — 5회차 자리에
+        4회차 소리가 앉으면 곡선 통과 기준이 그 자리에서 아무 말도 못 한다 (docs/MEASURE.md 2장).
+      */
+      const pending = {
+        clientId: crypto.randomUUID(),
+        ...("card" in target ? { cardId: target.card } : { chunkId: target.chunk }),
+        pitch: JSON.stringify(curve),
+        // 이 회차가 **겨눈 상대**. 들려준 소리가 있었으면 그 곡선이고, 없었으면 안 보낸다 —
+        // 없었다는 사실도 값이라 억지로 내 앞 회차를 채워 넣지 않는다. 나중에 일치도를 계산할 때
+        // 겨눈 상대가 무엇이었는지가 남아 있어야 한다 (api/recordings/route.ts).
+        ...(heard?.length ? { targetPitch: JSON.stringify(heard) } : {}),
+        durationMs,
+        audio: blob,
+      };
+      /*
+        **기다리지 않는다.** 실패해도 화면은 앞으로 가고(docs/FLOW.md 4장) 못 보낸 것은 기기에
+        남았다가 다음에 조용히 올라간다. "저장 중"·"저장 실패" 를 안 쓰는 이유도 같다 — 곡선은
+        이미 화면에 있고 사용자가 할 일이 없다.
+      */
+      void sendRecording(pending);
       setNote("곡선을 봐. 한 번 더.");
     } catch (e) {
       console.error(e);
@@ -178,10 +243,14 @@ export function PitchLoop({
     <>
       <Card>
         <Label>억양 비교</Label>
-        <Curves native={noTarget ? prevMine : native} mine={mine} label={legendAria(noTarget)} />
+        <Curves heard={noTarget ? prevMine : heard} mine={mine} label={legendAria(noTarget)} />
         {/*
-          범례는 늘 있다 (CLAUDE.md). 원어민 소리가 없으면 검정 선은 **원어민이 아니라 직전 회차**다 —
+          범례는 늘 있다 (CLAUDE.md). 겨눌 소리가 없으면 검정 선은 **들려준 소리가 아니라 직전 회차**다 —
           같은 선을 두고 이름만 바꾸면 거짓말이 되므로, 그릴 것이 없으면 그 항목 자체를 안 낸다.
+
+          그리고 있을 때도 **"원어민" 이라고 부르지 않는다.** 그 소리를 내는 것은 ElevenLabs 의
+          언어별 음성이거나 Jessi 목소리 클론이라, 사람을 가리키는 이름은 지금도 사실이 아니다.
+          이름은 그게 **무엇인지**로 짓는다 — 듣기를 눌렀을 때 들려준 소리 (docs/FLOW.md 1′장).
         */}
         <div className={s.legend}>
           {noTarget ? (
@@ -203,7 +272,7 @@ export function PitchLoop({
           ) : (
             <span className={s.legendItem}>
               <span className={s.legendLine} style={{ background: "var(--curve-native)" }} />
-              원어민
+              들려준 소리
             </span>
           )}
           <span className={s.legendItem}>
@@ -214,6 +283,13 @@ export function PitchLoop({
         <Lead>{note}</Lead>
       </Card>
       <Grow />
+      {/* 듣기 버튼 옆. 위의 곡선 옆 한 줄과 **자리가 둘인 이유**는 `NO_PLAY_NOTE` 주석에 있다. */}
+      {playNote && (
+        <>
+          <Lead>{NO_PLAY_NOTE}</Lead>
+          <Space h={8} />
+        </>
+      )}
       <ButtonRow>
         <Button outline disabled={state !== "idle"} onClick={listen}>
           {state === "playing" ? "듣는 중" : "듣기"}
@@ -240,7 +316,7 @@ export function PitchLoop({
 }
 
 /** 두 곡선. 범례는 항상 (CLAUDE.md). 데이터가 없으면 축만. */
-function Curves({ native, mine, label }: { native: Point[] | null; mine: Point[] | null; label: string }) {
+function Curves({ heard, mine, label }: { heard: Point[] | null; mine: Point[] | null; label: string }) {
   const W = 316;
   const H = 100;
   const path = (pts: Point[] | null) => {
@@ -262,48 +338,10 @@ function Curves({ native, mine, label }: { native: Point[] | null; mine: Point[]
   };
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} style={{ maxWidth: "100%" }}>
-      <path d={path(native)} fill="none" stroke="var(--curve-native)" strokeWidth={4} strokeLinecap="round" />
+      <path d={path(heard)} fill="none" stroke="var(--curve-native)" strokeWidth={4} strokeLinecap="round" />
       <path d={path(mine)} fill="none" stroke="var(--curve-me)" strokeWidth={4} strokeLinecap="round" strokeDasharray="8 7" />
     </svg>
   );
-}
-
-/**
- * 피치 검출 (브라우저): 40ms 창, 자기상관 최대점. 80~500Hz. 무성 구간은 f0 0.
- * 정밀한 알고리즘은 다음 단계(곡선 비교). 지금은 "올라가는지 내려가는지"가 보이면 된다.
- */
-function pitchTrack(x: Float32Array, sr: number): Point[] {
-  const win = Math.floor(sr * 0.04);
-  const hop = Math.floor(sr * 0.02);
-  const minLag = Math.floor(sr / 500);
-  const maxLag = Math.floor(sr / 80);
-  const out: Point[] = [];
-  for (let start = 0; start + win < x.length; start += hop) {
-    let energy = 0;
-    for (let i = 0; i < win; i++) energy += x[start + i] * x[start + i];
-    if (energy / win < 1e-4) {
-      out.push({ t: Math.round((start / sr) * 1000), f0: 0 });
-      continue;
-    }
-    let bestLag = 0;
-    let best = 0;
-    for (let lag = minLag; lag <= maxLag; lag++) {
-      let sum = 0;
-      for (let i = 0; i < win - lag; i++) sum += x[start + i] * x[start + i + lag];
-      const r = sum / energy;
-      if (r > best) {
-        best = r;
-        bestLag = lag;
-      }
-    }
-    out.push({ t: Math.round((start / sr) * 1000), f0: best > 0.3 && bestLag ? Math.round((sr / bestLag) * 10) / 10 : 0 });
-  }
-  // 튀는 점을 중앙값으로 눌러 곡선이 읽히게
-  return out.map((p, i, a) => {
-    if (p.f0 === 0) return p;
-    const nb = [a[i - 1]?.f0, p.f0, a[i + 1]?.f0].filter((v): v is number => typeof v === "number" && v > 0).sort((u, v) => u - v);
-    return { t: p.t, f0: nb[Math.floor(nb.length / 2)] };
-  });
 }
 
 function demoCurve(k: number): Point[] {

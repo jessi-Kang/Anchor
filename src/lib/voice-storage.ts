@@ -16,8 +16,19 @@ export function voicePrefix(userId: string): string {
   return `voice/${userId}/`;
 }
 
-/** 한 계정의 음성 원본을 전부 지운다. 지운 개수를 돌려주고, 실패하면 던진다. */
-export async function deleteVoiceObjects(userId: string, token: string): Promise<number> {
+/**
+ * 한 계정의 음성 원본을 전부 지운다. 지운 개수를 돌려주고, 실패하면 던진다.
+ *
+ * **던질 때도 몇 개가 이미 사라졌는지는 알려야 한다.** 여러 쪽에 걸쳐 지우므로 중간에 실패하면
+ * 앞쪽 오브젝트는 이미 없다. 돌려주는 값으로만 알리면 그 수가 예외와 함께 사라지고, 부르는 쪽은
+ * "하나도 안 지워졌다" 와 "절반 지워졌다" 를 구별하지 못한 채 사용자에게 말하게 된다.
+ * 그래서 한 쪽을 지울 때마다 `onRemoved` 로 알린다 — 세는 일은 부르는 쪽이 한다.
+ */
+export async function deleteVoiceObjects(
+  userId: string,
+  token: string,
+  onRemoved?: (n: number) => void,
+): Promise<number> {
   let cursor: string | undefined;
   let removed = 0;
   do {
@@ -28,6 +39,7 @@ export async function deleteVoiceObjects(userId: string, token: string): Promise
         { token },
       );
       removed += page.blobs.length;
+      onRemoved?.(page.blobs.length);
     }
     cursor = page.hasMore ? page.cursor : undefined;
   } while (cursor);

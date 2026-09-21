@@ -13,8 +13,12 @@ import { kanjiRuns } from "@/lib/kanji/extract";
  *
  * 가리는 것은 **틴트 붙은 덩어리뿐**이고 여는 단위도 덩어리다(`協力` 통째, 낱자로 안 쪼갠다).
  * 실제로 일어나는 사건이 "이 낱말을 못 읽었다" 이기 때문이다 — 낱자로 쪼개면 한 글자만 열어도
- * 나머지는 읽은 것으로 세게 된다. `基盤`·`妥協` 처럼 안 만난 글자가 섞인 덩어리는 **열리지 않는다**:
- * 열면 다음 카드의 답이 샌다(원칙 1).
+ * 나머지는 읽은 것으로 세게 된다.
+ *
+ * **안 만난 글자가 섞인 덩어리(`基盤`·`妥協`)는 읽기를 그대로 보여 준다.** 못 읽는 게 당연한 글자를
+ * 가리면 발판이 없다(원칙 2). 열고 닫을 것이 없으니 탭도 없다. 그래서 그 덩어리에서는 "열지 않고
+ * 읽었다" 가 성립하지 않고, 기록도 남기지 않는다 — 읽기가 떠 있는 자리에서 `true` 를 적으면
+ * **답을 보여 주고 맞혔다고 세는 것**이 된다 (`inputs/[id]/actions.ts` 의 `finishRead`).
  *
  * **표시를 새로 붙이지 않는다. 틴트가 곧 그 자리의 표시다** — 틴트 = 만난 것 = 가려진 것 =
  * 탭하면 열린다. 아이콘도 "탭해 보세요" 도 없다. 적는 순간 시험처럼 읽힌다. 연 뒤에도 열었다는
@@ -61,7 +65,18 @@ export function MetText({
     const runChars = Array.from(run.text);
     const allMet = runChars.every((ch) => met.has(ch));
     const isOpen = opened.includes(i);
-    const reading = allMet && isOpen ? readings?.[i] : undefined;
+    /*
+      **열 것이 있을 때만 열 수 있다.** 읽기를 못 구한 자료(후리가나 생성 실패, 또는 키가 없는
+      환경)에서는 `readings` 가 통째로 없다. 전에는 그래도 탭 영역을 만들어서, 탭하면 `opened`
+      만 바뀌고 **ruby 는 끝내 안 떴다** — 화면은 눌리는 척하는데 아무 일도 안 일어났고,
+      `aria-label` 은 "읽기 보기" 에서 "읽기" 로 바뀌어 **열렸다고 거짓말까지 했다.**
+
+      `docs/MEASURE.md` 1장이 F12 의 조건 셋 중 하나로 "읽기는 **언제나** 한 번 탭이면 열린다"
+      를 못박는다. 열 수 없는 자리를 눌리게 두면 그 조건이 깨지고, 그 화면에서 나온 판정도
+      같이 못 쓴다 (`finishRead` 가 그런 덩어리를 `null` 로 적는 이유가 그것이다).
+    */
+    const openable = allMet && !!readings?.[i];
+    const reading = openable && isOpen ? readings?.[i] : undefined;
     // 판정은 글자마다, **그리는 것은 붙어 있는 만큼 한 덩어리로.** 글자마다 틴트 상자를 씌우면
     // 상자마다 좌우 여백이 들어가 協 力 사이에 흰 틈이 생기고, 한 낱말이 두 조각으로 보인다.
     const glyphs = runChars
@@ -78,7 +93,7 @@ export function MetText({
         </span>
       ));
 
-    if (allMet) {
+    if (openable) {
       // 탭 영역은 글자 자체다 — 따로 키우면 옆 글자를 덮는다. 본문 줄높이(2.3)가 세로를 벌어 준다.
       out.push(
         <span
@@ -99,8 +114,16 @@ export function MetText({
         </span>,
       );
     } else {
-      // 아직 안 만난 글자가 섞인 덩어리. 읽기는 빈칸으로 가린다 (docs/FLOW.md 1′장 F12 행).
-      out.push(<Ruby key={`r${i}`}>{glyphs}</Ruby>);
+      // 안 만난 글자가 섞인 덩어리(또는 읽기를 못 구한 덩어리). **읽기가 있으면 그대로 단다.** 그 글자는 카드에서 풀 것이고, 카드가
+      // 묻는 것은 읽기가 아니라 뜻이다(Scene3 의 질문 = `payload.question`, 읽기는 Scene4 에서야
+      // 나온다). 그래서 여기 읽기를 달아도 추측 전에 답을 주지 않는다. 새는 것은 한국어 발판인데,
+      // 그건 안 만난 글자가 섞인 낱말에 "타협" 을 안 붙이는 규칙이 이미 막고 있다 (docs/FLOW.md 1′장).
+      //
+      // **빈 `<Ruby>` 는 어디에도 안 남긴다.** 그게 `rtBlank` 점선이 본문에 깔리는 유일한 길이었다 —
+      // F04 의 답칸을 흘러가는 본문에 옮긴 꼴이라 한 문단에 열두 개가 생기고 본문이 안 읽혔다.
+      // 읽기를 못 구했으면 글자만 둔다. 점선으로 자리를 만들지 않는다.
+      const r = readings?.[i];
+      out.push(r ? <Ruby key={`r${i}`} reading={r}>{glyphs}</Ruby> : <Fragment key={`r${i}`}>{glyphs}</Fragment>);
     }
     cur = run.end;
   });

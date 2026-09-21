@@ -4,8 +4,9 @@ import { ensureUser } from "@/lib/db/users";
 import { getSettings } from "@/lib/db/settings";
 import { listInputs } from "@/lib/db/inputs";
 import { countChunks } from "@/lib/db/chunks";
-import { inputProgress, nextCandidates, KNEW_VERB } from "@/lib/cards/progress";
-import { inputName, inputFrom } from "@/lib/input-name";
+import { KNEW_VERB } from "@/lib/cards/progress";
+import { inputRowData, toInputRow, splitForHome } from "@/lib/cards/input-rows";
+import { inputFrom } from "@/lib/input-name";
 import { enabledLanguages, homeRedirect, inputPath, LANG_LABEL, LANG_START } from "@/lib/languages";
 import { withParticle } from "@/lib/ko";
 import { isDesignPreview } from "@/lib/design-preview";
@@ -61,7 +62,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const home = homeRedirect(settings);
   if (home) redirect(home);
   const langs = enabledLanguages(settings);
-  const inputs = await listInputs(user.id, 10);
+  const inputs = await listInputs(user.id);
   if (inputs.length === 0) {
     // 켠 언어가 하나면 버튼 하나로 충분하다. 둘 이상이면 행이 없으면 **첫 언어 말고는 들어갈 길이 없다** —
     // 이미 켠 언어는 O02a 가 통과시키지 않으므로 주소를 손으로 치는 수밖에 없었다. 1장 2 의
@@ -106,17 +107,30 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
 
   const talkRows: HomeRow[] = langs.includes("en")
     // 부제에 "못 한 말" 을 또 쓰지 않는다 — 제목이 이미 그 말이라 한 행에서 같은 낱말을 두 번 쓰게 된다.
-    ? [{ id: "talk", title: "못 한 말", sub: talkCount > 0 ? `${talkCount}개` : "한 줄이면 돼", next: null, href: "/talk" }]
+    //
+    // **덩어리가 있으면 목록(F18)으로, 없으면 쓰기(F13)로.** 늘 F13 으로 보내면 덩어리가 셋이어도
+    // 빈 입력 칸에 떨어지고, 지난 덩어리로 돌아갈 길이 어디에도 없다 — 같은 말의 2회차가 안 생겨
+    // 곡선 표본이 1회차짜리만 쌓인다 (docs/FLOW.md 1′장 F01 행).
+    ? [
+        {
+          id: "talk",
+          title: "못 한 말",
+          sub: talkCount > 0 ? `${talkCount}개` : "한 줄이면 돼",
+          next: null,
+          href: talkCount > 0 ? "/talk/past" : "/talk",
+        },
+      ]
     : [];
 
-  const rows = await Promise.all(
-    inputs.map(async (input) => {
-      if (input.lang !== "ja") return { input, kanji: 0, remaining: 0, total: 0, next: null as null | ReturnType<typeof nextCandidates>[number] };
-      const prog = await inputProgress(user.id, input);
-      const next = prog.remaining > 0 ? (nextCandidates(prog)[0] ?? null) : null;
-      return { input, kanji: prog.nodes.length, remaining: prog.remaining, total: prog.total, next };
-    }),
-  );
+  const all = await inputRowData(user.id, inputs);
+  /*
+    **홈의 자료 행은 최대 넷이다** (docs/FLOW.md 4장). 2주를 쓰면 자료가 열댓 개가 되는데 전부
+    한 카드에 쌓으면 **홈이 목록이 되어 버리고**, 21일째엔 첫 주 자료로 들어갈 길이 사라진다.
+    일본어 축의 재만남(F12)은 다 본 자료 행 하나가 유일한 입구라 그게 밀리면 재만남이 통째로
+    막힌다 — 통과 기준 둘 중 하나가 거기 걸려 있다.
+  */
+  const { home: shown, rest } = splitForHome(all);
+  const rows = shown;
   const nextRow = rows.find((r) => r.next);
   // **여기서 하루 끝(F15)으로 보내지 않는다.** 보내면 다 본 다음 날부터 홈이 영영 하루 끝이 되고,
   // 그 화면의 나가는 길은 홈 하나뿐이라 홈 ↔ 하루 끝 고리에 갇힌다 — 자료 넣기·못 한 말·설정에
@@ -147,23 +161,17 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       <Card>
         <Label>오늘</Label>
         <HomeRows
-          rows={[...rows.map(({ input, kanji, remaining, next }) => ({
-            id: input.id,
-            title: inputName(input),
-            sub:
-              input.lang !== "ja"
-                ? `${LANG_LABEL[input.lang]} · 뽑기는 다음 단계`
-                : kanji === 0
-                  ? "아직 안 뽑았어"
-                  : remaining > 0
-                    ? `한자 ${kanji}개 · 남은 카드 ${remaining}`
-                    : `한자 ${kanji}개 · 다 봤어`,
-            next: remaining > 0 ? (next?.kanji ?? null) : null,
-            // 자료 행 하나가 세 상태를 가른다 (docs/FLOW.md 4장): 안 뽑음 → 뽑기(F03),
-            // 남은 카드 → 카드(F04, next 가 맡는다), 다 봄 → 재만남(F12).
-            // 다 본 자료를 뽑기로 보내면 할 일이 없는 화면이 뜨고, 재만남에 들어갈 길이 어디에도 없다.
-            href: input.lang === "ja" && kanji > 0 && remaining === 0 ? `/inputs/${input.id}/read` : undefined,
-          })), ...notStartedRows, ...talkRows]}
+          rows={[
+            ...rows.map((d) => toInputRow(d, langs.length > 1)),
+            ...notStartedRows,
+            ...talkRows,
+            /*
+              **넘치는 것이 있을 때만 낸다.** 홈에 다 들어가는 동안에는 빈 목록으로 가는 길을
+              만들지 않는다 (F18 의 빈 상태와 같은 이유). 부제는 없다 — 개수를 붙이면 "남은 일"
+              처럼 읽히는데 지난 자료는 할 일이 아니라 돌아갈 길이다.
+            */
+            ...(rest.length > 0 ? [{ id: "past", title: "지난 자료", sub: "", next: null, href: "/inputs" }] : []),
+          ]}
         />
       </Card>
       {reason && (

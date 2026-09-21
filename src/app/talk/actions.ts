@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/server";
-import { createChunk, getChunk, hasEnglish, saveGuessAndEnglish } from "@/lib/db/chunks";
+import { createChunk, findSameChunk, getChunk, hasEnglish, pointAt, saveEnglish, saveGuess } from "@/lib/db/chunks";
 import { getSettings } from "@/lib/db/settings";
 import { enabledLanguages } from "@/lib/languages";
 import { getChunkContent } from "@/lib/talk/chunk-content";
@@ -60,12 +60,67 @@ export async function submitGuess(id: string, guess: string) {
   // 말한 덩어리가 발밑에서 바뀌면 "같은 덩어리 5회차" 를 잴 수 없다 (docs/SPEC.md 9장).
   if (row.meta.guess !== undefined || hasEnglish(row)) redirect(`/talk/${id}`);
 
-  const { content, source } = await getChunkContent(row.situation);
-  await saveGuessAndEnglish(user.id, id, line, {
+  /*
+    **추측을 먼저 저장한다.** 문안 생성이 그 앞에 있으면, 생성이 실패했을 때 추측까지 안 써진다.
+    그런데 `guess-form` 은 보내기 전에 기기 임시본을 지우므로 **그 줄이 통째로 사라진다** —
+    데이터 원칙("추측 한 번도 유실 없음")이 여기서 걸린다. 순서 하나가 그 원칙을 지킨다.
+  */
+  await saveGuess(user.id, id, line);
+
+  const made = await getChunkContent(row.situation);
+  // 못 만들었으면 **추측을 낸 자리에 그대로 세워 둔다.** F14 로 보내면 곡선·듣기·말하기가 할 일이
+  // 없어 껍데기가 된다. 여기 남으면 "없어졌다" 도 "답이 비었다" 도 아니고 "아직 확인 중" 으로 읽힌다.
+  if (!made) redirect(`/talk/${id}/guess`);
+  redirect(await land(user.id, id, made.content));
+}
+
+/**
+ * 만든 문장을 행에 적고 **어느 F14 로 갈지** 돌려준다.
+ *
+ * `submitGuess` 와 `retryEnglish` 가 같은 일을 한다. 한쪽에만 이어 붙이기를 넣으면 "다시 해 볼게"
+ * 로 만든 덩어리만 회차가 갈린다 — 같은 값이 두 길로 들어오면 두 길 다 같은 자리를 지나야 한다.
+ */
+async function land(
+  userId: string,
+  id: string,
+  content: { english: string; attitude: string | null; chunk: string },
+): Promise<string> {
+  await saveEnglish(userId, id, {
     text: content.english,
     attitude: content.attitude,
     chunk: content.chunk,
-    source,
+    source: "claude",
   });
-  redirect(`/talk/${id}`);
+  /*
+    **같은 덩어리는 새로 만들지 않는다** (docs/FLOW.md 4장). 먼저 만난 것이 있으면 오늘 행은
+    지우지 않고 **그것을 가리키게** 한 뒤 먼저 것의 F14 로 간다. 회차와 곡선이 거기 쌓인다.
+    새로 만들면 같은 말을 다섯 번 해도 1회차짜리가 다섯 개가 되어 "같은 덩어리 5회차"
+    (`docs/SPEC.md` 9장)를 영영 못 잰다.
+
+    오늘 쓴 상황과 추측은 오늘 행에 그대로 남는다 — 하나도 없어지지 않는다(데이터 원칙).
+  */
+  const first = await findSameChunk(userId, "en", content.chunk, id);
+  if (!first) return `/talk/${id}`;
+  await pointAt(userId, id, first);
+  return `/talk/${first}`;
+}
+
+/**
+ * F17a "다시 해 볼게". **추측은 안 건드리고 영어 문장만 채운다.**
+ *
+ * `submitGuess` 를 다시 부르면 안 되는 이유가 둘이다. 하나는 그 함수가 추측이 이미 있으면 F14 로
+ * 보내는데, 문장이 없는 F14 는 다시 F17 로 보내서 **두 화면이 끝없이 돈다.** 다른 하나는 화면의
+ * 추측 칸이 읽기 전용이어야 한다는 것 — 다시 누르는 건 **새 추측이 아니라 문장을 다시 만드는
+ * 것**이고, 추측을 같이 보내면 고쳐 쓴 줄이 첫 추측을 덮을 길이 생긴다(유실).
+ */
+export async function retryEnglish(id: string) {
+  const user = await requireEnglishUser();
+  const row = await getChunk(user.id, id);
+  if (!row) redirect("/talk");
+  // 이미 있으면 다시 만들지 않는다 — 발밑에서 덩어리가 바뀌면 "같은 덩어리 5회차" 를 못 잰다.
+  if (hasEnglish(row)) redirect(`/talk/${id}`);
+
+  const made = await getChunkContent(row.situation);
+  if (!made) redirect(`/talk/${id}/guess`);
+  redirect(await land(user.id, id, made.content));
 }

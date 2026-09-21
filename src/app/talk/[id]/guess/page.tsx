@@ -5,6 +5,7 @@ import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Title, Lead, Card, Label, Grow, uiStyles as s } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
 import { GuessForm } from "./guess-form";
+import { RetryButton } from "./retry-button";
 
 export const dynamic = "force-dynamic";
 
@@ -31,16 +32,19 @@ export default async function GuessPage({
   const { fixed } = await searchParams;
   const preview = isDesignPreview();
   let situation = "이건 다음 스프린트로 미루죠";
+  // 추측이 이미 있으면 **못 만든 상태**다 (F17a). 위에서 문장이 있는 줄은 이미 나갔다.
+  let guess: string | null = null;
 
   if (!preview) {
     const user = await currentUser();
     if (!user) redirect("/");
     const row = await getSituation(user.id, id);
     if (!row) notFound();
-    // 이미 추측을 보낸 줄이면 여기 다시 서지 않는다. 빈 칸을 또 내밀면 덮어쓰게 되고,
-    // 덮어쓰기는 유실이다 (CLAUDE.md 데이터 원칙: "추측 한 번도 유실 없음").
+    // **영어 문장이 있을 때만** 여기서 나간다. 추측만 있고 문장이 없는 줄은 이 화면에 머문다 —
+    // 문안을 못 만든 상태이고, 다시 만들 수 있는 자리가 여기뿐이다 (design/screens/F17a.html).
     if (row.done) redirect(`/talk/${id}`);
     situation = row.situation;
+    guess = row.guess;
   }
 
   return (
@@ -51,14 +55,47 @@ export default async function GuessPage({
         <div className={s.talkSituation}>{situation}</div>
       </Card>
       <Space h={22} />
-      <Title lg>
-        영어로 뭐라고
-        <br />할 것 같아?
-      </Title>
-      <Space h={6} />
-      <Lead>틀려도 돼. 떠오르는 대로.</Lead>
-      <Grow />
-      <GuessForm chunkId={id} preview={preview} />
+      {guess === null ? (
+        <>
+          <Title lg>
+            영어로 뭐라고
+            <br />할 것 같아?
+          </Title>
+          <Space h={6} />
+          <Lead>틀려도 돼. 떠오르는 대로.</Lead>
+          <Grow />
+          <GuessForm chunkId={id} preview={preview} />
+        </>
+      ) : (
+        /*
+          **F17a — 문장을 못 만든 자리.** 쓴 줄은 **입력 칸이 아니라 카드로** 보여 준다
+          (design/screens/F17a.html, F14 의 "내가 쓴 것" 과 같은 꼴).
+
+          칸으로 두면 두 가지가 깨진다. 하나는 모양이 거짓말을 하는 것 — 칸은 "여기 쓰라" 는
+          모양인데 못 쓰게 막아 두면 그렇다. 다른 하나는 **버튼의 뜻**이다. 칸이 있으면 다시
+          누르는 것이 "새 추측" 으로 읽히고, 그 줄이 첫 추측을 덮을 길이 생긴다(유실).
+          칸이 없으면 그 버튼의 뜻이 "문장을 다시 만들어 보기" 하나로 좁혀진다.
+        */
+        <>
+          <Title lg>
+            지금은 영어를
+            <br />못 만들었어.
+          </Title>
+          <Space h={6} />
+          <Lead>쓴 건 저장했어.</Lead>
+          <Space h={18} />
+          <Card>
+            <div className={s.talkPair}>
+              <Label>내가 쓴 것</Label>
+              <p className={s.talkLine} lang="en">
+                {guess}
+              </p>
+            </div>
+          </Card>
+          <Grow />
+          <RetryButton chunkId={id} preview={preview} />
+        </>
+      )}
     </Screen>
   );
 }

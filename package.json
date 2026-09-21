@@ -18,7 +18,13 @@
     "design:diff": "tsx scripts/design/diff-screens.ts",
     "db:seed": "tsx scripts/seed.ts",
     "backup:restore": "tsx scripts/backup/restore-json.ts",
-    "kanji:build": "tsx scripts/kanji/build-kanjidic.ts"
+    "kanji:build": "tsx scripts/kanji/build-kanjidic.ts",
+    "pitch:baseline": "tsx scripts/pitch/clone-baseline.ts",
+    "measure": "tsx scripts/measure.ts",
+    "measure:fixture": "tsx scripts/measure-fixture.ts",
+    "seed:parts-sql": "tsx scripts/seed-parts-sql.ts",
+    "fallbacks": "tsx scripts/fallbacks.ts",
+    "test:db": "tsx --test scripts/test/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

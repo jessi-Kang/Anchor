@@ -52,6 +52,9 @@ export default async function ReadPage({
   let fresh = PREVIEW.fresh;
   let readings: string[] | undefined;
   let sounds = PREVIEW.sounds;
+  // 이 자료에서 **착지한 순서대로** 쌓인 한자 (`inputProgress` 가 `landed_at` 으로 정렬해 준다).
+  // 미리보기는 빈 채로 둔다 — 아래에서 지금까지와 같은 줄로 떨어진다.
+  let landed: string[] = [];
 
   if (!preview) {
     const user = await currentUser();
@@ -65,6 +68,7 @@ export default async function ReadPage({
     name = inputName(input);
     body = input.body;
     met = prog.anchors;
+    landed = prog.landedKanji;
     fresh = freshKanji(prog);
     sounds = new Map(prog.nodes.map((n) => [n.key, n.meta.ko_sound ?? ""]));
 
@@ -87,12 +91,23 @@ export default async function ReadPage({
     한국어 낱말이 붙는 낱말. 섞인 낱말이 있으면 그것 — 위 한 줄이 짚은 낱말이라 딴 낱말의 한국어를
     붙이면 화면이 두 낱말을 말하게 된다. 섞인 낱말은 `allMet` 이 거짓이라 아래에서 걸러진다.
 
-    섞인 낱말이 없으면(=이 자료를 다 만났으면) **마지막으로 다 만난 낱말**을 짚는다. 이 자리가
+    섞인 낱말이 없으면(=이 자료를 다 만났으면) **방금 푼 한자가 든 낱말**을 짚는다. 이 자리가
     없으면 한국어 낱말은 보이는 조건이 아예 없는 값이 된다 — "전부 만났을 때만 보인다" 를 늘 가리는
-    것으로 지키는 건 규칙을 지킨 게 아니라 피한 것이다 (docs/FLOW.md 1′장 F12 행). 마지막을 고르는
-    이유는 그게 방금까지 섞인 낱말이던 그 낱말이기 때문이다 (妥 를 풀면 妥協 가 다 만난 낱말이 된다).
+    것으로 지키는 건 규칙을 지킨 게 아니라 피한 것이다 (docs/FLOW.md 1′장 F12 행).
+
+    **전에는 "문장에서 마지막으로 다 만난 낱말" 이었다.** 주석은 "그게 방금까지 섞인 낱말이던 그
+    낱말이라서" 라고 적어 뒀는데 **코드는 그 일을 안 했다** — 문서 순서상 마지막을 고를 뿐이라,
+    방금 푼 낱말이 문장 끝에 있을 때만 우연히 맞았다. 참고 자료에서 妥 를 풀어도 화면은 妥協 가
+    아니라 文章 끝의 必要 를 냈다. 한국어 낱말은 **앵커를 부르는 값**이라(원칙 2) 부를 게 있는 쪽은
+    방금 푼 낱말이지 오래전부터 알던 낱말이 아니다.
+
+    그래서 착지한 순서를 **뒤에서부터** 훑어 그 한자가 든 낱말을 찾는다. 못 찾으면(착지가 아예
+    없거나, 착지한 글자가 다 만난 낱말에 안 들었으면) 옛 규칙으로 떨어진다 — 지금 나오던 자리에서
+    아무것도 사라지지 않는다.
   */
-  const wordRun = mixed ?? [...runs].reverse().find((r) => r.chars.length > 1 && r.allMet) ?? null;
+  const whole = runs.filter((r) => r.chars.length > 1 && r.allMet);
+  const justSolved = [...landed].reverse().flatMap((k) => whole.filter((r) => r.chars.includes(k)))[0] ?? null;
+  const wordRun = mixed ?? justSolved ?? [...whole].reverse()[0] ?? null;
   // 글자마다의 한국 한자음을 이어 만든다(妥協 → 타 + 협). 소리를 하나라도 모르면 만들지 않는다 —
   // 낱말의 한국어 낱말(協.ko_word 는 "협력")을 끌어다 쓰면 그 낱말의 말이 아니게 된다.
   const korean =
@@ -120,9 +135,18 @@ export default async function ReadPage({
           이미 만난 글자를 짚어 주는 한 줄. 한 낱말 안에 만난 것과 아직인 것이 같이 있는 자리를 고른다 —
           "妥協, 협은 방금 봤지" 가 이 화면이 하려는 말 그대로다.
         */}
-        {mixed && (
+        {/*
+          **부를 소리가 없으면 이 줄을 아예 안 낸다.** 전에는 `sounds.get(...) ?? mixed.met[0]` 이라
+          한국 한자음이 없는 글자(収 枠 塡 頰 𠮟 剝 여섯)에서 **"妥協, 는 방금 봤지"** 가 떴다 —
+          주어가 비고 조사만 남은 문장이다. `sounds` 가 없는 값을 `""` 로 채워서 `??` 가 안 걸렸다.
+
+          글자로 떨어뜨리는 것도 답이 아니다. 한국어 문장 안에 일본 글자를 넣는 것이고, 조사를 고를
+          소리가 없어 `withParticle` 도 찍을 수 없다 — Scene2 의 `pt.name ?? pt.ch` 와 같은 자리다.
+          **짚을 수 없으면 안 짚는다.** 아래 개수 한 줄이 남아 화면이 비지 않는다.
+        */}
+        {mixed && sounds.get(mixed.met[0]) && (
           <span className={s.metFootWord}>
-            {mixed.text}, {withParticle({ text: sounds.get(mixed.met[0]) ?? mixed.met[0], sound: null }, "은는")} 방금 봤지
+            {mixed.text}, {withParticle({ text: sounds.get(mixed.met[0]) as string, sound: null }, "은는")} 방금 봤지
           </span>
         )}
         <span className={s.metFootLine}>

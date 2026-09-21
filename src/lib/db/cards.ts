@@ -18,7 +18,13 @@ export type CardPayload = CardContent & {
    * 없으면(키 없음·생성 실패·개수 불일치) 그 문장은 ruby 없이 나온다.
    */
   source: { sentence: string; word: string; readings?: string[] } | null;
-  /** 문안 출처: 손으로 적음 / Claude / 사전 조합 */
+  /**
+   * 문안 출처: 손으로 적음 / Claude.
+   *
+   * `"fallback"`(사전 조합)은 **옛 행만 갖는다.** 지금은 못 만들면 카드를 아예 안 연다
+   * (`lib/kanji/card-content.ts`). 이미 저장된 카드를 읽으려면 유니온에 남아 있어야 하고,
+   * 남아 있어야 `pnpm fallbacks` 가 "그때 몇 장이 그렇게 만들어졌나" 를 셀 수 있다.
+   */
   content_source: "authored" | "claude" | "fallback";
 };
 

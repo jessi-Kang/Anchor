@@ -4,7 +4,7 @@ import { listInputs } from "@/lib/db/inputs";
 import { litToday, spokenToday } from "@/lib/db/today";
 import { inputProgress, freshKanji } from "@/lib/cards/progress";
 import { isDesignPreview } from "@/lib/design-preview";
-import { Screen, Space, Title, Card, Label, Row, Pill, Grow, Button } from "@/components/ui";
+import { Screen, Space, Title, Card, Row, Pill, Grow, Button } from "@/components/ui";
 import { nowKST } from "@/components/card-bits";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,7 @@ const PREVIEW = { lit: ["協", "開", "基"], spoken: ["push this to"], waiting:
 /**
  * `/today/done` — F15 하루 끝. 뼈대·문구는 design/screens/F15.html.
  * 카드 큐가 비었을 때 홈 대신 뜬다. 상단 라벨 → 홈, 주 버튼 "내일 아침에" → 홈.
+ * **오늘 켠 게 없으면 뜨지 않는다** — 아래 갈림길을 보라.
  *
  * **세는 자리지 칭찬하는 자리가 아니다.** 스트리크·점수·"잘했어요" 는 없다 (CLAUDE.md 하지 않는 것).
  * 오늘 켜진 것과 내일 기다리는 것을 그대로 센다.
@@ -36,9 +37,22 @@ export default async function DonePage({ searchParams }: { searchParams: Promise
   if (!preview) {
     const user = await currentUser();
     if (!user) redirect("/");
-    const inputs = await listInputs(user.id, 20);
-    const progs = await Promise.all(inputs.filter((i) => i.lang === "ja").map((i) => inputProgress(user.id, i)));
     [lit, spoken] = await Promise.all([litToday(user.id), spokenToday(user.id)]);
+    /*
+      **오늘 켠 것이 하나도 없으면 이 화면은 뜨지 않는다** (docs/FLOW.md 1′장 F15).
+
+      F14 의 "됐어" 가 녹음 없이도 여기로 보내서, 영어만 쓴 사람이 한 번도 안 켜고 이 화면에 닿았다.
+      그때 남는 건 제목 "오늘 켜진 것" 과 라벨 "그래프" 만 있는 빈 카드다. **세는 자리가 아무것도
+      못 세면 없느니만 못하다** — 켠 게 없는 날에 "오늘 켜진 것" 을 띄우는 건 빈 화면이 아니라
+      틀린 말이다.
+
+      `waiting` 은 안 센다. 내일 기다리는 글자는 오늘 켠 것이 아니라서, 그것만 있는 날은 FLOW 가
+      말하는 "아무것도 안 켠 날" 그대로다. 그래서 세는 것 둘을 먼저 읽고 여기서 갈라진다 —
+      돌아가는 사람 몫으로 자료·진행도를 훑지 않는다.
+    */
+    if (lit.length === 0 && spoken.length === 0) redirect("/today");
+    const inputs = await listInputs(user.id);
+    const progs = await Promise.all(inputs.filter((i) => i.lang === "ja").map((i) => inputProgress(user.id, i)));
     // 아직 안 만난 한자는 자료마다 나오니 글자로 모은다 — 같은 한자가 두 기사에 있어도 하나다.
     waiting = [...new Set(progs.flatMap(freshKanji))];
   }
@@ -48,8 +62,13 @@ export default async function DonePage({ searchParams }: { searchParams: Promise
       <Space h={28} />
       <Title lg>오늘 켜진 것</Title>
       <Space h={22} />
-      <Card>
-        <Label>그래프</Label>
+      {/*
+        **라벨이 없다.** "그래프" 는 우리끼리 쓰는 말이라 화면에 안 쓴다 (CLAUDE.md 내부 용어 금지,
+        docs/FLOW.md 1′장 F15 행). 라벨 없이 서는 게 이 화면에서만 되는 이유는 **바로 위 h1
+        ("오늘 켜진 것")이 이 카드가 무엇인지 이미 말하고 있어서**다 (디자인 확인).
+        `flush` 는 라벨이 만들던 위 간격을 카드 여백으로 대신 맞춘다.
+      */}
+      <Card flush>
         {lit.length > 0 && <Row title={lit.join(" ")} sub={`한자 ${lit.length}`} right={<Pill on>켜짐</Pill>} plain />}
         {spoken.length > 0 && (
           <Row title={spoken.join(" · ")} sub={`말해본 것 ${spoken.length}`} right={<Pill on>켜짐</Pill>} plain />
