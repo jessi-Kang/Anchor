@@ -368,7 +368,18 @@ function print(
   } else if (denom < MIN_DENOMINATOR) {
     console.log(`→ 표본 부족 (분모 ${denom} < ${MIN_DENOMINATOR}). 비율을 발표하지 않는다.`);
   } else {
-    console.log(`→ ${n1((numer / denom) * 100)}% (${numer}/${denom})`);
+    /*
+      **잘려 나간 한 줄은 머리말을 안 데려간다.** 위(합성 계정 머리말)에서 판정에 안 쓴다고 말해도,
+      비율 한 줄만 쪽지·로그·STATUS 한 칸으로 옮겨 적히면 그 말은 안 따라간다. 하필 fixture 값이
+      **70.0% 로 통과 기준(재만남 인식률 70%)과 같은 수**라, 잘린 줄은 「통과했다」로 읽힌다.
+
+      **그래서 수를 바꾸는 대신 수 옆에 붙인다.** 7/10 은 아무 수가 아니라 거르는 순서를 가르는
+      판정의 증거다 — 무효를 먼저 버리면 70.0%, 먼저 세고 나중에 거르면 77.8%, 늦은 줄을 세면 80%
+      (MEASURE 1장 · 이 파일을 만드는 `measure-fixture.ts` 의 주석). 셋이 서로 다른 것이 시험이라
+      분자를 옮기면 그 시험이 죽는다. **헷갈리게 생긴 것을 고치자고 재는 것을 버리지 않는다.**
+    */
+    const synthetic = isFixtureUser(userId) ? "  ← 합성. 판정 아님" : "";
+    console.log(`→ ${n1((numer / denom) * 100)}% (${numer}/${denom})${synthetic}`);
   }
   if (denom) {
     console.log("");
