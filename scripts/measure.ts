@@ -59,6 +59,11 @@ const CONTENT_OK = new Set(["claude", "authored"]);
 /**
  * 이 대상을 곡선에서 빼야 하는가, 뺀다면 왜. 카드 대상은 이 목록을 안 탄다 — `chunks` 행이 없어
  * 값이 언제나 NULL 이고, 카드가 말하는 것은 착지 낱말(일본어)이라 그 오염이 일어나지 않는다.
+ *
+ * **`chunk_source === null` 로 가르지 않는다.** 그게 더 짧아 보이지만, 그러면 **덩어리인데 출처가
+ * 안 적힌 행**까지 카드와 같이 통과해 `unknown` 이 영영 0 이 된다. 그 행이야말로 빼는 목록이 놓쳐서
+ * 허용 목록으로 바꾼 이유다 — NULL 로 가르면 **빼는 목록으로 되돌아간 것과 같다.**
+ * 카드와 덩어리를 가르는 것은 출처의 유무가 아니라 **`chunks` 행이 있느냐**다.
  */
 function dropReason(r: { is_chunk: boolean; chunk_source: string | null }): "fallback" | "unknown" | null {
   if (!r.is_chunk) return null;
@@ -318,6 +323,13 @@ function print(
     둘을 갈라 센다. **폴백**은 "영어를 못 만들었다" 는 신호이고, **출처 없음**은 "그 행이 언제
     만들어졌는지 모른다" 는 다른 신호다. 합치면 어느 쪽을 손봐야 하는지가 사라진다.
   */
+  const byTarget = new Map<string, RecordingRow[]>();
+  for (const r of rec) {
+    const rows = byTarget.get(r.target_key);
+    if (rows) rows.push(r);
+    else byTarget.set(r.target_key, [r]);
+  }
+
   const byReason = (why: "fallback" | "unknown") =>
     new Set(rec.filter((r) => dropReason(r) === why).map((r) => r.target_key)).size;
   const fb = byReason("fallback");
@@ -384,14 +396,8 @@ function print(
   console.log("## 2. 곡선 일치도");
   console.log(`통과 후보: 같은 대상에서 거리(${FIRST_ATTEMPT}회차) > 거리(${LAST_ATTEMPT}회차). 단위는 반음, 낮을수록 가깝다`);
 
-  const byTarget = new Map<string, RecordingRow[]>();
-  for (const r of rec) {
-    const rows = byTarget.get(r.target_key);
-    if (rows) rows.push(r);
-    else byTarget.set(r.target_key, [r]);
-  }
-
   type Result = {
+    key: string;
     label: string;
     lang: string;
     /** 문안 출처가 허용 목록 밖이라 곡선에서 뺀다. 덩어리 대상에만 걸린다. */
@@ -412,6 +418,7 @@ function print(
     };
     const base = rows.find((r) => r.target_voice_id) ?? rows[0];
     results.push({
+      key: rows[0].target_key,
       label: rows[0].label ?? "?",
       lang: rows[0].lang ?? "?",
       dropped: dropReason(rows[0]),
@@ -422,6 +429,30 @@ function print(
       // 겨눈 소리가 아예 없던 회차다. 둘을 뭉개지 않게 목소리 ID 를 같이 낸다.
       voice: base.target_voice_kind ? `${base.target_voice_kind}/${base.target_voice_id ?? "?"}` : "모름",
     });
+  }
+
+  /*
+    **어느 묶음에도 안 들어간 대상.** 아래 묶음은 `lang` 으로 고르므로 값이 en·ja 가 아니면 그 대상은
+    두 표 어디에도 안 뜨고 **아무 말 없이 사라진다** — 없는 계정이 "표본 없음" 으로 보이던 것과 같은
+    종류다. 언어가 하나 늘거나(스페인어), 조인이 주인을 못 찾아 `lang` 이 NULL 이 되면 그때 조용해진다.
+  */
+  const orphan = results.filter((r) => !r.dropped && r.lang !== "en" && r.lang !== "ja");
+  if (orphan.length) {
+    console.log(
+      `※ 어느 언어 묶음에도 안 들어간 대상 ${orphan.length}개 (lang=${[...new Set(orphan.map((r) => r.lang))].join(", ")}) — 아래 표에 안 뜬다.`,
+    );
+  }
+  /*
+    **회차가 겹치는 대상.** 회차는 서버가 INSERT 직전 `count(*)+1` 로 센다. 같은 대상에 두 요청이
+    동시에 들어오면 둘 다 같은 수를 받을 수 있고, 그러면 아래 `at(1)`·`at(5)` 가 **둘 중 아무거나
+    집는다.** 표에는 멀쩡한 거리가 뜨는데 어느 회차를 잰 것인지는 모르는 상태다.
+
+    **고치는 답은 유니크 제약이 아니다.** 왜 아닌지와 진짜 답은 `db/README.md` 의 "회차는 왜 저장된
+    값인가" 에 있다 — 이 줄이 실제로 뜬 날 급하게 손대기 전에 거기를 먼저 읽는다.
+  */
+  const dup = [...byTarget.entries()].filter(([, rows]) => new Set(rows.map((r) => r.attempt)).size !== rows.length);
+  if (dup.length) {
+    console.log(`※ 회차 번호가 겹치는 대상 ${dup.length}개 — 같은 회차가 둘이라 어느 것을 잰 값인지 모른다. 그 대상의 거리는 못 믿는다.`);
   }
 
   /*
