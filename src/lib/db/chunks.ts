@@ -78,10 +78,24 @@ export async function getChunk(userId: string, id: string): Promise<ChunkRow | n
  * `done` 은 "이미 지났다"만 알려 주는 **불리언**이다. 추측도 영어 문장도 값이 아니라 있는지 없는지로만
  * 나온다 — 그래야 이 화면이 지나간 추측을 다시 채워 보여 줄 수도, 영어가 새어 나올 수도 없다.
  */
-export async function getSituation(userId: string, id: string): Promise<{ situation: string; done: boolean } | null> {
+export async function getSituation(
+  userId: string,
+  id: string,
+): Promise<{ situation: string; done: boolean; guess: string | null } | null> {
   return withUser(userId, async (tx) => {
-    const { rows } = await tx.query<{ situation: string; done: boolean }>(
-      `SELECT situation, (meta ? 'guess' OR btrim(text) <> '') AS done FROM chunks WHERE user_id = $1 AND id = $2`,
+    const { rows } = await tx.query<{ situation: string; done: boolean; guess: string | null }>(
+      /*
+        **`done` 은 영어 문장이 있을 때만 참이다.** 전에는 `meta ? 'guess'` 도 참으로 쳤는데,
+        그러면 **추측은 냈고 문장은 못 만든 상태**에서 이 화면이 F14 로 튕기고, F14 는 문장이
+        없다며 다시 여기로 보내 **두 화면이 끝없이 돈다.** 그 상태는 이제 실제로 생긴다 —
+        문안 생성이 실패하면 추측만 저장되고 `text` 는 빈 채로 남는다.
+
+        `guess` 는 **사용자가 쓴 자기 말**이라 돌려줘도 새는 게 아니다. 다시 그릴 때 그 줄이
+        그대로 있어야 "없어졌다" 가 아니라 "아직 확인 중" 으로 읽힌다.
+        **영어 문장(`text`)은 여전히 안 돌려준다** — 이 화면이 답을 들고 있으면 안 된다.
+      */
+      `SELECT situation, btrim(text) <> '' AS done, meta ->> 'guess' AS guess
+         FROM chunks WHERE user_id = $1 AND id = $2`,
       [userId, id],
     );
     return rows[0] ?? null;
@@ -135,34 +149,43 @@ export async function pastChunks(userId: string, lang: Lang3 = "en"): Promise<Pa
 }
 
 /**
- * F17 "이제 확인": 추측을 저장하고 그때 만든 영어 문장을 채운다. 한 트랜잭션에서 같이 쓴다 —
- * 추측만 저장되고 문장이 안 들어가면 F14 가 또 추측 화면으로 되돌린다.
- * 이미 문장이 있으면(뒤로 가기로 F17 을 다시 지나온 경우) 덮어쓰지 않는다. 같은 상황에 매번 다른
- * 영어가 나오면 "그때 그 말" 이 아니게 된다.
+ * F17 "이제 확인" 이 쓰는 것 **둘로 나눠 뒀다**. 전에는 한 트랜잭션에 같이 썼는데, 문안 생성이
+ * 그 앞에 있어서 **생성이 실패하면 추측까지 저장이 안 됐다.** 게다가 `guess-form` 이 보내기 전에
+ * 기기 임시본을 지우므로 그 줄이 통째로 사라졌다 — 데이터 원칙("추측 한 번도 유실 없음") 위반이다.
+ * **그래서 추측을 먼저 쓰고, 문장은 만들어진 뒤에 따로 쓴다.**
+ *
+ * 이미 문장이 있으면 덮지 않는다. 같은 상황에 매번 다른 영어가 나오면 "그때 그 말" 이 아니게 된다.
  *
  * **그리고 이건 측정의 전제이기도 하다.** 곡선 기준선은 1회차에 뽑아 고정한다(`docs/MEASURE.md`
  * 2장). 나중에 누가 이 문장을 고치면 **옛 문장의 기준선과 새 문장을 말한 내 곡선**을 겨누게 되고,
  * 화면에는 멀쩡한 숫자가 뜬다 — 조용히 깨지는 종류다. 그래서 `btrim(text) = ''` 조건은 화면 편의가
  * 아니라 **불변 조건**이다. 문장을 고칠 길을 내려면 그 대상의 회차를 어떻게 할지 같이 정해야 한다.
  */
-export async function saveGuessAndEnglish(
+export async function saveGuess(userId: string, id: string, guess: string): Promise<void> {
+  await withUser(userId, async (tx) => {
+    // **첫 추측은 안 덮는다.** 덮어쓰기는 유실이고, 데이터 원칙이 "추측 한 번도 유실 없음" 이다.
+    // 문장을 다시 만드는 것은 **새 추측이 아니다** — 그래서 다시 만들기는 이 함수를 안 부른다.
+    await tx.query(
+      `UPDATE chunks SET meta = jsonb_build_object('guess', $3::text) || meta
+         WHERE user_id = $1 AND id = $2 AND NOT (meta ? 'guess')`,
+      [userId, id, guess],
+    );
+  });
+}
+
+export async function saveEnglish(
   userId: string,
   id: string,
-  guess: string,
-  english: { text: string; attitude: string | null; chunk: string; source: "claude" | "fallback" },
+  english: { text: string; attitude: string | null; chunk: string; source: "claude" },
 ): Promise<void> {
   await withUser(userId, async (tx) => {
     await tx.query(
       `UPDATE chunks
-          SET text = CASE WHEN btrim(text) = '' THEN $4::text ELSE text END,
-              attitude = coalesce(attitude, $5),
-              meta = meta
-                   || jsonb_build_object('guess', $3::text)
-                   || CASE WHEN btrim(text) = ''
-                           THEN jsonb_build_object('chunk', $6::text, 'content_source', $7::text)
-                           ELSE '{}'::jsonb END
-        WHERE user_id = $1 AND id = $2`,
-      [userId, id, guess, english.text, english.attitude, english.chunk, english.source],
+          SET text = $3::text,
+              attitude = coalesce(attitude, $4),
+              meta = meta || jsonb_build_object('chunk', $5::text, 'content_source', $6::text)
+        WHERE user_id = $1 AND id = $2 AND btrim(text) = ''`,
+      [userId, id, english.text, english.attitude, english.chunk, english.source],
     );
   });
 }

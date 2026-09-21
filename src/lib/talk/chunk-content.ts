@@ -34,14 +34,19 @@ const SYSTEM = `너는 한국어 화자가 "오늘 못 한 말" 한 줄을 주�
 - 문법 설명 금지. 왜 그런 형태인지 설명하지 않는다. 다른 표현을 여러 개 늘어놓지 않는다.
 - 이모지·마크다운 금지.`;
 
-/** 키가 없거나 실패했을 때. 문장을 지어내지 않고 사용자가 쓴 말을 그대로 덩어리 자리에 둔다. */
-export function fallbackContent(situation: string): ChunkContent {
-  const line = situation.trim();
-  return { english: line, chunk: line, attitude: "설명" };
-}
-
-export async function getChunkContent(situation: string): Promise<{ content: ChunkContent; source: "claude" | "fallback" }> {
-  if (!process.env.ANTHROPIC_API_KEY) return { content: fallbackContent(situation), source: "fallback" };
+/**
+ * **못 만들면 `null` 이다. 지어내지 않는다.**
+ *
+ * 전에는 사용자가 쓴 **한국어 한 줄을 그대로 `english` 에 넣었다.** 화면은 그걸 "따라 말할 영어
+ * 덩어리" 라고 부르고 곡선까지 그렸다 — 듣기가 그 한국어를 영어 목소리로 읽고, 그 곡선이
+ * `target_pitch` 로 **1회차 기준선에 고정**됐다. 화면만 틀린 게 아니라 **곡선 숫자가 통째로
+ * 뜻을 잃는** 자리였다 (`docs/MEASURE.md` 2장).
+ *
+ * 부르는 쪽(`submitGuess`)이 `null` 을 받으면 **추측은 저장한 채** F17 에 세워 둔다. 그 상태는
+ * 코드가 이미 아는 상태다 — `hasEnglish` 가 거짓이고, F18 목록에도 안 뜬다.
+ */
+export async function getChunkContent(situation: string): Promise<{ content: ChunkContent; source: "claude" } | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
   try {
     const client = new Anthropic({ timeout: 25_000, maxRetries: 1 });
     const res = await client.messages.parse({
@@ -57,7 +62,7 @@ export async function getChunkContent(situation: string): Promise<{ content: Chu
     const chunk = parsed.english.includes(parsed.chunk) ? parsed.chunk : parsed.english;
     return { content: { ...parsed, chunk }, source: "claude" };
   } catch (e) {
-    console.error("[chunk-content] 생성 실패, 쓴 그대로", e instanceof Error ? e.message : e);
-    return { content: fallbackContent(situation), source: "fallback" };
+    console.error("[chunk-content] 생성 실패 — 지어내지 않고 못 만들었다고 돌려준다", e instanceof Error ? e.message : e);
+    return null;
   }
 }
