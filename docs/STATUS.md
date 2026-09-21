@@ -100,6 +100,10 @@ ko_sound_of = ko 가 있는 한자 수      = 2,136 − 1(枠, 일본 국자라 
 엣지        = part_of + ko_sound_of                                    = 3,913 + 2,135     = 6,048
 ```
 
+**그리고 그 DB 로 `pnpm test:db` 를 돌렸다 — `3a64735` 에서 72/72 초록.** 오늘 내내 이 자리는 아홉 파일이 *"DB 가 없어 이 컨테이너에서 안 돈다"* 로 빠져 있었다(`backup-tables` · `chunk-fallback` · `delete-paths` · `encounters` · `export-tables` · `input-list` · `judge-missing-node` · `recordings-key` · `same-chunk`). **빠진 채로 스물몇 커밋이 `main` 에 올라갔다** — `main` 은 프로덕션이고 Vercel 이 거기서 배포한다. 같은 상태에서 `db-provenance`(0001–0008, 레포와 8/8 일치) · typecheck · lint · build 도 통과한다.
+
+**이것이 말하지 않는 것**: 프로덕션이 아니다. 여기는 씨앗을 처음부터 새로 넣은 DB 이고, 프로덕션은 40행 위에 이어 넣는 자리다. 그리고 `ANTHROPIC_API_KEY` 가 없어 **모델을 타는 길은 이 초록 안에 없다.**
+
 **두 수가 떠돌면 적재 결과를 기다릴 게 아니라 어느 커밋이 사이에 있는지를 본다.** 여기서는 기다릴 필요가 없었다 — 값이 `db/seed/kanji.json` 안에 있고, 그 파일의 두 판을 읽으면 5와 2가 그대로 나온다.
 
 **프로덕션의 40 은 고장이 아니라 「옛 씨앗」으로 보인다** — `db/seed/ja-seed.json` 이 정확히 **40항목**이고, 프로덕션의 `ja/kanji` 가 40행이다. `kanji.json`(2,136)이 씨앗 스크립트에 들어오기 전에 한 번 돌린 자리로 읽힌다. 그러면 지금 돌리는 것은 **고치는 것이 아니라 이어 넣는 것**이고, 기존 40행은 `meta = nodes.meta || EXCLUDED.meta` 라 덮이지 않고 합쳐진다.
