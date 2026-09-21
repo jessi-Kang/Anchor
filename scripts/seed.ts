@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { loadEnv } from "./lib/load-env";
 import { adminClient } from "./lib/admin-client";
+import { ORPHAN_SOUND_DELETE } from "../src/lib/db/node-guard";
 
 loadEnv();
 
@@ -128,6 +129,9 @@ async function main() {
     const kanjiId = new Map<string, string>();
     const soundId = new Map<string, string>();
     let edges = 0;
+    let dropped = 0;
+    /** 지운 행 수를 세어 돌려준다 — 조용한 DELETE 를 안 만든다. */
+    const drop = async (sql: string, params: unknown[]) => (await client.query(sql, params)).rowCount ?? 0;
     for (const it of kanji) {
       const seed = seedByKanji.get(it.kanji);
       const koWord = koWords[it.kanji] ?? seed?.ko_word;
@@ -197,6 +201,7 @@ async function main() {
       kanjiId.set(it.kanji, id);
 
       // 부품 ∈ 한자
+      const keptParts: string[] = [];
       for (const p of new Set(it.parts)) {
         const pid = partId.get(p);
         if (!pid || pid === id) continue;
@@ -205,11 +210,17 @@ async function main() {
            ON CONFLICT (src, dst, rel) WHERE user_id IS NULL DO UPDATE SET weight = EXCLUDED.weight`,
           [pid, id, it.parts.filter((x) => x === p).length],
         );
+        keptParts.push(pid);
         edges++;
       }
+      dropped += await drop(
+        `DELETE FROM edges WHERE user_id IS NULL AND rel = 'part_of' AND dst = $1 AND src <> ALL($2::uuid[])`,
+        [id, keptParts],
+      );
 
       // 한국 한자음 → 한자 (ko sound 노드는 한 소리에 하나)
       const ko = it.ko ?? seed?.ko_sound;
+      let keptSound: string | null = null;
       if (ko) {
         let sid = soundId.get(ko);
         if (!sid) {
@@ -226,11 +237,35 @@ async function main() {
            ON CONFLICT (src, dst, rel) WHERE user_id IS NULL DO NOTHING`,
           [sid, id],
         );
+        keptSound = sid;
         edges++;
       }
+      dropped += await drop(
+        `DELETE FROM edges
+          WHERE user_id IS NULL AND rel = 'ko_sound_of' AND dst = $1
+            AND ($2::uuid IS NULL OR src <> $2::uuid)`,
+        [id, keptSound],
+      );
     }
+    /*
+      **엣지를 고치면 소리 노드가 고아로 남는다.** 金 의 소리가 김 → 금 으로 바뀌면 김→金 엣지는
+      위에서 지워지는데, 김 노드 자체는 아무도 안 가리킨 채 `ko/sound` 에 앉아 있다. 그러면
+      "맞춘다, 쌓지 않는다" 가 엣지에만 참이고 노드엔 거짓이 된다.
+
+      **범위를 `lang='ko' AND kind='sound'` 로 못 박는다.** 언젠가 `kind IN (...)` 으로 넓히고
+      싶은 날이 온다(안 쓰는 부품·한자). **여기를 넓히면 `encounters` 가 같이 지워진다** —
+      `nodes` 로 가는 FK 여섯이 CASCADE 이고, `encounters` 는 `docs/MEASURE.md` 의 분자·분모이자
+      다시 만들 수 없는 유일한 표다. 넓히려면 이 줄과 `node-guard.ts` 를 같이 읽고 정한다.
+
+      가드는 손으로 안 적는다 — `NODE_GUARD_TABLES` 에서 낸다(`node-guard.ts` 가 이유를 적고 있다).
+      오늘은 소리 노드에 사용자 행이 안 붙어서 이 절이 아무것도 안 거른다. **그게 요점이다:
+      지금 값이 아니라 구문이 안전을 진다.**
+    */
+    const orphans = await drop(ORPHAN_SOUND_DELETE, []);
     await client.query("COMMIT");
     console.log(`한자: ${kanji.length} 노드, 한국 한자음: ${soundId.size} 노드, 엣지: ${edges}`);
+    // 정상이면 둘 다 0 이다. 0 이 아닌 날이 "무엇이 바뀌었나" 를 묻는 날이다.
+    console.log(`지운 엣지: ${dropped} · 지운 소리 노드: ${orphans}`);
   } catch (e) {
     await client.query("ROLLBACK");
     throw e;
