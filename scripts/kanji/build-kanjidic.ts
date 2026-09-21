@@ -10,12 +10,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import path from "node:path";
+import { pickKoSound } from "../../src/lib/kanji/ko-sound";
 
 const CACHE = path.resolve(process.cwd(), ".cache");
 const KANJIDIC_URL = "http://www.edrdg.org/kanjidic/kanjidic2.xml.gz";
 const IDS_URL = "https://raw.githubusercontent.com/cjkvi/cjkvi-ids/master/ids.txt";
 const OUT = path.resolve(process.cwd(), "db/seed/kanji.json");
 const PARTS = path.resolve(process.cwd(), "db/seed/parts-ko.json");
+const KO_WORDS = path.resolve(process.cwd(), "db/seed/kanji-ko.json");
 
 type KanjiOut = {
   kanji: string;
@@ -25,6 +27,7 @@ type KanjiOut = {
   on: string[];
   kun: string[];
   ko: string | null;
+  ko_all: string[];
   meanings: string[];
   parts: string[];
 };
@@ -56,6 +59,7 @@ async function main() {
   const xml = await fetchCached(KANJIDIC_URL, "kanjidic2.xml", true);
   const idsText = await fetchCached(IDS_URL, "ids.txt");
   const partsFile = JSON.parse(readFileSync(PARTS, "utf8")) as { parts: Record<string, string>; expand: Record<string, string> };
+  const koWords = (JSON.parse(readFileSync(KO_WORDS, "utf8")) as { words: Record<string, string> }).words;
   const named = new Set(Object.keys(partsFile.parts));
   const override = partsFile.expand;
 
@@ -133,6 +137,51 @@ async function main() {
 
   const chars = xml.split("<character>").slice(1);
   /*
+    **KANJIDIC2 가 제 항목에 걸어 둔 변이자 링크를 한 번 따라간다.**
+
+    여섯 자(収 枠 塡 頰 𠮟 剝)에 한국 한자음이 없었다. 그중 다섯은 KANJIDIC2 자신이 `<variant>` 로
+    정자를 가리키고 있고(収 → 收 수, 塡 → 填, 頰 → 頬 협, 𠮟 → 叱 질, 剝 → 剥 박) 그 정자 항목에는
+    한국 한자음이 있다. 우리가 못 읽은 것은 아래 `grade` 1~8 필터 때문이다 — 정자는 상용한자가
+    아니라 `items` 에도 `koSound` 에도 안 들어온다. **손 표를 새로 만드는 게 아니라 원본이 이미
+    푼 것을 안 따라갔던 것**이라 원칙 2 에 맞는다. `枠` 은 링크가 없으니 그대로 빈다(국자 한 자).
+
+    **목록이 비었을 때만이 아니라 늘 합친다.** 비었을 때만 따라가면 `予`(여)가 남는다 — 제 소리는
+    「여」지만 한국어가 「예약」에 쓰는 글자는 정자 `豫`(예)이고, KANJIDIC2 는 `予` 에서 거기로
+    링크를 걸어 두었다. 재 보니 합쳐서 목록이 길어지는 씨앗 글자는 37자, 그중 **고른 값이 실제로
+    바뀌는 것은 `予` 하나**다(나머지는 앵커가 이미 제 목록 안에서 하나를 집는다).
+
+    합친 목록을 `ko_all` 로 내보낸다. `ko` 는 그중 **하나를 고른 것**이고 고르는 규칙은
+    `src/lib/kanji/ko-sound.ts` 에 있다. 고른 티가 안 나면 다음 사람이 첫 값으로 되돌린다.
+  */
+  const koReadings = new Map<string, string[]>();
+  const byCp = new Map<string, string>();
+  const variantsOf = new Map<string, string[]>();
+  for (const c of chars) {
+    const lit = /<literal>(.*?)<\/literal>/.exec(c)?.[1];
+    if (!lit) continue;
+    koReadings.set(lit, [...c.matchAll(/<reading r_type="korean_h">(.*?)<\/reading>/g)].map((m) => m[1]));
+    for (const m of c.matchAll(/<cp_value cp_type="(.*?)">(.*?)<\/cp_value>/g)) byCp.set(`${m[1]}:${m[2].toLowerCase()}`, lit);
+    variantsOf.set(lit, [...c.matchAll(/<variant var_type="(.*?)">(.*?)<\/variant>/g)].map((m) => `${m[1]}:${m[2].toLowerCase()}`));
+  }
+  /** 제 값 먼저, 그 뒤에 변이자가 들고 있는 값 중 아직 없는 것. 중복은 없앤다. */
+  const koList = (lit: string): string[] => {
+    const own = koReadings.get(lit) ?? [];
+    const linked = (variantsOf.get(lit) ?? []).flatMap((cp) => koReadings.get(byCp.get(cp) ?? "") ?? []);
+    return [...new Set([...own, ...linked])];
+  };
+  /*
+    **손으로 고른 값은 이 한 줄뿐이다** (PM 판정).
+
+    `塡` 은 앵커가 없어 규칙대로면 첫 값 「진」이 남는다. 한국어가 그 글자를 쓰는 자리는
+    충전(充塡)·보전(補塡) 이라 「전」이다. 그런데 그 둘을 앵커 낱말로는 못 쓴다 — 한국어에서
+    훨씬 흔한 충전(充電)·보전(保全)과 소리가 같아서, 화면에 세우면 Jessi 가 떠올리는 글자가
+    `電`·`全` 이 된다. **틀린 앵커보다 없는 앵커가 낫다**(PM). 그래서 값만 손으로 집는다.
+
+    울타리: 여기서 집는 값은 **반드시 KANJIDIC2 목록 안에 있어야 한다**(`塡` 목록은 진·전).
+    이 파일은 소리를 만들지 않는다. 늘리려면 PM 판정을 거친다.
+  */
+  const KO_PICK: Record<string, string> = { "\u5861": "\uc804" }; // 塡 → 전
+  /*
     **부를 이름이 있는 부품만 남긴다** (docs/FLOW.md, PM 결정).
 
     카드가 묻는 것은 "이 부품들이 모이면 무슨 뜻이 될까" 인데, 부를 이름이 없는 부품이 그 문장에
@@ -143,13 +192,19 @@ async function main() {
     이름은 두 곳에서 온다: `parts-ko.json` 의 훈("열 십"), 아니면 **그 글자 자체의 한국 한자음**
     (부품이 그 자체로 한자면 사용자가 이미 아는 소리가 있다 — 원칙 2).
   */
+  const chooseKo = (lit: string): string | null => {
+    const list = koList(lit);
+    const hand = KO_PICK[lit];
+    if (hand && list.includes(hand)) return hand;
+    return pickKoSound(list, koWords[lit]);
+  };
   const koSound = new Map<string, string>();
   for (const c of chars) {
     const lit = /<literal>(.*?)<\/literal>/.exec(c)?.[1];
     const grade = Number(/<grade>(\d+)<\/grade>/.exec(c)?.[1] ?? 0);
-    const ko = /<reading r_type="korean_h">(.*?)<\/reading>/.exec(c)?.[1];
     // **우리 씨앗에 든 한자의 소리만 센다.** KANJIDIC 에는 상용한자 밖 글자의 한국 한자음도 있지만,
     // 그 글자는 우리 그래프에 노드가 없어서 부를 수도 다음 카드가 될 수도 없다 — 이름이 있는 것과 다르다.
+    const ko = lit ? chooseKo(lit) : null;
     if (lit && ko && grade >= 1 && grade <= 8) koSound.set(lit, ko);
   }
   /*
@@ -181,9 +236,10 @@ async function main() {
     const jlpt = /<jlpt>(\d+)<\/jlpt>/.exec(c)?.[1];
     const on = [...c.matchAll(/<reading r_type="ja_on">(.*?)<\/reading>/g)].map((m) => toHira(m[1]));
     const kun = [...c.matchAll(/<reading r_type="ja_kun">(.*?)<\/reading>/g)].map((m) => m[1]);
-    const ko = /<reading r_type="korean_h">(.*?)<\/reading>/.exec(c)?.[1] ?? null;
+    const ko_all = koList(lit);
+    const ko = chooseKo(lit);
     const meanings = [...c.matchAll(/<meaning>(.*?)<\/meaning>/g)].map((m) => m[1]);
-    items.push({ kanji: lit, grade, freq: freq ? Number(freq) : null, jlpt: jlpt ? Number(jlpt) : null, on, kun, ko, meanings, parts: parts(lit) });
+    items.push({ kanji: lit, grade, freq: freq ? Number(freq) : null, jlpt: jlpt ? Number(jlpt) : null, on, kun, ko, ko_all, meanings, parts: parts(lit) });
   }
   /*
     **질문이 겹치면 둘 다 「부품 없음」으로 보낸다** (PM 판정, 기획 확정).
@@ -208,7 +264,7 @@ async function main() {
   const unnamed = new Map<string, number>();
   for (const it of items) for (const p of it.parts) if (!nameable(p)) unnamed.set(p, (unnamed.get(p) ?? 0) + 1);
   const out = {
-    _comment: "scripts/kanji/build-kanjidic.ts 가 KANJIDIC2 + CJKVI IDS 에서 만든다. 손으로 고치지 말 것. 상용한자 2,136자: 음독(히라가나)·훈독·한국 한자음·영어 뜻·부품. 한국어 앵커 단어는 kanji-ko.json, 카드 문안은 kanji-cards.json.",
+    _comment: "scripts/kanji/build-kanjidic.ts 가 KANJIDIC2 + CJKVI IDS 에서 만든다. 손으로 고치지 말 것. 상용한자 2,136자: 음독(히라가나)·훈독·한국 한자음·영어 뜻·부품. ko 는 KANJIDIC2 가 실은 여러 값(ko_all) 중 앵커 낱말이 가리키는 하나이고, 고르는 규칙은 src/lib/kanji/ko-sound.ts 에 있다. 한국어 앵커 단어는 kanji-ko.json, 카드 문안은 kanji-cards.json.",
     source: { kanjidic2: KANJIDIC_URL, ids: IDS_URL, built_at: new Date().toISOString().slice(0, 10) },
     items,
   };
