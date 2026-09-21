@@ -55,6 +55,8 @@ function internalTerms(): string[] {
 
 async function main() {
   const picked = process.argv.slice(2);
+  // `readdirSync` 는 한 층만 읽고 `archive/` 는 `.html` 로 안 끝나서 **원래부터 안 걸린다.**
+  // 버린 화면은 글꼴도 규칙도 안 따라오는데, 도구가 거기서 울면 다음엔 도구를 꺼 버리게 된다.
   const ids = readdirSync(DIR)
     .filter((f) => f.endsWith(".html") && f !== "Sitemap.html")
     .map((f) => f.slice(0, -5))
@@ -63,6 +65,7 @@ async function main() {
   const browser = await chromium.launch({ executablePath: findChromium() });
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const problems: string[] = [];
+  const tall: string[] = [];
   const INTERNAL = internalTerms();
 
   for (const id of ids) {
@@ -103,6 +106,7 @@ async function main() {
     }, TAP_MIN);
 
     if (found.overflow) problems.push(`${id}: 틀(${found.frameH}px)을 넘친다`);
+    if (found.frameH > H) tall.push(`${id}(${found.frameH}px)`);
     for (const s of found.small) problems.push(`${id}: 탭 영역 ${s.w}×${s.h} — "${s.text}" (가로·세로 ${TAP_MIN}px 이상이어야 한다)`);
     for (const href of found.hrefs) {
       if (!existsSync(path.join(DIR, href))) problems.push(`${id}: 없는 화면으로 간다 — ${href}`);
@@ -120,6 +124,12 @@ async function main() {
     process.exit(1);
   }
   console.log(`화면 ${ids.length}장, 규칙 어긋난 곳 없음`);
+  /*
+    **틀을 키우면 넘침이 사라진다.** 고의가 아니라 실수로 그렇게 된다 — `844` 고정은 못 속이는데
+    제가 선언한 틀은 속일 수 있다. 그래서 **선언이 조용해지지 않게** 한 줄로 남긴다.
+    실패가 아니라 **사실**이다: "이 화면은 스크롤된다" 가 눈에 보이는 값이 된다.
+  */
+  if (tall.length) console.log(`틀이 ${H}px 보다 큰 화면: ${tall.join(" · ")}`);
 }
 
 main();
