@@ -187,11 +187,30 @@ async function main() {
     // 열 수 없게 해 뒀으므로(읽기를 열면 다음 카드의 답이 샌다) 그 안의 만난 글자에는 "열었다 / 안
     // 열었다" 가 생기지 않는다 — `recognized` 가 NULL 이다. 분모에 넣으면 기회가 없던 것을 못 읽은
     // 것으로 세게 되니 빠져야 하고, 동시에 **얼마나 빠지는지는 보여야** 한다.
+    // 이 자료(`again`)에는 `meta.readings` 가 없다 — **읽기를 아예 못 만든 자료**다. 세는 쪽이
+    // 이걸 "고칠 일" 쪽으로 갈라야 한다.
     const noJudge = await node("妥", "ja", "kanji");
     await card(noJudge, src, 12);
     await client.query(
       "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at) VALUES ($1, $2, $3, NULL, $4)",
       [USER_ID, noJudge, again, daysAgo(4)],
+    );
+
+    /*
+      **실패 케이스 3″ — 읽기가 일부만 비었다.** `alignReadings` 는 가나가 아니거나 터무니없이 긴
+      읽기를 그 덩어리만 비우고(`""`) 나머지를 돌려준다. 그러면 그 덩어리는 못 열고 나머지는 열린다.
+      읽기가 아예 없는 자료와 **손쓰는 법이 다르므로** 따로 세어져야 한다.
+    */
+    const partial = await input("ja", "읽기가 일부 빈 자료", "일부만 읽힌 글. 誓協.", 4);
+    await client.query("UPDATE inputs SET meta = meta || jsonb_build_object('readings', $2::jsonb) WHERE id = $1", [
+      partial,
+      JSON.stringify(["", "きょう"]),
+    ]);
+    const partialNode = await node("誓", "ja", "kanji");
+    await card(partialNode, src, 12);
+    await client.query(
+      "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at) VALUES ($1, $2, $3, NULL, $4)",
+      [USER_ID, partialNode, partial, daysAgo(4)],
     );
 
     // ── 곡선 ──────────────────────────────────────────────────────────────────
@@ -251,7 +270,8 @@ async function main() {
     console.log("");
     console.log("배관이 맞으면 이렇게 나온다. 하나라도 다르면 스크립트가 정의대로 안 거른 것이다.");
     console.log("  재만남: 분모 10 · 분자 7 → 70.0%");
-    console.log("          참고 — 착지한 한자 14자 · 자격 미달 1자 · 다시 안 나온 한자 2자 · 판정 불가 1자 · 같은 글 재투입 1자");
+    console.log("          참고 — 착지한 한자 15자 · 자격 미달 1자 · 다시 안 나온 한자 2자 · 같은 글 재투입 1자");
+  console.log("          판정 불가 2자 — 읽기가 아예 없는 자료 1자 · 읽기가 일부 빈 자료 1자 (갈라져 나와야 한다)");
   console.log("          支 는 \"열었다\" 여야 한다 — 재투입(D-6, 안 열었다)이 아니라 진짜 새 자료(D-4)를 세야 맞다.");
   console.log("          거꾸로 거르면 支 를 잃고 분모 9 · 분자 7 = 77.8% 가 나온다 — 비율이 위로 부푼다");
     console.log("  곡선 영어: 가까워진 대상 1 / 2   (3회차뿐인 것 · 겨눈 곡선이 없는 것 · 폴백 문안은 빠진다)");

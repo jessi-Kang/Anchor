@@ -154,7 +154,7 @@ async function main() {
       자격에 못 미친 행과, 착지했지만 다시 안 나온 한자. **비율에는 안 들어간다.** 70% 가 안 나온
       날 그게 "아직 이르다"인지 "안 된다"인지를 가르는 재료라 같이 찍는다 (MEASURE 0′장).
     */
-    const { rows: ctx } = await client.query<{ too_soon: string; landed: string; never_back: string; no_judgement: string; same_body: string }>(
+    const { rows: ctx } = await client.query<{ too_soon: string; landed: string; never_back: string; no_judgement: string; same_body: string; no_readings: string; partial_readings: string }>(
       `
       WITH landed AS (
         SELECT node_id, min(landed_at) AS landed_at
@@ -192,6 +192,32 @@ async function main() {
            JOIN inputs i ON i.id = e.input_id AND i.user_id = $1
           WHERE e.user_id = $1 AND e.recognized IS NULL
             AND i.created_at >= l.landed_at + make_interval(days => $2::int)) AS no_judgement,
+        /*
+          NULL 이 되는 길이 둘이고 **손쓰는 법이 정반대다** (MEASURE 0′장). 섞인 덩어리에 갇힌 것은
+          표본이 쌓이면 줄어들고, 읽기가 없어 열 수조차 없던 것은 **우리 쪽 버그라 당장 고칠 일이다.**
+
+          가르는 자리는 만남이 아니라 **자료**다 — 버그가 거기 있다. inputs.meta.readings 키가
+          없으면 그 자료는 덩어리를 하나도 못 열었고, 키는 있는데 빈 항목이 섞여 있으면 그 덩어리만
+          못 열었다 (lib/kanji/furigana.ts 의 alignReadings 가 일부만 비우고 나머지를 돌려준다).
+
+          **덩어리를 다시 쪼개 되짚지 않는다.** 그 로직이 바뀌는 날 옛 데이터의 뜻이 같이 바뀐다.
+          그래서 아래 둘째 수는 **자료 단위의 상한**이다 — 그 자료 안에서 갇힌 것과 섞여 있을 수 있다.
+        */
+        (SELECT count(DISTINCT e.node_id)::text
+           FROM encounters e
+           JOIN landed l ON l.node_id = e.node_id
+           JOIN inputs i ON i.id = e.input_id AND i.user_id = $1
+          WHERE e.user_id = $1 AND e.recognized IS NULL
+            AND i.created_at >= l.landed_at + make_interval(days => $2::int)
+            AND i.meta -> 'readings' IS NULL) AS no_readings,
+        (SELECT count(DISTINCT e.node_id)::text
+           FROM encounters e
+           JOIN landed l ON l.node_id = e.node_id
+           JOIN inputs i ON i.id = e.input_id AND i.user_id = $1
+          WHERE e.user_id = $1 AND e.recognized IS NULL
+            AND i.created_at >= l.landed_at + make_interval(days => $2::int)
+            AND i.meta -> 'readings' IS NOT NULL
+            AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(i.meta -> 'readings') x WHERE x = '')) AS partial_readings,
         -- 자격은 갖췄는데 **카드를 푼 그 글을 다시 넣은 자료**라 버린 것. 0 이 아니면 그 자체가
         -- 신호다 — 같은 글을 다시 읽고 있다는 뜻이고, 그만큼 표본이 줄어든다.
         (SELECT count(DISTINCT e.node_id)::text
@@ -258,7 +284,7 @@ async function main() {
 function print(
   userId: string,
   enc: EncounterRow[],
-  ctx: { too_soon: string; landed: string; never_back: string; no_judgement: string; same_body: string } | undefined,
+  ctx: { too_soon: string; landed: string; never_back: string; no_judgement: string; same_body: string; no_readings: string; partial_readings: string } | undefined,
   rec: RecordingRow[],
 ) {
   console.log(`Anchor 측정 — ${new Date().toISOString()}`);
@@ -325,10 +351,14 @@ function print(
       console.log(
         `  카드를 푼 그 글을 다시 넣은 자료에서의 출현 ${ctx.same_body}자 — 글자를 알아본 것인지 글을 기억한 것인지 못 가른다. 분모에서 뺀다.`,
       );
-    if (ctx.no_judgement !== "0")
-      console.log(
-        `  판정이 일어날 수 없던 출현 ${ctx.no_judgement}자 — 안 만난 한자가 섞인 덩어리라 읽기를 열 기회가 없었다. 분모에서 뺀다.`,
-      );
+    if (ctx.no_judgement !== "0") {
+      console.log(`  판정이 일어날 수 없던 출현 ${ctx.no_judgement}자 — 읽기를 열 기회가 없었다. 분모에서 뺀다.`);
+      // 둘을 갈라 낸다. 뒤쪽은 우리 쪽 버그라 당장 고칠 일이고, 앞쪽은 표본이 쌓이면 줄어든다.
+      if (ctx.no_readings !== "0")
+        console.log(`    그중 ${ctx.no_readings}자는 **읽기가 아예 없는 자료**에서 왔다 — 후리가나를 못 만든 것이다. 고칠 일이다.`);
+      if (ctx.partial_readings !== "0")
+        console.log(`    ${ctx.partial_readings}자는 읽기가 일부 빈 자료에서 왔다 (그 자료 안에서 섞인 덩어리에 갇힌 것과 겹칠 수 있는 상한).`);
+    }
   }
 
   // ── 2 ──────────────────────────────────────────────────────────────────────
