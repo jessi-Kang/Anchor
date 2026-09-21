@@ -19,14 +19,14 @@ export function SpeakLoop({
   preview,
   startAttempt,
   startPrev,
-  nativeVoice,
+  targetVoice,
 }: {
   cardId: string;
   text: string;
   preview: boolean;
   startAttempt: number;
   startPrev: PitchPoint[] | null;
-  nativeVoice: boolean;
+  targetVoice: boolean;
 }) {
   const [, start] = useTransition();
   return (
@@ -37,7 +37,7 @@ export function SpeakLoop({
       preview={preview}
       startAttempt={startAttempt}
       startPrev={startPrev}
-      nativeVoice={nativeVoice}
+      targetVoice={targetVoice}
       doneLabel="됐어, 다음"
       firstNote="먼저 듣고, 그대로 따라 말해봐."
       onDone={(spoke) => start(() => finishSpeak(cardId, spoke))}

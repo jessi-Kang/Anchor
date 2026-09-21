@@ -14,14 +14,14 @@ export function TalkLoop({
   text,
   preview,
   startAttempt,
-  nativeVoice,
+  targetVoice,
   startPrev,
 }: {
   chunkId: string;
   text: string;
   preview: boolean;
   startAttempt: number;
-  nativeVoice: boolean;
+  targetVoice: boolean;
   startPrev: PitchPoint[] | null;
 }) {
   const router = useRouter();
@@ -32,7 +32,7 @@ export function TalkLoop({
       lang="en"
       preview={preview}
       startAttempt={startAttempt}
-      nativeVoice={nativeVoice}
+      targetVoice={targetVoice}
       startPrev={startPrev}
       doneLabel="됐어"
       firstNote="먼저 듣고, 그대로 따라 말해봐."

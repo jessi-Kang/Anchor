@@ -1,5 +1,5 @@
 import { countRecordings, lastPitch, type PitchPoint } from "@/lib/db/recordings";
-import { hasNativeVoice } from "@/lib/tts-voice";
+import { hasTargetVoice } from "@/lib/tts-voice";
 
 /**
  * 말하기 루프(`PitchLoop`)가 서버에서 받아야 하는 것을 **한 군데에서** 푼다.
@@ -19,8 +19,8 @@ export type SpeakLoopData = {
   startAttempt: number;
   /** 마지막 회차의 곡선. 범례가 말하는 그 회차의 곡선이다. */
   startPrev: PitchPoint[] | null;
-  /** 이 언어의 원어민 음성이 있는가. 없으면 화면이 그렇게 말한다. */
-  nativeVoice: boolean;
+  /** 이 언어로 들려줄 목표 발음이 있는가. 없으면 화면이 그렇게 말한다. */
+  targetVoice: boolean;
 };
 
 export async function loadSpeakLoop(
@@ -29,5 +29,5 @@ export async function loadSpeakLoop(
   lang: "ja" | "en",
 ): Promise<SpeakLoopData> {
   const [startAttempt, startPrev] = await Promise.all([countRecordings(userId, target), lastPitch(userId, target)]);
-  return { startAttempt, startPrev, nativeVoice: hasNativeVoice(lang) };
+  return { startAttempt, startPrev, targetVoice: hasTargetVoice(lang) };
 }
