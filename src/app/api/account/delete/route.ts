@@ -1,16 +1,21 @@
 import { auth, requireUser } from "@/lib/auth/server";
 import { withUser } from "@/lib/db";
-import { deleteVoiceObjects } from "@/lib/voice-storage";
+import { deleteVoiceObjects, voicePrefix } from "@/lib/voice-storage";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/account/delete  body: { confirm: "삭제" }
  *
+ * 0. 음성 키가 전부 이 계정 접두사 안에 있는지 확인 (아니면 아무것도 안 지우고 멈춘다)
  * 1. **음성 원본(Blob) 삭제 — DB 보다 먼저.**
  * 2. 삭제 원장에 기록 (백업 복구 시 이 사용자를 다시 지우는 근거)
- * 3. users 행 삭제 → 모든 테이블 CASCADE
+ * 3. users 행 삭제 → 모든 테이블 CASCADE (**지워진 행 수를 확인한다**)
  * 4. Neon Auth 계정 삭제
+ *
+ * 3 이 목록이 아니라 CASCADE 인 것은 목록 표류를 구조적으로 없애기 때문이다. 대신 **가정이
+ * 하나 생긴다** — 사용자 행을 가진 표가 전부 `users` 까지 이어져 있다는 것. 그 가정은 주석이
+ * 아니라 `pnpm test:db` 가 붙든다 (`src/lib/db/delete-paths.ts`).
  *
  * 1 이 2 보다 먼저인 이유: CASCADE 가 recordings 행을 지우면 audio_object_key 도 함께 사라진다.
  * 키가 사라진 뒤에는 어떤 오브젝트를 지워야 하는지 알 방법이 없어, 주인 없는 녹음이 스토리지에 영영 남는다.
@@ -32,6 +37,29 @@ export async function POST(req: Request) {
   }
 
   // 1. 음성 원본 먼저. 토큰이 없으면 남은 원본이 있는지부터 보고, 있으면 아무것도 지우지 않는다.
+  /*
+    **접두사 하나가 계정 하나를 덮는다는 가정을 여기서 확인한다.** `deleteVoiceObjects` 는
+    `voice/<user_id>/` 를 훑을 뿐 DB 에 적힌 키를 보지 않는다. 그 접두사를 벗어난 키가 하나라도
+    있으면 오브젝트는 스토리지에 남고, **그것을 가리키던 유일한 표식인 DB 행은 바로 뒤에서 지워진다.**
+    그 뒤로는 무엇을 지워야 하는지 알 길이 영영 없다 — 오류도 없이, 응답은 "지웠다" 다.
+
+    키를 만드는 자리는 `/api/recordings` 한 곳이지만 실제로 저장되는 값은 우리가 만든 키가 아니라
+    **스토리지가 돌려준 `blob.pathname`** 이다. 둘이 갈라질 수 있는 한 가정으로 두지 않는다.
+    걸리면 아무것도 안 지우고 멈춘다 — 이 라우트가 음성 원본에 대해 이미 지키는 순서와 같은 이유다.
+  */
+  const stray = await withUser(user.id, async (tx) => {
+    const { rows } = await tx.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM recordings
+        WHERE user_id = $1 AND audio_object_key IS NOT NULL AND NOT starts_with(audio_object_key, $2)`,
+      [user.id, voicePrefix(user.id)],
+    );
+    return Number(rows[0]?.n ?? 0);
+  });
+  if (stray > 0) {
+    console.error("[account delete] 접두사 밖 음성 키", { userId: user.id, stray, prefix: voicePrefix(user.id) });
+    return Response.json({ error: "음성 원본 일부를 찾지 못해 삭제를 멈췄다. 관리자에게 알려 달라." }, { status: 500 });
+  }
+
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (token) {
     try {
@@ -55,7 +83,7 @@ export async function POST(req: Request) {
     }
   }
 
-  await withUser(user.id, async (tx) => {
+  const deleted = await withUser(user.id, async (tx) => {
     // 원장은 앱에게 INSERT 전용이다(0001). 여기서 ON CONFLICT 를 쓰면 42501 로 막힌다.
     // PG16 에서 갈라 확인한 결과(보안 세션도 같은 결과):
     //   ON CONFLICT (user_id) DO UPDATE → permission denied  (INSERT·UPDATE·SELECT 를 다 요구)
@@ -77,8 +105,23 @@ export async function POST(req: Request) {
       await tx.query("ROLLBACK TO SAVEPOINT ledger");
       if ((e as { code?: string })?.code !== "23505") throw e;
     }
-    await tx.query("DELETE FROM users WHERE id = $1", [user.id]);
+    /*
+      **지워진 행 수를 본다.** 권한이 빠지면 `permission denied` 로 터지지만, RLS 정책이 DELETE 를
+      안 덮으면 **`DELETE 0` 에 오류가 없다**(PG16 에서 정책만 좁혀 확인). 그대로 두면 이 라우트가
+      `{ ok: true }` 를 돌려주고 뒤이어 `auth.deleteUser()` 가 로그인까지 지운다 — 사용자는 다
+      지웠다고 믿는데 전부 남아 있고 **다시 들어와 지울 길도 없다.**
+      여기서 던지면 withUser 가 트랜잭션을 되돌려 원장 행도 남지 않는다.
+    */
+    const gone = await tx.query("DELETE FROM users WHERE id = $1", [user.id]);
+    if (gone.rowCount !== 1) throw new Error(`users 행이 지워지지 않았다 (rowCount=${gone.rowCount})`);
+    return true;
+  }).catch((e) => {
+    console.error("[account delete] DB 삭제 실패, 아무것도 안 지웠다", { userId: user.id, e });
+    return false;
   });
+  if (!deleted) {
+    return Response.json({ error: "삭제하지 못했다. 데이터는 그대로 있다. 다시 시도해 달라." }, { status: 500 });
+  }
 
   const { error } = await auth.deleteUser();
   if (error) {
