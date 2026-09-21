@@ -23,6 +23,7 @@
     "measure": "tsx scripts/measure.ts",
     "measure:fixture": "tsx scripts/measure-fixture.ts",
     "seed:parts-sql": "tsx scripts/seed-parts-sql.ts",
+    "fallbacks": "tsx scripts/fallbacks.ts",
     "test:db": "tsx --test scripts/test/*.test.ts"
   },
   "dependencies": {

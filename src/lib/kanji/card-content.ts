@@ -86,7 +86,18 @@ export function fallbackContent(node: KanjiNode, names: Map<string, string>): Ca
     hook: { word, mark: sound },
     parts_meaning,
     question: partWords.length ? `${parts_meaning}${iGa(parts_meaning)} 모이면\n무슨 뜻이 될까?` : `이 모양이면\n무슨 뜻이 될까?`,
-    answer: (m.meanings ?? []).slice(0, 2).join(", ") || node.key,
+    /*
+      **`|| node.key` 를 뺐다.** 뜻이 비면 정답 자리에 그 한자 자체가 떴다 — "무슨 뜻이 될까?"
+      에 "協" 은 답이 아니다. 지금은 `meanings` 가 상용한자 2,136자 전부에 있어서 안 터지는
+      죽은 가지지만, 데이터가 바뀌면 살아난다. 값이 없을 때 **그럴듯한 것을 내놓지 않는다.**
+
+      **이 줄은 아직 영어다.** KANJIDIC 의 `<meaning>` 이라 정답이 "co-, cooperation" 으로 뜬다.
+      같은 파일 위쪽 프롬프트가 "이 한자의 뜻을 **한국어 한 줄로**" 라고 적어 둔 것과 어긋난다.
+      고치는 길은 정해졌다(**못 만들면 카드를 안 연다**, PM 판정) — 다만 문안이 없을 때 화면이
+      뭐라고 할지가 기획에 가 있어서, 그 문구가 오면 이 함수를 부르는 쪽에 게이트가 선다.
+      **여기서 영어만 먼저 빼면 정답 자리가 빈 채로 Scene4 가 뜬다** — 아무도 정한 적 없는 상태다.
+    */
+    answer: (m.meanings ?? []).slice(0, 2).join(", "),
     landing,
     pattern: "",
   };
