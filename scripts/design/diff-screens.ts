@@ -45,6 +45,7 @@ const ROUTES: Record<string, string> = {
   F12: "/inputs/x/read",
   F13: "/talk",
   F17: "/talk/x/guess",
+  F18: "/talk/past",
   F14: "/talk/x",
   F01: "/today",
   F15: "/today/done",
@@ -59,6 +60,9 @@ const SKIP: Record<string, string> = {
   O02b: "같은 라우트의 다른 상태(언어 추가 모드)",
   O03a: "같은 라우트의 다른 상태(읽는 중)",
   F14a: "같은 라우트의 다른 상태(원어민 소리 없음)",
+  F03b: "같은 라우트의 다른 상태(카드 문안을 못 만든 한자가 묶음으로 빠진 F03)",
+  F17a: "같은 라우트의 다른 상태(영어 문장을 못 만들어 추측이 칸에 남은 F17)",
+  F19: "라우트가 아직 안 정해졌다 — 개발이 F19 를 지으면서 정한다. 정해지면 ROUTES 로 옮긴다",
   X01: "라우트가 아니라 not-found 화면",
   X02: "라우트가 아니라 error 화면",
   // E·S 는 **없는 화면이 아니다.** 영어 어근 카드(E01~E06)와 스페인어 소리 카드(S01~S04)는
