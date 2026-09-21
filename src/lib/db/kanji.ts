@@ -19,7 +19,10 @@ export type KanjiMeta = {
   on?: string[];
   kun?: string[];
   ko_sound?: string | null;
-  /** 이미 아는 한국어 한자어 (앵커). 없으면 "발판 없음" */
+  /**
+   * 이미 아는 한국어 한자어 (앵커). 2,136자 중 656자에만 있다.
+   * **이 칸이 F03 의 두 묶음을 가른다** — 없으면 「부를 낱말이 아직 없어」 쪽이다.
+   */
   ko_word?: string;
   meanings?: string[];
   parts?: string[];
