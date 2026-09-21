@@ -10,7 +10,21 @@ import type { JudgeItem } from "@/lib/cards/judge-items";
  * "알아"로 표시한 한자는 카드 큐에서 빠져 "아는 것" 묶음으로 내려가고 제목의 개수가 줄어든다 (F03a).
  * 판정은 즉시 화면에 반영하고 서버에 보낸다. 주 버튼은 큐의 첫 한자(아는 소리 묶음 먼저)로 간다.
  */
-export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string; anchored: JudgeItem[]; bare: JudgeItem[]; empty: boolean }) {
+export function JudgeRows({
+  inputId,
+  anchored,
+  bare,
+  seen,
+  found,
+}: {
+  inputId: string;
+  anchored: JudgeItem[];
+  bare: JudgeItem[];
+  /** 자료에서 뽑아낸 한자 수 */
+  seen: number;
+  /** 그중 우리가 아는 한자 수 */
+  found: number;
+}) {
   const [known, setKnown] = useState<Record<string, boolean | null>>(() =>
     Object.fromEntries([...anchored, ...bare].map((i) => [i.nodeId, i.known])),
   );
@@ -53,10 +67,32 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
 
   return (
     <>
-      <Title lg>{empty ? "이 자료엔 한자가 없어" : unknownCount > 0 ? `모르는 한자 ${unknownCount}개` : "다 아는 한자야"}</Title>
+      {/*
+        **"한자가 없다" 와 "우리가 그 한자를 모른다" 는 다른 말이다.**
+
+        전에는 우리가 아는 한자가 0이면 무조건 "이 자료엔 한자가 없어" 라고 했다. 한자가 열아홉인
+        기사에도 그렇게 말하고 "다른 자료를 넣어 봐" 로 돌려보냈다. **사용자의 자료를 두고 사실이
+        아닌 말을 한 자리**였고, 비어 있던 것은 자료가 아니라 우리 쪽 행이었다.
+
+        주어는 사용자가 아니라 앱이다 — 아래 "부를 낱말이 아직 없어" 묶음과 같은 규칙이다.
+        자료를 탓하지 않고 못 하는 쪽을 우리로 둔다.
+      */}
+      <Title lg>
+        {seen === 0
+          ? "이 자료엔 한자가 없어"
+          : found === 0
+            ? `한자 ${seen}개, 아직 카드로 못 만들어`
+            : unknownCount > 0
+              ? `모르는 한자 ${unknownCount}개`
+              : "다 아는 한자야"}
+      </Title>
       <Space h={6} />
       <Lead>
-        {empty
+        {/*
+          못 낸 쪽이 둘(자료에 한자가 없다 · 우리가 그 한자를 모른다)이지만 지금 할 수 있는 일은
+          같다. **언제 되는지는 약속하지 않는다** — 못 지킬 약속이 이 표를 다시 여는 길이다.
+        */}
+        {found === 0
           ? "다른 자료를 넣어 봐."
           : unknownCount > 0
             ? // 묶음 제목이 이미 축과 순서를 말하므로 이 줄은 **묶음이 안 하는 일**(무엇을 하면 되는지)만
