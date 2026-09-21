@@ -212,6 +212,15 @@ async function main() {
       "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at) VALUES ($1, $2, $3, NULL, $4)",
       [USER_ID, partialNode, partial, daysAgo(4)],
     );
+    /*
+      **실패 케이스 3‴ — 한 글자가 두 버킷에 다 든다.** 誓 를 `again`(읽기 키가 아예 없는 자료)에서도
+      만난다. 세는 쪽은 글자를 세는데 버킷은 자료별로 갈리므로 誓 가 양쪽에 다 들어가고, **두 줄의
+      합이 총계보다 커진다.** 합을 맞춰 보는 사람이 반드시 나오니 출력이 그렇게 말해야 한다.
+    */
+    await client.query(
+      "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at) VALUES ($1, $2, $3, NULL, $4)",
+      [USER_ID, partialNode, again, daysAgo(4)],
+    );
 
     // ── 곡선 ──────────────────────────────────────────────────────────────────
     /*
@@ -271,7 +280,7 @@ async function main() {
     console.log("배관이 맞으면 이렇게 나온다. 하나라도 다르면 스크립트가 정의대로 안 거른 것이다.");
     console.log("  재만남: 분모 10 · 분자 7 → 70.0%");
     console.log("          참고 — 착지한 한자 15자 · 자격 미달 1자 · 다시 안 나온 한자 2자 · 같은 글 재투입 1자");
-  console.log("          판정 불가 2자 — 읽기가 아예 없는 자료 1자 · 읽기가 일부 빈 자료 1자 (갈라져 나와야 한다)");
+  console.log("          판정 불가 2자 — 읽기 없는 자료 2자 · 일부 빈 자료 1자. 합이 총계보다 큰 것까지 말해야 한다");
   console.log("          支 는 \"열었다\" 여야 한다 — 재투입(D-6, 안 열었다)이 아니라 진짜 새 자료(D-4)를 세야 맞다.");
   console.log("          거꾸로 거르면 支 를 잃고 분모 9 · 분자 7 = 77.8% 가 나온다 — 비율이 위로 부푼다");
     console.log("  곡선 영어: 가까워진 대상 1 / 2   (3회차뿐인 것 · 겨눈 곡선이 없는 것 · 폴백 문안은 빠진다)");
