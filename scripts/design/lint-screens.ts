@@ -43,6 +43,26 @@ function findChromium(): string | undefined {
  * **목록을 여기 베껴 적지 않는다.** `CLAUDE.md` "하지 않는 것"의 내부 용어 줄에서 읽는다 —
  * 두 벌이 되면 한쪽만 늘어나고, 그때부터 어느 쪽이 규칙인지 알 수 없다.
  */
+/**
+ * **서비스가 사용자에게 하면 안 되는 말.** 내부 용어와는 다른 종류다 — 저쪽은 *우리끼리 쓰는 말*
+ * 이고 이쪽은 *뜻은 맞는데 사람한테 하면 다르게 읽히는 말*이다.
+ *
+ * **왜 두 검사 다 이걸 못 잡았나.** `design:diff` 는 **참고와 같은가**만 재고 참고에 그 말이 적혀
+ * 있었다. 앱은 규칙대로 그대로 옮겼다(`CLAUDE.md`: 문구를 임의로 늘리지 않는다). **참고가 틀린
+ * 날에는 두 쪽이 사이좋게 틀리고 아무 줄도 안 울린다.** 문구를 「같은가」로만 재면 **언어로 읽어
+ * 본 사람**이 아무 데도 없다.
+ *
+ * **그래서 목록이 아니라 겪은 것만 적는다.** 지어내면 「성질 없는 이름」과 같은 것이 된다 —
+ * 다음 사람이 아무 데나 갖다 쓴다. **한 줄 = 실제로 화면에 떠서 걸린 말 하나**이고, 옆에 누가
+ * 언제 짚었는지를 적는다.
+ */
+const HARSH: { word: string; why: string }[] = [
+  // Jessi 가 폰에서 설정을 열고 짚었다 (2026-09-21, 고친 커밋 `762cb7c`).
+  // 뜻은 「전원이 꺼진다」인데 **욕과 같은 글자**고, 그 말을 서비스가 사용자에게 한다.
+  // 읽는 사람에게 둘 중 어느 쪽인지 고를 근거가 화면에 없다. 옆의 알약이 쓰는 「꺼짐」이 맞다.
+  { word: "꺼져", why: "욕으로도 읽힌다. 알약이 쓰는 「꺼짐」으로" },
+];
+
 function internalTerms(): string[] {
   const md = readFileSync(path.resolve(process.cwd(), "CLAUDE.md"), "utf8");
   const line = md.match(/^- 내부 용어\((.+?)\)/m);
@@ -78,7 +98,7 @@ async function main() {
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const problems: string[] = [];
   // 센 자리. 「어긋난 곳 없음」을 낼 때 **무엇을 몇 개 봤는지**를 같이 찍는다.
-  const looked = { tap: 0, link: 0, spacer: 0, term: 0, overflow: 0, primary: 0 };
+  const looked = { tap: 0, link: 0, spacer: 0, term: 0, harsh: 0, overflow: 0, primary: 0 };
   // 화면마다 몇 자리를 봤나. **합계만 있으면 「어느 화면이 덜 걸렸나」가 안 보인다** — 쉰두 장이
   // 고르게 걸린 896 과 한 장이 다 채운 896 이 같은 줄로 나온다. 그래서 **제일 적게 걸린 쪽**을
   // 같이 찍는다. **적다고 틀린 것은 아니다** — 로그인(O01)처럼 원래 누를 것이 하나뿐인 화면이 있다.
@@ -147,13 +167,14 @@ async function main() {
       };
     }, { tapMin: TAP_MIN, frameStyle: FRAME_STYLE });
 
-    perScreen.push({ id, n: found.tapCount + found.hrefs.length + found.spacerCount + INTERNAL.length + 2 });
+    perScreen.push({ id, n: found.tapCount + found.hrefs.length + found.spacerCount + INTERNAL.length + HARSH.length + 2 });
     looked.overflow += 1;
     looked.primary += 1;
     looked.tap += found.tapCount;
     looked.link += found.hrefs.length;
     looked.spacer += found.spacerCount;
     looked.term += INTERNAL.length;
+    looked.harsh += HARSH.length;
 
     if (found.overflow) problems.push(`${id}: 틀(${found.frameH}px)을 넘친다`);
     for (const q of found.squeezed) {
@@ -168,6 +189,9 @@ async function main() {
     for (const w of INTERNAL) {
       if (found.text.includes(w)) problems.push(`${id}: 화면에 내부 용어 "${w}" 가 있다`);
     }
+    for (const h of HARSH) {
+      if (found.text.includes(h.word)) problems.push(`${id}: 화면이 사용자에게 "${h.word}" 라고 말한다 — ${h.why}`);
+    }
     await page.close();
   }
 
@@ -176,10 +200,10 @@ async function main() {
     console.error(problems.join("\n"));
     process.exit(1);
   }
-  const total = looked.tap + looked.link + looked.spacer + looked.term + looked.overflow + looked.primary;
+  const total = looked.tap + looked.link + looked.spacer + looked.term + looked.harsh + looked.overflow + looked.primary;
   const thin = [...perScreen].sort((x, y) => x.n - y.n).slice(0, 3);
   console.log(
-    `화면 ${ids.length}장 · 잰 자리 ${total}곳 (탭 영역 ${looked.tap} · 링크 ${looked.link} · 선언한 여백 ${looked.spacer} · 내부 용어 ${looked.term} · 넘침 ${looked.overflow} · 주 버튼 ${looked.primary}), 규칙 어긋난 곳 없음`,
+    `화면 ${ids.length}장 · 잰 자리 ${total}곳 (탭 영역 ${looked.tap} · 링크 ${looked.link} · 선언한 여백 ${looked.spacer} · 내부 용어 ${looked.term} · 하면 안 되는 말 ${looked.harsh} · 넘침 ${looked.overflow} · 주 버튼 ${looked.primary}), 규칙 어긋난 곳 없음`,
   );
   if (ids.length > 3) {
     console.log(`제일 적게 걸린 화면: ${thin.map((t) => `${t.id}(${t.n})`).join(" · ")} — 이 화면들의 「없음」은 그만큼만 뒷받침된다`);
