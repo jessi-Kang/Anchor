@@ -94,19 +94,38 @@ export function PitchLoop({
           src.start();
         });
       } else if ("speechSynthesis" in window) {
-        await new Promise<void>((resolve) => {
+        /*
+          **"소리를 냈다" 와 "냈는데 아무것도 안 나왔다" 를 가른다.**
+
+          전에는 `onend` 와 `onerror` 가 똑같이 성공으로 풀려서, 목소리가 하나도 없는 기기
+          (`getVoices().length === 0` — 헤드리스·최소 컨테이너의 기본값)에서도 앱은 재생했다고
+          여겼다. 사용자에게는 **눌렀는데 아무 일도 안 일어난** 것이고, 화면이 그걸 말해 주지 않았다.
+
+          판정은 **탭 시점**에 한다. 브라우저가 목소리를 비동기로 채워서(`voiceschanged`) 첫
+          렌더의 0 은 못 믿는다 — 누르기 전에 미리 말하려면 그 이벤트를 기다려야 하는데, 안 오는
+          기기도 있어 "아직 모름" 상태가 화면에 눌러앉는다. 실제로 못 냈을 때 말하는 쪽이 맞다.
+        */
+        const spoke = await new Promise<boolean>((resolve) => {
           const u = new SpeechSynthesisUtterance(text);
           u.lang = lang === "en" ? "en-US" : "ja-JP";
           u.rate = 0.9;
-          u.onend = () => resolve();
-          u.onerror = () => resolve();
+          u.onend = () => resolve(true);
+          u.onerror = () => resolve(false);
           window.speechSynthesis.cancel();
+          // 목소리가 하나도 없으면 `speak` 이 조용히 아무것도 안 하는 기기가 있다. 부르기 전에 본다.
+          if (window.speechSynthesis.getVoices().length === 0) return resolve(false);
           window.speechSynthesis.speak(u);
         });
         // 여기로 왔다는 건 목표 발음 음성이 안 왔다는 뜻이다 — `noTarget` 으로 들어왔든 이번에 못 받았든
         // 화면에 벌어진 일은 같다. 그러니 FLOW 가 정한 그 한 줄을 쓴다. 전에는 "목소리 키를 넣으면"
         // 이라고 했는데, 그건 Jessi 가 배포에 넣는 환경변수라 읽은 사람이 설정에서 찾을 수 없다.
+        //
+        // **소리가 아예 안 났을 때의 한 줄은 아직 비어 있다.** 폴백 넷(한자 정답·영어 문장·
+        // 후리가나·듣기)이 같은 병이라 기획이 **결을 하나로** 잡는 중이다. 자리마다 다른 말을
+        // 지으면 상태 어휘가 넷 는다. 문구가 오면 아래 `spoke` 가 거짓인 가지에 한 줄 끼운다 —
+        // 그때까지는 **없는 말을 지어내지 않고** 겨눌 소리가 없다는 사실만 말한다.
         setNote(NO_TARGET_NOTE);
+        if (!spoke) console.warn("[tts] 브라우저 음성이 소리를 못 냈다 (목소리 0개이거나 재생 실패)");
       }
     } catch (e) {
       console.error(e);
