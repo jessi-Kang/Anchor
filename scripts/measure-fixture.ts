@@ -166,6 +166,17 @@ async function main() {
     // **실패 케이스 3 — 착지했지만 다시 안 나왔다.** 분모에 넣으면 앱의 효과가 아니라 자료 선택을 잰다.
     for (const ch of ["謹", "頒"]) await card(await node(ch, "ja", "kanji"), src, 12);
 
+    // **실패 케이스 3′ — 다시 나왔지만 판정이 일어날 수 없었다.** F12 는 안 만난 한자가 섞인 덩어리를
+    // 열 수 없게 해 뒀으므로(읽기를 열면 다음 카드의 답이 샌다) 그 안의 만난 글자에는 "열었다 / 안
+    // 열었다" 가 생기지 않는다 — `recognized` 가 NULL 이다. 분모에 넣으면 기회가 없던 것을 못 읽은
+    // 것으로 세게 되니 빠져야 하고, 동시에 **얼마나 빠지는지는 보여야** 한다.
+    const noJudge = await node("妥", "ja", "kanji");
+    await card(noJudge, src, 12);
+    await client.query(
+      "INSERT INTO encounters (user_id, node_id, input_id, recognized, created_at, meta) VALUES ($1, $2, $3, NULL, $4, $5)",
+      [USER_ID, noJudge, again, daysAgo(4), SYNTHETIC],
+    );
+
     // ── 곡선 ──────────────────────────────────────────────────────────────────
     const chunk = async (text: string, lang: "en" | "ja", ago: number) => {
       const { rows } = await client.query<{ id: string }>(
@@ -197,7 +208,7 @@ async function main() {
     console.log("");
     console.log("배관이 맞으면 이렇게 나온다. 하나라도 다르면 스크립트가 정의대로 안 거른 것이다.");
     console.log("  재만남: 분모 10 · 분자 7 → 70.0%");
-    console.log("          참고 — 착지한 한자 13자 · 자격 미달 1자 · 다시 안 나온 한자 2자");
+    console.log("          참고 — 착지한 한자 14자 · 자격 미달 1자 · 다시 안 나온 한자 2자 · 판정 불가 1자");
     console.log("  곡선 영어: 가까워진 대상 1 / 2   (3회차뿐인 것과 겨눈 곡선이 없는 것은 빠진다)");
     console.log("          기준선 출처가 안 남은 대상 1개");
     console.log("  곡선 일본어: 가까워진 대상 1 / 1  (따로 적히고 통과·미달에 안 들어간다)");
