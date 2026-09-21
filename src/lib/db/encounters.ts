@@ -28,12 +28,29 @@ export function recordEncounters(userId: string, inputId: string, rows: Encounte
     /*
       **그 자료가 내 것인지 먼저 본다** (보안 C13). RLS 는 `user_id` 만 보는데 이 함수는 `input_id`·
       `node_id` 를 밖에서 받는다 — 남의 자료 id 로도 내 이름의 행이 만들어질 수 있고, 그러면 남의
-      자료를 읽었다는 기록이 내 인식률에 섞인다. `node_id` 는 공용 참조 노드라 주인이 없지만,
-      아래 INSERT 는 외래키가 있는 값만 받으므로 없는 노드로는 행이 안 생긴다.
+      자료를 읽었다는 기록이 내 인식률에 섞인다. `node_id` 도 같다 — 아래에서 같이 거른다.
     */
     const { rowCount: mine } = await tx.query("SELECT 1 FROM inputs WHERE id = $1 AND user_id = $2", [inputId, userId]);
     if (!mine) throw new Error("그런 자료가 없다");
+    /*
+      **`node_id` 도 같은 확인이 필요하다.** 외래키는 "그 노드가 있는가" 만 보는데, `nodes.user_id`
+      는 NULL(공용 참조)일 수도 있고 **남의 개인 노드**일 수도 있다 (0001 의 `nodes_user_key_uq`).
+      남의 노드 id 로 내 이름의 줄이 생기면 내 인식률의 분모가 내가 만난 적 없는 글자로 채워진다.
+      녹음에서 정확히 같은 자리가 걸렸고(보안 C13) 거기서는 DB 가 돌려준 id 만 쓰게 고쳤다.
+      한 번에 걸러 INSERT 를 배치마다 한 질의 더 늘리지 않는다.
+    */
+    const { rows: owned } = await tx.query<{ id: string }>(
+      "SELECT id FROM nodes WHERE id = ANY($1::uuid[]) AND (user_id IS NULL OR user_id = $2)",
+      [rows.map((r) => r.nodeId), userId],
+    );
+    const allowed = new Set(owned.map((r) => r.id));
     for (const r of rows) {
+      // 내 것도 공용도 아닌 노드는 적지 않는다. 화면이 보낼 수 있는 값이 아니라, 여기까지 왔으면
+      // 어딘가 틀린 것이다 — 줄을 버리되 나머지 판정은 살린다. 읽기는 이미 끝났다.
+      if (!allowed.has(r.nodeId)) {
+        console.error("[encounters] 내 것도 공용도 아닌 노드라 건너뛴다", { nodeId: r.nodeId });
+        continue;
+      }
       // 읽을 때마다 한 줄씩 쌓는다. "두 번째엔 안 열었다" 자체가 값이라 덮어쓰지 않는다.
       await tx.query("INSERT INTO encounters (user_id, node_id, input_id, recognized) VALUES ($1, $2, $3, $4)", [
         userId,
