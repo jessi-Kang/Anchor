@@ -10,8 +10,17 @@ import type { Lang3 } from "@/lib/db/settings";
 export type ChunkMeta = {
   /** text 안에서 강조·연습할 덩어리 ("push this to") */
   chunk?: string;
-  /** 문안 출처 */
-  content_source?: "claude" | "fallback";
+  /**
+   * 문안 출처. **곡선 집계가 이 값으로 행을 가른다** (`scripts/measure.ts`).
+   *  claude   — Claude 가 만든 영어
+   *  authored — 손으로 적었거나 시드가 넣은 영어. 시드가 `claude` 를 쓰면 합성 문안과 진짜
+   *             생성 문안을 못 가른다. 카드 쪽이 이미 쓰는 값이라 새 어휘가 아니다.
+   *  fallback — 영어를 못 만들어 **사용자가 쓴 한국어가 그대로** 들어간 행. 그 덩어리는 영어
+   *             목소리가 한국어를 읽은 소리를 기준선으로 갖게 되어 거리에 뜻이 없다.
+   * optional 이라 **값이 아예 없는 행이 있다.** 그래서 세는 쪽은 "fallback 을 뺀다" 가 아니라
+   * "claude·authored 만 넣는다" 로 거른다 — 빼는 목록은 값 없는 행을 조용히 통과시킨다.
+   */
+  content_source?: "claude" | "authored" | "fallback";
   /**
    * F17 에서 사용자가 쓴 영어 추측, **쓴 그대로**.
    * 데이터 원칙이 "추측 한 번도 유실 없음" 이고, "지난번엔 이렇게 말하려 했지" 가 재만남(원칙 4)의 재료다.

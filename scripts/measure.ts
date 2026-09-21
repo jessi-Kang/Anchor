@@ -47,8 +47,24 @@ type RecordingRow = {
   target_pitch: unknown;
   target_voice_kind: string | null;
   target_voice_id: string | null;
-  fallback: boolean;
+  /** 덩어리 대상인가 (카드 대상이면 false). 문안 허용 목록은 덩어리에만 건다. */
+  is_chunk: boolean;
+  /** 덩어리 문안의 출처. 값이 아예 없는 행이 있다. */
+  chunk_source: string | null;
 };
+
+/** 문안 출처 허용 목록 (MEASURE 2장). 여기 없으면 곡선에서 뺀다. */
+const CONTENT_OK = new Set(["claude", "authored"]);
+
+/**
+ * 이 대상을 곡선에서 빼야 하는가, 뺀다면 왜. 카드 대상은 이 목록을 안 탄다 — `chunks` 행이 없어
+ * 값이 언제나 NULL 이고, 카드가 말하는 것은 착지 낱말(일본어)이라 그 오염이 일어나지 않는다.
+ */
+function dropReason(r: { is_chunk: boolean; chunk_source: string | null }): "fallback" | "unknown" | null {
+  if (!r.is_chunk) return null;
+  if (r.chunk_source && CONTENT_OK.has(r.chunk_source)) return null;
+  return r.chunk_source === "fallback" ? "fallback" : "unknown";
+}
 
 const n1 = (x: number) => x.toFixed(1);
 const n3 = (x: number) => x.toFixed(3);
@@ -206,6 +222,14 @@ async function main() {
 
       `chunks.meta.content_source` 에 이미 적혀 있다(`lib/db/chunks.ts` 의 saveGuessAndEnglish).
       새 칸도 마이그레이션도 필요 없다. **재만남 쪽은 건드리지 않는다** — 오염된 것은 영어 곡선뿐이다.
+
+      **빼는 목록이 아니라 넣는 목록으로 거른다.** `content_source` 는 optional 이라 값이 아예 없는
+      행이 있고, "fallback 이면 뺀다" 는 그걸 조용히 통과시킨다. "claude·authored 만 넣는다" 는
+      틀려도 분모가 작아지는 쪽이라 아래 머리말에 수로 드러난다.
+
+      **허용 목록은 덩어리 대상에만 건다.** 카드 대상은 `chunks` 행이 없어 이 값이 언제나 NULL 이라,
+      같이 걸면 일본어 곡선이 통째로 사라진다. 그리고 카드가 폴백으로 만들어져도 말하는 것은 착지
+      낱말(일본어)이라 "영어 목소리가 한국어를 읽는" 오염이 일어나지 않는다.
     */
     const { rows: rec } = await client.query<RecordingRow>(
       `
@@ -213,7 +237,8 @@ async function main() {
              COALESCE(n.display, left(ch.text, 40))                             AS label,
              COALESCE(c.lang::text, ch.lang::text)                              AS lang,
              r.attempt, r.pitch, r.target_pitch, r.target_voice_kind, r.target_voice_id,
-             (ch.meta ->> 'content_source' = 'fallback')                       AS fallback
+             (r.chunk_id IS NOT NULL)                                           AS is_chunk,
+             ch.meta ->> 'content_source'                                       AS chunk_source
         FROM recordings r
         LEFT JOIN cards  c  ON c.id  = r.card_id  AND c.user_id  = $1
         LEFT JOIN nodes  n  ON n.id  = c.node_id AND (n.user_id IS NULL OR n.user_id = $1)
@@ -252,12 +277,21 @@ function print(
   /*
     **뺀 것은 세어서 말한다.** 안 보이게 빼면 곡선 표본이 왜 작은지를 못 가른다. 그리고 이 수가
     0 이 아니라는 것 자체가 신호다 — 영어 문안을 못 만들고 있다는 뜻이다.
+
+    둘을 갈라 센다. **폴백**은 "영어를 못 만들었다" 는 신호이고, **출처 없음**은 "그 행이 언제
+    만들어졌는지 모른다" 는 다른 신호다. 합치면 어느 쪽을 손봐야 하는지가 사라진다.
   */
-  const dropped = new Set(rec.filter((r) => r.fallback).map((r) => r.target_key)).size;
-  if (dropped) {
+  const byReason = (why: "fallback" | "unknown") =>
+    new Set(rec.filter((r) => dropReason(r) === why).map((r) => r.target_key)).size;
+  const fb = byReason("fallback");
+  const unknown = byReason("unknown");
+  if (fb || unknown) {
     console.log("");
-    console.log(`※ 폴백 문안이라 곡선에서 뺀 대상 ${dropped}개 — 영어를 못 만들어 한국어가 그대로 덩어리에 들어간 행이다.`);
-    console.log("  그 기준선은 영어 목소리가 읽은 한국어라 거리에 뜻이 없다. 재만남 쪽은 그대로 센다.");
+    if (fb)
+      console.log(`※ 폴백 문안이라 곡선에서 뺀 대상 ${fb}개 — 영어를 못 만들어 한국어가 그대로 덩어리에 들어간 행이다.`);
+    if (unknown)
+      console.log(`※ 문안 출처가 안 적힌 덩어리 ${unknown}개도 뺐다 — 무엇으로 만든 문안인지 몰라 기준선을 믿을 수 없다.`);
+    console.log("  그 기준선은 영어 목소리가 읽은 한국어일 수 있어 거리에 뜻이 없다. 재만남 쪽은 그대로 센다.");
   }
 
   // ── 1 ──────────────────────────────────────────────────────────────────────
@@ -312,7 +346,8 @@ function print(
   type Result = {
     label: string;
     lang: string;
-    fallback: boolean;
+    /** 문안 출처가 허용 목록 밖이라 곡선에서 뺀다. 덩어리 대상에만 걸린다. */
+    dropped: "fallback" | "unknown" | null;
     d1: number | null;
     d5: number | null;
     attempts: number;
@@ -331,7 +366,7 @@ function print(
     results.push({
       label: rows[0].label ?? "?",
       lang: rows[0].lang ?? "?",
-      fallback: rows.some((r) => r.fallback),
+      dropped: dropReason(rows[0]),
       d1: dist(at(FIRST_ATTEMPT)),
       d5: dist(at(LAST_ATTEMPT)),
       attempts: rows.length,
@@ -351,7 +386,7 @@ function print(
     ["en", "영어 (M4 판정 대상)"],
     ["ja", "일본어 (판정에 안 쓴다 — 기준선이 맞는지 아직 확인 안 됐다)"],
   ] as const) {
-    const group = results.filter((r) => r.lang === lang && !r.fallback);
+    const group = results.filter((r) => r.lang === lang && !r.dropped);
     console.log("");
     console.log(`### ${title}`);
     /*
