@@ -6,7 +6,7 @@
     { "kanji": "社", "ko_sound": "사", "ko_word": "회사", "onyomi": "しゃ", "example": "会社", "reading": "かいしゃ", "pattern": "∅→1모라" },
     { "kanji": "時", "ko_sound": "시", "ko_word": "시간", "onyomi": "じ", "example": "時間", "reading": "じかん", "pattern": "∅→1모라" },
     { "kanji": "意", "ko_sound": "의", "ko_word": "의미", "onyomi": "い", "example": "意味", "reading": "いみ", "pattern": "∅→1모라" },
-    { "kanji": "理", "ko_sound": "리", "ko_word": "이해", "onyomi": "り", "example": "理解", "reading": "りかい", "pattern": "∅→1모라" },
+    { "kanji": "理", "ko_sound": "리", "ko_word": "관리", "onyomi": "り", "example": "管理", "reading": "かんり", "pattern": "∅→1모라" },
     { "kanji": "語", "ko_sound": "어", "ko_word": "영어", "onyomi": "ご", "example": "英語", "reading": "えいご", "pattern": "∅→1모라" },
     { "kanji": "山", "ko_sound": "산", "ko_word": "등산", "onyomi": "さん", "example": "登山", "reading": "とざん", "pattern": "ㄴ→ん" },
     { "kanji": "新", "ko_sound": "신", "ko_word": "신문", "onyomi": "しん", "example": "新聞", "reading": "しんぶん", "pattern": "ㄴ→ん" },
