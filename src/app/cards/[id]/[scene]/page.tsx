@@ -6,7 +6,7 @@ import { cardContext } from "@/lib/cards/progress";
 import { landingWords } from "@/lib/cards/landing";
 import { isDesignPreview } from "@/lib/design-preview";
 import { Screen, Space, Label, Lead, Card, Grow, Button, Ghost, Mark, Ja, rubyKanji, uiStyles as s } from "@/components/ui";
-import { withParticle } from "@/lib/ko";
+import { iGa, withParticle } from "@/lib/ko";
 import { GuessForm } from "./guess-form";
 import { LandingButtons } from "./landing-buttons";
 
@@ -15,7 +15,8 @@ export const dynamic = "force-dynamic";
 const PREVIEW: CardPayload = {
   kanji: "協",
   reading: "きょう",
-  hook: { word: "협력", mark: "협" },
+  sound: "협",
+  anchor: "협력",
   parts: [
     { ch: "十", name: "열 십", count: 1 },
     { ch: "力", name: "힘 력", count: 3 },
@@ -32,8 +33,16 @@ const PREVIEW: CardPayload = {
   content_source: "authored",
 };
 
-/** 단어 안에서 한 음절(협)만 배경 틴트 */
+/**
+ * 단어 안에서 한 음절(협)만 배경 틴트.
+ *
+ * **글자가 하나뿐이면 안 씌운다.** 틴트의 일은 *여럿 중 이것*을 가리키는 것인데, 견줄 나머지가
+ * 없으면 강조가 아니라 **상자로 읽히고** 더 나쁘게는 낱말 속 한 글자처럼 보여 뒤가 잘린 것 같다
+ * (design/screens/Scene1a.html · Scene5a.html, 둘 다 틴트가 빠져 있다). 착지의 마지막 수단은
+ * 그 한자 하나뿐이라 여기로 온다.
+ */
 function markSyllable(word: string, mark: string) {
+  if (word.length <= mark.length) return <>{word}</>;
   const i = word.indexOf(mark);
   if (i < 0) return <>{word}</>;
   return (
@@ -91,14 +100,22 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   const next = (n: number) => (preview ? `/cards/preview/${n}` : `/cards/${id}/${n}`);
 
   if (scene === 1) {
+    /*
+      **자리는 그대로 서고 담기는 것만 바뀐다** (design/screens/Scene1.html · Scene1a.html).
+      부를 낱말이 있으면 낱말을 내고 그 안의 한 음절에만 틴트를 씌운다(협**력**의 `협`).
+      없으면 **소리 한 글자**를 틴트 없이 낸다 — 음절이 하나뿐이면 틴트가 강조가 아니라 상자로
+      읽힌다. 틴트의 일은 여럿 중 이것을 가리키는 것인데 견줄 나머지가 없다 (디자인 판정).
+
+      물음은 양쪽이 같다. 이미 소리만 쓰고 있어서 새로 지을 말이 없다.
+    */
     return (
       <Screen {...common}>
         <Grow />
         <div className={`${s.center} ${s.centerWide}`}>
-          <Label>늘 쓰는 단어</Label>
-          <Ja size="lg">{markSyllable(p.hook.word, p.hook.mark)}</Ja>
+          <Label>{p.anchor ? "늘 쓰는 단어" : "이미 아는 소리"}</Label>
+          <Ja size="lg">{p.anchor ? markSyllable(p.anchor, p.sound) : p.sound}</Ja>
           <h1 className={s.ask}>
-            이 {p.hook.mark}, 한자로는
+            이 {p.sound}, 한자로는
             <br />
             어떤 모양일까?
           </h1>
@@ -216,13 +233,47 @@ export default async function ScenePage({ params, searchParams }: { params: Prom
   }
 
   // scene 5
+  /*
+    **머리줄은 축이 둘이다** (design/SCREENS.md "머리줄은 축이 둘이다", 그 표가 기준).
+    카드에 뜨는 낱말은 어느 쪽이든 그대로고 바뀌는 건 h1 뿐이다.
+
+    | 앵커 낱말 | 안전한 착지 낱말 | h1 |
+    | --- | --- | --- |
+    | 있음 (協) | 있음 | 이미 아는 단어에 協이 들어 있어 |
+    | 없음 (条) | 있음 | 이 조가 여기 들어 있어 |
+    | 아무거나 | **하나도 없음** | 이미 아는 소리에 모양이 생겼어 |
+
+    **앵커 유무는 「안다고 말해도 되나」를, 착지 유무는 「낱말을 가리킬 수 있나」를 가른다.**
+    둘은 서로 독립이라 하나로 못 줄인다.
+
+    **그래서 착지부터 본다.** 앵커를 먼저 보면 앵커도 착지도 없는 칸이 둘째 줄로 떨어지는데, 그 칸은
+    `条` 카드를 **처음 여는 순간**이다 — `条件` 은 `件` 을, `条約` 는 `約` 을 아직 안 만나 둘 다
+    걸러지고 화면에 서는 낱말은 `条` 하나뿐이다. 그 위에 "이 조가 여기 들어 있어" 가 서면
+    **「여기」 가 가리킬 데가 없다.** 아래 있는 것이 그 한자 자신이라서다.
+
+    **그 자리에 소리 줄이 맞는 이유**는 디자인이 그려 보고 적었다 — *"머리줄의 두 낱말이 화면과
+    1:1 로 짝이 맞는다: 오른쪽 `조` 가 소리, 왼쪽 `条` 가 모양."* 가리킬 낱말이 없어서 **덜 나쁜**
+    쪽이 아니라, 그 화면에 **정확히 맞는** 말이라는 뜻이다.
+
+    셋째 줄은 **낱말 없는 한자 전용이 아니다** — `協` 도 `力` 을 아직 안 만났으면 거기로 온다.
+  */
+  const landing = landingWords(p, met);
   return (
     <Screen {...common}>
       <Grow />
-      <Label as="h1">이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.hook.mark }, "이가")} 들어 있어</Label>
+      <Label as="h1">
+        {!landing.landed ? (
+          "이미 아는 소리에 모양이 생겼어"
+        ) : p.anchor ? (
+          <>이미 아는 단어에 {withParticle({ text: p.kanji, sound: p.sound }, "이가")} 들어 있어</>
+        ) : (
+          // 소리는 한글이라 조사를 글자에서 센다 — `건` 이면 "이 건이 여기 들어 있어" 다.
+          `이 ${p.sound}${iGa(p.sound)} 여기 들어 있어`
+        )}
+      </Label>
       <Space h={10} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {landingWords(p, met).map((w) => (
+        {landing.words.map((w) => (
           <Card key={w.word}>
             <div className={s.landing}>
               <div className={s.landingWord}>

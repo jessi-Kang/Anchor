@@ -120,6 +120,38 @@ test("목록과 개수가 같은 것을 뺀다 — 가리키는 행은 둘 다�
   assert.equal(n, list.length, "개수가 목록보다 크면 홈이 F18 로 보내 놓고 빈 목록을 띄운다");
 });
 
+/*
+  **F13 에 한 줄 쓰고 F17 에서 그만둔 행.** 영어도 덩어리도 없다 — 문안 생성이 실패하거나(키 없음)
+  사용자가 그 화면을 떠나면 이 모양으로 남는다.
+*/
+const stopped = (user: string, situation: string) =>
+  createChunk(user, { lang: "en", situation, text: "", attitude: null, meta: {} });
+
+test("F17 에서 멈춘 줄도 목록에 서고 개수에도 든다 — 문 없는 행을 안 남긴다", async () => {
+  /*
+    **이 시험이 붙드는 것은 「문이 있나」다** (`docs/FLOW.md` 1′장 F18 행). 목록에서 빼면 홈도
+    F13 도 그 행을 모르므로 **주소를 이미 아는 사람만** 닿고, 같은 말을 다시 써도 새 행이 된다.
+    그리고 세는 조건과 내는 조건이 갈리면 홈이 "한 줄이면 돼" 라며 F13 으로 보내 또 쓰게 한다.
+  */
+  const before = await countChunks(USER, "en");
+  const id = await stopped(USER, "이번 주는 어려울 것 같아요");
+
+  const list = await pastChunks(USER, "en");
+  const row = list.find((r) => r.id === id);
+  assert.ok(row, "멈춘 줄이 목록에 없다 — 어느 화면에도 문이 없는 행이 된다");
+  assert.equal(row.done, false, "영어가 없으면 done 이 아니다 — 화면이 F14 가 아니라 F17 로 보내야 한다");
+  assert.equal(row.situation, "이번 주는 어려울 것 같아요", "제목 자리에 설 한국어 줄이 그대로 와야 한다");
+  assert.equal(await countChunks(USER, "en"), before + 1, "세는 조건과 목록에 내는 조건은 하나다");
+
+  // 끝난 행은 여전히 done 이다 — 갈래가 한쪽으로 쏠리지 않았는지 같이 본다.
+  assert.ok(
+    list.some((r) => r.id !== id && r.done),
+    "끝난 행까지 done=false 가 되면 목록 전체가 F17 로 간다",
+  );
+
+  await admin.query("DELETE FROM chunks WHERE id = $1", [id]);
+});
+
 test("묶음이 내놓는 상황 한 줄은 가장 최근 것이다", async () => {
   const { rows } = await admin.query<{ id: string }>(
     "SELECT id FROM chunks WHERE user_id = $1 AND lang = 'en' ORDER BY created_at LIMIT 1",

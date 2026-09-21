@@ -57,7 +57,7 @@ async function main() {
         `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
          VALUES (NULL, 'en', $1, $2, $3, $4)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
-         DO UPDATE SET display = EXCLUDED.display, meta = nodes.meta || EXCLUDED.meta`,
+         DO UPDATE SET display = EXCLUDED.display, meta = EXCLUDED.meta`,
         [
           it.kind,
           it.key,
@@ -82,9 +82,20 @@ async function main() {
     /*
       **부를 이름이 없으면 그 글자의 한국 한자음으로 떨어진다.**
       `parts-ko.json` 은 부수·구성요소의 훈("열 십")만 갖고 있어서, **그 자체가 상용한자인 부품**
-      (不·与·丘·先·保·倉·光·兵·前·北·南… 112종)이 "이름 없음" 으로 취급되고 있었다. 씨앗에 한국
-      한자음이 이미 있는데도다. 그대로 두면 "이름 없는 부품은 뺀다" 규칙이 그 112종을 같이 버려서
-      한자 143자가 괜히 「부품 없음」으로 간다.
+      (不·与·丘·先·保·倉·光·兵·前·北·南…)이 "이름 없음" 으로 취급되고 있었다. 씨앗에 한국 한자음이
+      이미 있는데도다. 그대로 두면 "이름 없는 부품은 뺀다" 규칙이 그것들을 같이 버린다.
+
+      **수는 그 뒤로 움직였다.** 이 줄이 처음 설 때(`e9147a5`)는 112종·한자 143자였는데, 20분 뒤
+      `215c915` 가 획 아홉 종을 부품에서 빼면서 판이 달라졌다. 2026-09-21 origin/main 기준으로 다시
+      세면:
+
+        대체로만 이름이 붙는 부품         108 종
+        대체를 끄면 부품 줄이 짧아지는 한자 139 자  (際 認 使 増 割 優 警 病 …)
+        대체를 끄면 「부품 없음」이 되는 한자  0 자
+
+      **끄면 카드가 사라지는 한자는 이제 없고, 부품 줄이 얇아지는 한자가 139 자다.** 그러니 이 대체가
+      막는 것은 「부품 없음」이 아니라 **使 를 `亻` 하나로만 보여 주는 것**이다. 규칙은 그대로 서지만
+      **이유가 옮겨 갔다** — 옛 수(112·143)로 이 줄을 지키려 들면 근거가 없는 것을 지키게 된다.
 
       소리 한 글자가 훈보다 덜 주는 것이라 규칙에도 맞다 — "판정 자리에는 발판을 주되 가장 적게,
       소리만 주는 쪽이 낱말까지 주는 쪽보다 덜 준다" (커밋 `00f3b7b`, docs/FLOW.md 4장).
@@ -100,7 +111,7 @@ async function main() {
         `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
          VALUES (NULL, 'ja', 'radical', $1, $1, $2)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
-         DO UPDATE SET meta = nodes.meta || EXCLUDED.meta
+         DO UPDATE SET meta = EXCLUDED.meta
          RETURNING id`,
         [ch, JSON.stringify(name ? { ko_name: name } : {})],
       );
@@ -115,6 +126,43 @@ async function main() {
     for (const it of kanji) {
       const seed = seedByKanji.get(it.kanji);
       const koWord = koWords[it.kanji] ?? seed?.ko_word;
+      /*
+        **적재는 파일이 말하는 상태를 쓴다. 쌓지 않는다.**
+
+        위 upsert 셋은 `meta = EXCLUDED.meta` 다. 전에는 `meta = nodes.meta || EXCLUDED.meta`
+        였는데, jsonb `||` 는 **오른쪽에 없는 키를 왼쪽에서 그대로 살린다.** 그래서 칸이 하나라도
+        빠지면 **파일에서 지운 값이 DB 에서는 안 지워졌고**, 적재가 "파일이 말하는 상태"가 아니라
+        "파일이 말한 적 있는 모든 상태의 합"이 됐다.
+
+        **돌려서 봤다** (로컬, 2026-09-21): `駅` 의 앵커를 「역」으로 넣어 놓고 — 표에서 뺀 뒤의
+        파일로 — 다시 적재하니 `meta.ko_word` 가 **「역」 그대로 남았다.** F03 은 그 한 칸으로
+        두 묶음을 가르므로, 화면은 표에서 뺀 지 한참 뒤에도 **"역의 역"** 이라고 말한다.
+        규칙 1 이 물린 바로 그 거짓말이 적재를 타고 살아남는 것이다.
+
+        **칸마다 `?? null` 로 막는 길도 있었는데, 그건 「빠뜨리지 않기」를 사람이 매번 지키는
+        길이다.** 실제로 한 자리를 고친 뒤에도 `...(x ? { k: x } : {})` 가 세 군데 남아 있었고,
+        그걸 막으려고 쓴 시험은 `const meta: Record<…>` 모양만 찾아서 **나머지를 안 보고도 초록
+        이었다.** 문법을 바꾸면 그 규칙 자체가 없어진다 — 조건부로 빼든 안 빼든, DB 는 파일이
+        말한 것만 갖는다.
+
+        **탐침으로 갈랐다** (2026-09-21, `anchor_local` 복제본): `扌` 의 훈과 `retro-` 의 `es` 를
+        파일에서 뺀 채로 돌려서, `||` 는 옛 값을 살리고(`{"ko_name": "손 수"}`) `= EXCLUDED.meta`
+        는 지우는 것(`{}`)을 봤다. 같은 돌림에서 행 수(18·2136·505·22·427)와 kind 별 칸(14·1·6·7)
+        은 그대로였다. **새로 지워지는 건 「씨앗이 안 쓰는데 DB 엔 있는 칸」뿐**인데, 공용 `nodes`
+        를 쓰는 건 이 파일과 `scripts/seed-parts-sql.ts`(칸 하나, `meta.parts` — 여기서도 쓴다)
+        뿐이고, 앱 역할은 RLS 로 공용 노드를 못 고친다(`db/migrations/0006_node_cards.sql`).
+
+        **그래서 `seed-parts-sql.ts` 는 적재보다 뒤다 — 순서를 바꾸면 조용히 지워진다.** 그 스크립트는
+        `meta.parts` 를 `jsonb_set` 으로 고치는데, 이 파일은 `parts` 를 **늘 쓴다**(위 `parts: it.parts`).
+        그러니 부품을 맞춘 뒤에 적재를 한 번 더 돌리면 **맞춘 값이 씨앗 값으로 되돌아간다.** `||` 때도
+        그랬지만(겹친 키는 오른쪽이 이긴다) 그때는 「안 쓰는 칸은 남는다」가 같이 있어서 덜 또렷했다.
+        `docs/STATUS.md` 가 이미 「적재가 부품 동기화보다 먼저다」라고 적어 두었는데, **까닭이 하나 더 는다.**
+
+        **돌려서도 봤다** (2026-09-21 09:1x, 로컬): `駅` 에 옛 앵커(`ko_word: "역"`)와 **씨앗이 안 쓰는 칸**
+        하나를 같이 넣어 두고 다시 적재하니 **둘 다 사라졌다**(`ko_word` → SQL NULL, 그 칸 → 키째 없음).
+        행 수는 2,136 · 505 · 427 · 6,048 로 그대로다. 위 탐침이 복제본에서 가른 것을, 처음부터 세운
+        DB 에서 한 번 더 본 것이다.
+      */
       const meta: Record<string, unknown> = {
         on: it.on,
         kun: it.kun,
@@ -124,16 +172,19 @@ async function main() {
         grade: it.grade,
         freq: it.freq,
         jlpt: it.jlpt,
-        ...(koWord ? { ko_word: koWord } : {}),
-        ...(seed ? { seed: "ja-onboarding", example: seed.example, example_reading: seed.reading, pattern: seed.pattern } : {}),
-        ...(cards[it.kanji] ? { card: cards[it.kanji] } : {}),
+        ko_word: koWord ?? null,
+        seed: seed ? "ja-onboarding" : null,
+        example: seed?.example ?? null,
+        example_reading: seed?.reading ?? null,
+        pattern: seed?.pattern ?? null,
+        card: cards[it.kanji] ?? null,
       };
       const reading = seed?.onyomi ?? it.on[0] ?? null;
       const { rows } = await client.query<{ id: string }>(
         `INSERT INTO nodes (user_id, lang, kind, key, display, reading, meta)
          VALUES (NULL, 'ja', 'kanji', $1, $1, $2, $3)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
-         DO UPDATE SET reading = EXCLUDED.reading, meta = nodes.meta || EXCLUDED.meta
+         DO UPDATE SET reading = EXCLUDED.reading, meta = EXCLUDED.meta
          RETURNING id`,
         [it.kanji, reading, JSON.stringify(meta)],
       );

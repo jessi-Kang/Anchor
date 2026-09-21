@@ -77,11 +77,19 @@ export function Lead({ children }: { children: ReactNode }) {
   return <div className={s.lead}>{children}</div>;
 }
 
+/** 목록 뒤에 서는 보조 한 줄 (F03 의 "그 밖에 N자"). 제목 밑의 머리줄(`Lead`)과 다른 자리다. */
+export function Note({ children }: { children: ReactNode }) {
+  return <div className={s.note}>{children}</div>;
+}
+
 export function Card({
   children,
   tint,
   list,
+  group,
   flush,
+  whole,
+  glyph,
   style,
 }: {
   children: ReactNode;
@@ -89,12 +97,29 @@ export function Card({
   tint?: boolean;
   /** 행(Row) 목록용 패딩 */
   list?: boolean;
+  /** 묶음 라벨 + 행이 서는 카드 (F03). 라벨이 위 간격을 지므로 카드 여백·행 여백이 `list` 와 다르다. */
+  group?: boolean;
   /** 라벨 없이 행만 서는 카드. 첫 줄 위·끝 줄 아래를 카드 여백에 맞춰 대칭으로 만든다. */
   flush?: boolean;
+  /** 덩어리 하나가 카드를 채우는 카드 (F11 그래프 · F12 본문). 줄 여럿이 아니라 한 덩어리다. */
+  whole?: boolean;
+  /** 큰 한자(132px)가 든 카드 (F10 말하기). */
+  glyph?: boolean;
   style?: CSSProperties;
 }) {
   return (
-    <section className={cx(s.card, tint && s.cardTint, list && s.cardList, flush && s.cardFlush)} style={style}>
+    <section
+      className={cx(
+        s.card,
+        tint && s.cardTint,
+        list && s.cardList,
+        group && s.cardGroup,
+        flush && s.cardFlush,
+        whole && s.cardWhole,
+        glyph && s.cardGlyph,
+      )}
+      style={style}
+    >
       {children}
     </section>
   );

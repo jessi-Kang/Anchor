@@ -1,6 +1,7 @@
 import { Pool } from "@neondatabase/serverless";
 import { put, list, del } from "@vercel/blob";
 import { gzipSync } from "node:zlib";
+import { BACKUP_TABLES } from "@/lib/db/backup-tables";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -16,21 +17,10 @@ export const maxDuration = 300;
  * pg_dump 가 아니라 JSON 인 이유: 서버리스에는 pg_dump 가 없고, 외부 스토리지 계정을 만들려면 카드가 필요했다.
  * 데이터 양이 작은 MVP 에선 테이블별 JSON 이 충분하고, 복구는 scripts/backup/restore-json.ts 로 한다.
  * 공용 참조 노드(user_id IS NULL)는 저장소의 db/seed 로 언제든 다시 만들 수 있지만 그래도 함께 담는다.
+ *
+ * 뜨는 표 목록은 `src/lib/db/backup-tables.ts` 에 있다. 라우트 안에 두면 시험이 이 파일을 불러야
+ * 하고, 그러면 `@vercel/blob` 까지 딸려 온다 — 목록만 보려고 배포 의존을 끌고 오지 않는다.
  */
-
-const TABLES = [
-  "schema_migrations",
-  "users",
-  "inputs",
-  "nodes",
-  "edges",
-  "user_node_state",
-  "cards",
-  "chunks",
-  "recordings",
-  "encounters",
-  "account_deletions",
-] as const;
 
 /**
  * 로그인 계정 매핑도 함께 (복구 뒤 같은 Google 계정이 같은 user_id 로 이어지도록).
@@ -62,7 +52,7 @@ export async function GET(req: Request) {
     const counts: Record<string, number> = {};
     try {
       await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
-      for (const t of TABLES) {
+      for (const t of BACKUP_TABLES) {
         const { rows } = await client.query(`SELECT * FROM public.${t}`);
         dump[`public.${t}`] = rows;
         counts[t] = rows.length;

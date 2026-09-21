@@ -6,8 +6,14 @@ import { withoutUser, withUser } from "@/lib/db";
  */
 
 export type LandingWord = { word: string; reading: string; ko: string };
+/**
+ * 카드 문안. **발판(소리·앵커 낱말)은 여기 없다** — 그건 사전에서 오지 문안에서 오지 않는다
+ * (`CardPayload` 의 `sound`·`anchor`). 전에는 `hook: { word, mark }` 가 이 안에 있었고,
+ * 스키마가 그 칸을 **필수**로 잡고 있어서 모델이 "없다" 고 말할 길이 없었다. 그래서 앵커 낱말이
+ * 없는 한자(`条`)에도 모델이 낱말 하나를 지어냈고, F03 이 "부를 낱말이 아직 없어" 라고 해 놓은
+ * 다음 화면이 "조건은 알아" 라고 말했다 (design/SCREENS.md "부를 낱말이 없는 한자의 카드").
+ */
 export type CardContent = {
-  hook: { word: string; mark: string };
   parts_meaning: string;
   question: string;
   answer: string;
@@ -20,18 +26,21 @@ export type KanjiMeta = {
   kun?: string[];
   ko_sound?: string | null;
   /**
-   * 이미 아는 한국어 한자어 (앵커). 2,136자 중 656자에만 있다.
+   * 이미 아는 한국어 한자어 (앵커). 2,136자 중 641자에만 있다.
    * **이 칸이 F03 의 두 묶음을 가른다** — 없으면 「부를 낱말이 아직 없어」 쪽이다.
+   *
+   * **`null` 과 없는 것이 같다.** 적재는 앵커가 없으면 `null` 을 적는다 — 칸을 빼면 jsonb `||` 가
+   * 옛 값을 살려서 표에서 뺀 낱말이 DB 에 남는다(`scripts/seed.ts`). 읽는 쪽은 둘을 안 가른다.
    */
-  ko_word?: string;
+  ko_word?: string | null;
   meanings?: string[];
   parts?: string[];
   grade?: number;
   freq?: number | null;
-  card?: CardContent;
-  example?: string;
-  example_reading?: string;
-  pattern?: string;
+  card?: CardContent | null;
+  example?: string | null;
+  example_reading?: string | null;
+  pattern?: string | null;
 };
 
 export type KanjiNode = {

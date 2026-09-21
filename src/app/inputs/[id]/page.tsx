@@ -24,17 +24,26 @@ export default async function InputPage({ params, searchParams }: { params: Prom
   const { fixed } = await searchParams;
 
   if (isDesignPreview()) {
+    /*
+      **부제는 앵커 낱말 표(`db/seed/kanji-ko.json`)에서 읽은 값이다.** 참고 화면과 쪽지를 보고
+      옮겨 적으면 안 된다 — 그림이 `妥` 를 둘째 묶음에 `타` 로, `開` 를 `개발의 개` 로 그려 놨었고
+      **그 그림에서 베낀 이 상수가 같이 틀렸다.** 표는 `妥 → 타협` 이라 첫 묶음이고, 둘째 묶음을
+      채우는 것은 표에 **아예 없는** 글자다 — `条`(조). `docs/FLOW.md` 97: 눈으로 고르면 틀린다.
+
+      **그런데 `開` 는 2026-09-21 에 표가 그림 쪽으로 왔다** — `개시`(소리 개가 첫 음절)에서
+      `개발`로. 규칙 3 을 재는 사이 기획이 같이 고른 값이라 **그림이 맞아서 맞은 게 아니다.**
+      여기 넷을 바꿀 일이 생기면 그때도 화면이 아니라 **표를 읽고** 골라라.
+    */
     const anchored: JudgeItem[] = [
-      { nodeId: "a", kanji: "協", sub: "협력의 협", hasWord: true, known: null },
-      { nodeId: "b", kanji: "開", sub: "개발의 개", hasWord: true, known: null },
-      { nodeId: "c", kanji: "基", sub: "기반의 기", hasWord: true, known: null },
+      { nodeId: "a", kanji: "協", sub: "협력의 협", hasWord: true, hasSound: true, known: null },
+      { nodeId: "b", kanji: "基", sub: "기반의 기", hasWord: true, hasSound: true, known: null },
+      { nodeId: "c", kanji: "妥", sub: "타협의 타", hasWord: true, hasSound: true, known: null },
     ];
     // 낱말은 없고 소리만 있는 행 — 부제는 한국 한자음 한 글자다 (docs/FLOW.md 1장 F03 행).
-    const bare: JudgeItem[] = [{ nodeId: "d", kanji: "妥", sub: "타", hasWord: false, known: null }];
+    const bare: JudgeItem[] = [{ nodeId: "d", kanji: "条", sub: "조", hasWord: false, hasSound: true, known: null }];
     return (
       <Screen where="아침 기사" up="/today" aside="오전 8:42" fixed={fixed === "1"}>
-        <Space h={28} />
-        <JudgeRows inputId="preview" anchored={anchored} bare={bare} empty={false} />
+        <JudgeRows inputId="preview" anchored={anchored} bare={bare} seen={1} found={1} />
       </Screen>
     );
   }
@@ -58,7 +67,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
   }
 
   // 줄과 그 순서는 F04a("다음 글자")와 한 곳에서 온다 (lib/cards/judge-items.ts).
-  const { found, items } = await judgeItems(user.id, input.body);
+  const { seen, found, items } = await judgeItems(user.id, input.body);
   if (!input.extracted_at) await markExtracted(user.id, input.id, found);
 
   const anchored = items.filter((i) => i.hasWord);
@@ -68,8 +77,7 @@ export default async function InputPage({ params, searchParams }: { params: Prom
 
   return (
     <Screen where={where} up="/today" aside={nowKST()}>
-      <Space h={28} />
-      <JudgeRows inputId={input.id} anchored={anchored} bare={bare} empty={found.length === 0} />
+      <JudgeRows inputId={input.id} anchored={anchored} bare={bare} seen={seen.length} found={found.length} />
     </Screen>
   );
 }

@@ -12,7 +12,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { describeMigrations } from "../lib/migration-state";
+import { describeMigrations } from "../../src/lib/db/migration-state";
 
 const FILES = [
   { name: "0001_init.sql", checksum: "a".repeat(64) },

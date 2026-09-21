@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Card, Label, Row, Ja, Choice, ChoiceRow, Space, Grow, Button, Title, Lead } from "@/components/ui";
+import { Card, Label, Row, Ja, Choice, ChoiceRow, Space, Grow, Button, Title, Lead, Note } from "@/components/ui";
 import { judge, startCard } from "./actions";
 import type { JudgeItem } from "@/lib/cards/judge-items";
 
@@ -10,7 +10,21 @@ import type { JudgeItem } from "@/lib/cards/judge-items";
  * "알아"로 표시한 한자는 카드 큐에서 빠져 "아는 것" 묶음으로 내려가고 제목의 개수가 줄어든다 (F03a).
  * 판정은 즉시 화면에 반영하고 서버에 보낸다. 주 버튼은 큐의 첫 한자(아는 소리 묶음 먼저)로 간다.
  */
-export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string; anchored: JudgeItem[]; bare: JudgeItem[]; empty: boolean }) {
+export function JudgeRows({
+  inputId,
+  anchored,
+  bare,
+  seen,
+  found,
+}: {
+  inputId: string;
+  anchored: JudgeItem[];
+  bare: JudgeItem[];
+  /** 자료에서 뽑아낸 한자 수 */
+  seen: number;
+  /** 그중 우리가 아는 한자 수 */
+  found: number;
+}) {
   const [known, setKnown] = useState<Record<string, boolean | null>>(() =>
     Object.fromEntries([...anchored, ...bare].map((i) => [i.nodeId, i.known])),
   );
@@ -21,7 +35,9 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
   const queueA = anchored.filter((i) => !isKnown(i));
   const queueB = bare.filter((i) => !isKnown(i));
   const knownItems = [...anchored, ...bare].filter(isKnown);
-  const first = queueA[0] ?? queueB[0] ?? null;
+  // 주 버튼이 가리킬 글자. **소리가 없으면 카드가 못 서므로 내밀지 않는다** — 규칙은
+  // `nextKanji` 와 같은 한 줄이다 (lib/cards/judge-items.ts). 행은 그대로 선다: 판정은 발판 없이도 된다.
+  const first = queueA.find((i) => i.hasSound) ?? queueB.find((i) => i.hasSound) ?? null;
   const unknownCount = queueA.length + queueB.length;
 
   const set = (nodeId: string, v: boolean) => {
@@ -51,29 +67,75 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
 
   return (
     <>
-      <Title lg>{empty ? "이 자료엔 한자가 없어" : unknownCount > 0 ? `모르는 한자 ${unknownCount}개` : "다 아는 한자야"}</Title>
+      {/*
+        **"한자가 없다" 와 "우리가 그 한자를 모른다" 는 다른 말이다.**
+
+        전에는 우리가 아는 한자가 0이면 무조건 "이 자료엔 한자가 없어" 라고 했다. 한자가 열아홉인
+        기사에도 그렇게 말하고 "다른 자료를 넣어 봐" 로 돌려보냈다. **사용자의 자료를 두고 사실이
+        아닌 말을 한 자리**였고, 비어 있던 것은 자료가 아니라 우리 쪽 행이었다.
+
+        주어는 사용자가 아니라 앱이다 — 아래 "부를 낱말이 아직 없어" 묶음과 같은 규칙이다.
+        자료를 탓하지 않고 못 하는 쪽을 우리로 둔다.
+      */}
+      {/*
+        위 간격이 여기 있다. 부르는 쪽(`page.tsx`)이 미리보기와 실제 화면 두 군데서 따로 넣고
+        있었는데, 같은 화면이라 두 값이 갈릴 자리였다. 24 는 참고에서 읽은 값이다
+        (`design/screens/F03.html` 의 `height: 24px` — 24 · 6 · 18 · 10 넷이 이 화면의 세로 간격 전부다).
+      */}
+      <Space h={24} />
+      <Title>
+        {seen === 0
+          ? "이 자료엔 한자가 없어"
+          : found === 0
+            ? "아직 카드로 못 만들어"
+            : unknownCount > 0
+              ? `모르는 한자 ${unknownCount}개`
+              : found < seen
+                ? // **주어가 갈린다 — 물은 건 우리고 아는 건 사용자다.** `다 아는 한자야` 는
+                  // "이 자료의 한자를 네가 다 안다" 로 읽히는데, 실제로 일어난 일은 "우리가 낼 수
+                  // 있는 걸 다 냈고 그걸 네가 다 안다" 다. 안 보이는 글자가 남은 채로 「다」라고
+                  // 말하면 바로 아래 "그 밖에 N자" 가 그 말을 뒤집는다 — 머리줄을 가른 것과
+                  // 같은 자리다 (PM 판정). 참고 F03a 에는 이 상태 그림이 아예 없다.
+                  "물어본 건 다 알아"
+                : "다 아는 한자야"}
+      </Title>
       <Space h={6} />
       <Lead>
-        {empty
+        {/*
+          못 낸 쪽이 둘(자료에 한자가 없다 · 우리가 그 한자를 모른다)이지만 지금 할 수 있는 일은
+          같다. **언제 되는지는 약속하지 않는다** — 못 지킬 약속이 이 표를 다시 여는 길이다.
+        */}
+        {seen === 0
           ? "다른 자료를 넣어 봐."
+          : found === 0
+            ? // **개수가 여기 있는 이유.** 우리가 그 글자들을 **봤다는 것**이 이 화면에서 가장
+              // 중요한 사실이다 — 못 본 척하면 "한자가 없어" 로 되돌아간다. 제목은 짧게 한 줄로
+              // 두고(F04a 와 같은 결) 개수는 이 줄이 진다.
+              `한자 ${seen}개를 봤어. 다른 자료를 넣어 봐.`
           : unknownCount > 0
             ? // 묶음 제목이 이미 축과 순서를 말하므로 이 줄은 **묶음이 안 하는 일**(무엇을 하면 되는지)만
               // 한다. 옛 문구 "아는 소리로 시작할 수 있는 것부터" 는 가르는 축이 소리였을 때의 말이라
               // 지금은 틀린 데다 묶음 제목과 같은 말을 두 번 했다 (docs/FLOW.md 1장 F03 행).
               "하나씩 알아 / 몰라만 골라."
-            : "여기서 새로 배울 건 없어. 다른 자료를 넣어 봐."}
+            : found < seen
+              ? // **아래 줄이 바로 반박할 말을 안 한다.** "여기서 새로 배울 건 없어" 밑에
+                // "그 밖에 4자는 아직 카드로 못 만들어" 가 서면 한 화면이 제 말을 뒤집는다.
+                // 안 보이는 글자가 남아 있는 한 **배울 게 없다고 말할 자격이 우리한테 없다** —
+                // 못 만든 쪽은 우리고, 그건 사용자가 다 안다는 뜻이 아니다 (PM 판정).
+                "다른 자료를 넣어 봐."
+              : "여기서 새로 배울 건 없어. 다른 자료를 넣어 봐."}
       </Lead>
-      <Space h={22} />
+      <Space h={18} />
       {queueA.length > 0 && (
-        <Card>
+        <Card group>
           {/* 가르는 축은 낱말이라 "아는 소리에서 시작" 이 아니다 — 소리는 양쪽 다 있다 */}
           <Label>아는 낱말에서 시작</Label>
           {queueA.map(row)}
         </Card>
       )}
-      {queueA.length > 0 && queueB.length > 0 && <Space h={12} />}
+      {queueA.length > 0 && queueB.length > 0 && <Space h={10} />}
       {queueB.length > 0 && (
-        <Card>
+        <Card group>
           {/* "발판" 은 우리끼리 쓰는 말이라 화면에 안 쓴다. 그리고 주어는 사용자가 아니라 앱이다 —
               그 소리를 모르는 게 아니라, 그 글자를 부를 낱말을 우리가 아직 못 골랐다. */}
           <Label>부를 낱말이 아직 없어</Label>
@@ -82,14 +144,35 @@ export function JudgeRows({ inputId, anchored, bare, empty }: { inputId: string;
       )}
       {knownItems.length > 0 && (
         <>
-          {unknownCount > 0 && <Space h={12} />}
-          <Card>
+          {unknownCount > 0 && <Space h={10} />}
+          <Card group>
             <Label>아는 것</Label>
             {knownItems.map(row)}
           </Card>
         </>
       )}
-      <Space h={12} />
+      {/*
+        **안 보이는 것을 셈에 넣는 한 줄** (design/screens/F03d.html). 자료에서 한자를 열아홉 뽑았는데
+        우리 표에 둘만 있으면 나머지 열일곱이 **말없이 빠진다** — 제목은 `모르는 한자 2개` 라고만 한다.
+
+        **`N` 은 「카드로 못 만드는 글자 수」가 아니라 「행으로 안 선 글자 수」다.** 갈리는 축은
+        `judgeItems` 의 `found`(= 우리 표에 노드가 있나)이고, `extractKanji` 가 중복을 지우므로
+        **글자 종류 수**다. 소리가 없어 카드가 못 서는 글자(`枠`)는 **행으로는 서니까 여기 안 센다** —
+        이 줄의 일은 안 보이는 것을 세는 것이지 카드 가능 여부를 세는 게 아니다. 그걸 섞으면
+        보이는 것을 두 번 센다.
+
+        **묶음 수와 무관하다.** 조건은 `found > 0 && found < seen` 하나뿐이다 — 다 "알아" 로 내리면
+        두 묶음이 사라지고 제목이 "다 아는 한자야" 가 되는데, **열일곱이 안 보이는 그 화면에서
+        그 말이 가장 큰 거짓말**이라 그때도 이 줄이 서야 한다.
+
+        "다른 자료를 넣어 봐" 는 안 붙인다. 넣을 자료가 잘못된 게 아니다 (PM 판정).
+      */}
+      {found > 0 && found < seen && (
+        <>
+          <Space h={14} />
+          <Note>그 밖에 {seen - found}자는 아직 카드로 못 만들어</Note>
+        </>
+      )}
       <Grow />
       {first ? (
         <Button

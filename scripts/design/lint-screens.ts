@@ -14,10 +14,13 @@
 import { readdirSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright-core";
+import { FRAME_W, FRAME_H, FRAME_STYLE } from "./frame";
 
 const DIR = path.resolve(process.cwd(), "design/screens");
-const W = 390;
-const H = 844;
+// 틀을 찾는 규칙과 기본 자는 `frame.ts` 한 곳에 있다 — `design:diff` 가 제 값을 따로 들고 있다가
+// 이 검사와 다른 화면을 보고 있었다.
+const W = FRAME_W;
+const H = FRAME_H;
 const TAP_MIN = 44;
 
 function findChromium(): string | undefined {
@@ -55,13 +58,17 @@ function internalTerms(): string[] {
 
 async function main() {
   const picked = process.argv.slice(2);
-  // `readdirSync` 는 한 층만 읽고 `archive/` 는 `.html` 로 안 끝나서 **원래부터 안 걸린다.**
-  // 버린 화면은 글꼴도 규칙도 안 따라오는데, 도구가 거기서 울면 다음엔 도구를 꺼 버리게 된다.
+  // **`h1` 은 여기서 안 본다 — 「아직 안 만듦」이 아니라 「일부러 안 검」이다.** 참고 HTML 의 일은
+  // 레이아웃과 문구를 고정하는 것이고, 접근성은 앱에서 나온다(아무도 참고를 스크린 리더로 안 읽는다).
+  // 50장 중 `h1` 을 쓰는 것은 다섯뿐인데, 나머지를 기계로 돌리면 기본 여백·크기가 미세하게 움직여
+  // `design:diff` 의 바닥(0.02%)이 흔들린다 — **잴 자가 흔들리는 값이 참고가 규칙을 지키는 값보다
+  // 크다.** 그래서 `규칙 어긋난 곳 없음` 은 **참고가 그 규칙 밖에 있다**는 뜻이다
+  // (design/SCREENS.md "참고 화면에 `h1` 이 없다").
+  //
+  // `archive/` 는 **명시적으로** 뺀다. 지금은 `readdirSync` 가 한 층만 읽어서 우연히 안 걸리지만,
+  // 버린 화면은 글꼴도 규칙도 안 따라오니 거기서 문이 울리면 **고칠 자리가 아닌 데서 우는 것**이
+  // 되고, 그러면 다음엔 문을 꺼 버리게 된다 — 틀린 통과만큼이나 틀린 경보가 도구를 못 믿게 만든다.
   const ids = readdirSync(DIR, { withFileTypes: true })
-    // **`archive/` 는 명시적으로 뺀다.** 버린 화면이라 글꼴도 규칙도 안 따라오는데, 거기서 문이
-    // 울리면 **고칠 자리가 아닌 데서 우는 것**이 된다. 그러면 다음엔 문을 꺼 버리게 된다 —
-    // 틀린 통과만큼이나 **틀린 경보**가 도구를 못 믿게 만든다. 지금은 `readdirSync` 가 한 층만
-    // 읽어서 우연히 안 걸리는데, 우연이 아니라 **적어 둔 규칙**으로 막는다.
     .filter((e) => e.isFile() && e.name.endsWith(".html") && e.name !== "Sitemap.html")
     .map((e) => e.name)
     .map((f) => f.slice(0, -5))
@@ -70,6 +77,13 @@ async function main() {
   const browser = await chromium.launch({ executablePath: findChromium() });
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   const problems: string[] = [];
+  // 센 자리. 「어긋난 곳 없음」을 낼 때 **무엇을 몇 개 봤는지**를 같이 찍는다.
+  const looked = { tap: 0, link: 0, spacer: 0, term: 0, overflow: 0, primary: 0 };
+  // 화면마다 몇 자리를 봤나. **합계만 있으면 「어느 화면이 덜 걸렸나」가 안 보인다** — 쉰두 장이
+  // 고르게 걸린 896 과 한 장이 다 채운 896 이 같은 줄로 나온다. 그래서 **제일 적게 걸린 쪽**을
+  // 같이 찍는다. **적다고 틀린 것은 아니다** — 로그인(O01)처럼 원래 누를 것이 하나뿐인 화면이 있다.
+  // 이 수가 말하는 것은 **그 화면의 「없음」이 몇 자리에 기대고 있나**다. 적으면 적은 만큼만 믿는다.
+  const perScreen: { id: string; n: number }[] = [];
   const tall: string[] = [];
   const INTERNAL = internalTerms();
 
@@ -79,13 +93,15 @@ async function main() {
     await page.waitForLoadState("networkidle").catch(() => undefined);
     await page.evaluate(() => document.fonts.ready);
 
-    const found = await page.evaluate((tapMin) => {
-      // 화면 틀은 390×844 인 div 다. `body.firstElementChild` 를 쓰다가 <link> 를 집고 있었다 —
+    const found = await page.evaluate(({ tapMin, frameStyle }) => {
+      // 화면 틀은 폭 390px 짜리 div 다(높이는 화면이 선언한다 — 규칙은 `frame.ts`).
+      // `body.firstElementChild` 를 쓰다가 <link> 를 집고 있었다 —
       // 넘침은 documentElement 쪽 조건이 대신 잡아 줘서 표가 안 났고, 본문 글자를 읽으려니 그제야 빈 값이 나왔다.
       // **높이를 박아서 찾지 않는다.** 전에는 `height: 844px` 로 찾았는데, 설정처럼 제 높이를
       // 선언한 화면에서 이 선택자가 **빗나가 body 로 떨어졌다.** body 는 넘치는 일이 없어서
       // 검사가 조용히 통과했다 — 못 찾은 것을 "괜찮다" 로 답한 것이다.
-      const frame = ([...document.querySelectorAll("div")].find((d) => /width:\s*390px/.test(d.getAttribute("style") || "")) ??
+      const frameRe = new RegExp(frameStyle);
+      const frame = ([...document.querySelectorAll("div")].find((d) => frameRe.test(d.getAttribute("style") || "")) ??
         document.body) as HTMLElement;
       const links = [...document.querySelectorAll("a")].filter((a) => !a.href.includes("fonts.g"));
       const tappable = [...document.querySelectorAll("a, button, [role=button], [data-tap]")].filter(
@@ -103,14 +119,46 @@ async function main() {
             return { text: (el.textContent || "").trim().slice(0, 14), h: Math.round(r.height), w: Math.round(r.width) };
           })
           .filter((x) => x.h < tapMin || x.w < tapMin),
+        // **선언한 간격이 실제로 그 값인가.** 틀이 `display:flex` 라 자식의 `flex-shrink` 가 1 이고,
+        // 내용이 틀보다 크면 **넘치는 대신 여백이 줄어든다.** 그러면 `scrollHeight` 는 안 넘쳐서
+        // 위 `overflow` 가 조용히 통과하는데 **간격은 전부 틀려 있다** — F16 을 900·920·950 으로
+        // 두는 동안 24·18·10·16 이 16·12·7·11 로 눌려 있었고 검사는 세 번 다 통과했다.
+        // 그래서 **선언한 높이와 잰 높이를 맞대 본다.** 눌린 여백은 넘침의 다른 얼굴이다.
+        squeezed: [...frame.children]
+          .map((c) => {
+            const m = (c.getAttribute("style") || "").match(/height:\s*(\d+)px/);
+            if (!m) return null;
+            const want = Number(m[1]);
+            const got = Math.round(c.getBoundingClientRect().height);
+            // **줄어든 것만 본다.** 늘어난 것(`flex-grow` 가 같이 붙은 여백)은 의도한 것이고,
+            // 눌린 것만 「틀이 내용보다 작다」를 뜻한다.
+            return got >= want ? null : { want, got };
+          })
+          .filter((x): x is { want: number; got: number } => x !== null),
+        // **0 은 「없다」와 「안 봤다」를 구분 못 하는 유일한 수다.** 「어긋난 곳 없음」이 몇 자리를
+        // 보고 한 말인지가 같이 있어야 그 0 이 값이 된다 — 탭 대상이 0개인 화면과 다 통과한 화면이
+        // 같은 줄로 나오면 안 된다. 그래서 **센 자리의 수**를 돌려준다.
+        tapCount: tappable.length,
+        spacerCount: [...frame.children].filter((c) => /height:\s*\d+px/.test(c.getAttribute("style") || "")).length,
         frameH: frame.clientHeight,
         text: (frame.innerText || "").replace(/\s+/g, " "),
         hrefs: links.map((a) => a.getAttribute("href") || ""),
         primary: links.filter((a) => /background: #2A2D33/.test(a.getAttribute("style") || "")).length,
       };
-    }, TAP_MIN);
+    }, { tapMin: TAP_MIN, frameStyle: FRAME_STYLE });
+
+    perScreen.push({ id, n: found.tapCount + found.hrefs.length + found.spacerCount + INTERNAL.length + 2 });
+    looked.overflow += 1;
+    looked.primary += 1;
+    looked.tap += found.tapCount;
+    looked.link += found.hrefs.length;
+    looked.spacer += found.spacerCount;
+    looked.term += INTERNAL.length;
 
     if (found.overflow) problems.push(`${id}: 틀(${found.frameH}px)을 넘친다`);
+    for (const q of found.squeezed) {
+      problems.push(`${id}: 선언한 여백 ${q.want}px 이 ${q.got}px 로 눌렸다 — 틀(${found.frameH}px)이 내용보다 작다`);
+    }
     if (found.frameH > H) tall.push(`${id}(${found.frameH}px)`);
     for (const s of found.small) problems.push(`${id}: 탭 영역 ${s.w}×${s.h} — "${s.text}" (가로·세로 ${TAP_MIN}px 이상이어야 한다)`);
     for (const href of found.hrefs) {
@@ -128,7 +176,14 @@ async function main() {
     console.error(problems.join("\n"));
     process.exit(1);
   }
-  console.log(`화면 ${ids.length}장, 규칙 어긋난 곳 없음`);
+  const total = looked.tap + looked.link + looked.spacer + looked.term + looked.overflow + looked.primary;
+  const thin = [...perScreen].sort((x, y) => x.n - y.n).slice(0, 3);
+  console.log(
+    `화면 ${ids.length}장 · 잰 자리 ${total}곳 (탭 영역 ${looked.tap} · 링크 ${looked.link} · 선언한 여백 ${looked.spacer} · 내부 용어 ${looked.term} · 넘침 ${looked.overflow} · 주 버튼 ${looked.primary}), 규칙 어긋난 곳 없음`,
+  );
+  if (ids.length > 3) {
+    console.log(`제일 적게 걸린 화면: ${thin.map((t) => `${t.id}(${t.n})`).join(" · ")} — 이 화면들의 「없음」은 그만큼만 뒷받침된다`);
+  }
   /*
     **틀을 키우면 넘침이 사라진다.** 고의가 아니라 실수로 그렇게 된다 — `844` 고정은 못 속이는데
     제가 선언한 틀은 속일 수 있다. 그래서 **선언이 조용해지지 않게** 한 줄로 남긴다.

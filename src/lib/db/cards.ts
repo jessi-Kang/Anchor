@@ -11,6 +11,20 @@ export type CardPayload = CardContent & {
   kanji: string;
   /** 음독 (きょう) */
   reading: string;
+  /**
+   * **발판: 이 한자의 한국 한자음 한 글자**(協 → "협"). 카드가 서려면 이것 하나는 있어야 해서
+   * `string | null` 이 아니다 — 없으면 카드를 안 만든다 (`app/inputs/[id]/actions.ts`).
+   * 원칙 2 가 "사용자의 것" 이라고 보장한 값이라, 앱이 고른 것이 아니다.
+   */
+  sound: string;
+  /**
+   * **부를 낱말**(協 → "협력"). 2,136자 중 653자에만 있다. 없으면 `null` 이고, 그때 카드는
+   * 소리 하나로 선다 — **낱말을 지어내지 않는다.** F03 이 "부를 낱말이 아직 없어" 라고 한
+   * 글자에 다음 화면이 낱말을 대면 그 화면이 거짓이 된다 (design/SCREENS.md, `docs/FLOW.md` 1′장
+   * F03 행의 "그 묶음의 주어는 앱이다").
+   * 사전(`nodes.meta.ko_word`)에서만 온다. 문안 생성이 고른 낱말은 쓰지 않는다.
+   */
+  anchor: string | null;
   parts: CardPart[];
   /**
    * 출처: 자료 문장과 그 한자가 든 단어 (F04).
@@ -63,14 +77,46 @@ export async function createCard(userId: string, nodeId: string, inputId: string
   });
 }
 
+/**
+ * 옛 payload 를 지금 모양으로 읽는다. **payload 는 만들 때 굳히므로 고쳐 쓰지 않고 읽을 때 맞춘다.**
+ *
+ * `sound`·`anchor` 로 가르기 전에 만든 카드는 `hook: { word, mark }` 하나를 지고 있다. **둘을 다르게
+ * 다룬다:**
+ *
+ *  - **`sound` 는 `hook.mark` 를 그대로 옮긴다.** 한국 한자음은 사전 값이고, 칸 이름만 바뀌었다.
+ *  - **`anchor` 는 `hook.word` 를 안 옮기고 사전(`nodes.meta.ko_word`)을 다시 본다.** 그 `word` 는
+ *    **모델이 지어낸 낱말일 수 있다** — 옛 갈래가 사전에 앵커가 없으면 문안 생성이 고른 것으로
+ *    떨어졌기 때문이다. 그대로 옮기면 그 카드에서는 F03 과의 뒤집힘이 **그대로 살아 있다**
+ *    (뽑기는 "부를 낱말이 아직 없어", 카드는 "조건은 알아").
+ *
+ * **왜 이것이 굳힘을 어기는 게 아닌가.** `anchor` 는 **정의가 바뀐 칸**이다 — 이제 "사전이 고른
+ * 낱말" 이고 옛 `hook.word` 는 그 정의를 만족하지 않는다. 굳힘이 지키는 것은 **그 카드가 물은 것**
+ * (질문·부품 뜻·정답·착지 낱말)이지, 정의가 바뀐 칸을 옛 값으로 채우는 일이 아니다. 발판은 사용자가
+ * 답을 건 자리가 아니라 그 위에 얹힌 비계다 (PM 판정).
+ *
+ * 부르는 쪽이 사전 값을 읽어 넘긴다 — 이 함수는 DB 를 모른다.
+ */
+type LegacyPayload = Omit<CardPayload, "sound" | "anchor"> & { hook?: { word: string; mark: string } };
+
+export function cardPayload(raw: CardPayload | LegacyPayload, dictAnchor: string | null): CardPayload {
+  if ("sound" in raw && raw.sound) return raw as CardPayload;
+  const hook = (raw as LegacyPayload).hook;
+  return { ...(raw as LegacyPayload), sound: hook?.mark ?? "", anchor: dictAnchor };
+}
+
 export async function getCard(userId: string, id: string): Promise<CardRow | null> {
   return withUser(userId, async (tx) => {
-    const { rows } = await tx.query<CardRow>(
-      `SELECT id, node_id, input_id, payload, guess, guess_at, skipped_at, guess_correct, revealed_at, landed_at, created_at
-       FROM cards WHERE user_id = $1 AND id = $2`,
+    // 사전의 앵커 낱말을 같이 읽는다 — 옛 payload 의 `anchor` 는 이 값으로 다시 채운다.
+    // 공용 노드(`user_id IS NULL`)는 `nodes_read` 정책이 누구에게나 열어 두므로 이 조인이 막히지 않는다.
+    const { rows } = await tx.query<CardRow & { dict_anchor: string | null }>(
+      `SELECT c.id, c.node_id, c.input_id, c.payload, c.guess, c.guess_at, c.skipped_at, c.guess_correct,
+              c.revealed_at, c.landed_at, c.created_at, n.meta ->> 'ko_word' AS dict_anchor
+         FROM cards c JOIN nodes n ON n.id = c.node_id
+        WHERE c.user_id = $1 AND c.id = $2`,
       [userId, id],
     );
-    return rows[0] ?? null;
+    const row = rows[0];
+    return row ? { ...row, payload: cardPayload(row.payload, row.dict_anchor) } : null;
   });
 }
 

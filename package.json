@@ -24,7 +24,9 @@
     "measure:fixture": "tsx scripts/measure-fixture.ts",
     "seed:parts-sql": "tsx scripts/seed-parts-sql.ts",
     "fallbacks": "tsx scripts/fallbacks.ts",
-    "test:db": "tsx scripts/db-provenance.ts && tsx --test scripts/test/*.test.ts"
+    "test:db": "tsx scripts/db-provenance.ts && tsx --test scripts/test/*.test.ts",
+    "verify": "pnpm typecheck && pnpm lint && pnpm build && pnpm test:db",
+    "push": "bash scripts/push.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

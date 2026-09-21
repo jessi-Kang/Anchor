@@ -106,16 +106,30 @@ function main() {
   });
   const want = ["  WITH want(key, parts) AS (VALUES", ...values, "  )"].join("\n");
   const where = `   WHERE n.user_id IS NULL AND n.lang = 'ja' AND n.kind = 'kanji'\n     AND n.meta -> 'parts' IS DISTINCT FROM w.parts`;
+  /*
+    **세는 질의는 JOIN 이 아니라 LEFT JOIN 이다.** 안쪽 조인으로 세면 **노드가 아예 없는 글자는
+    세어지지 않는다** — 그러면 씨앗이 40행뿐인 DB 에서도 3번이 "아직 다른 노드 0" 을 내고,
+    그 0 은 "다 맞췄다" 로 읽힌다. 2,096자가 없는데도. 이 파일은 **있는 행만 고치는** 파일이라
+    없는 글자를 만들지 못하고, 그 사실을 세어서 말하지 않으면 읽는 사람이 알 길이 없다.
+    (실제로 프로덕션이 40/2,136 이었다. 그때 이 파일은 초록으로 끝났을 것이다.)
+  */
+  const outer = "    FROM want w LEFT JOIN nodes n\n      ON n.key = w.key AND n.user_id IS NULL AND n.lang = 'ja' AND n.kind = 'kanji'";
+  const tally = (label: string) =>
+    [
+      `SELECT count(*) FILTER (WHERE n.id IS NOT NULL AND n.meta -> 'parts' IS DISTINCT FROM w.parts) AS "${label}",`,
+      '       count(*) FILTER (WHERE n.id IS NULL) AS "노드가 없는 글자",',
+      `       ${changed.length} AS "파일에 적힌 글자"`,
+      outer,
+    ].join("\n");
 
   const sql = [
     ...head,
     "BEGIN;",
     "",
-    "-- 1. 돌리기 전에 — 실제로 바뀔 줄이 몇인가. 0 이면 이미 맞는 것이니 그대로 ROLLBACK 해도 된다.",
+    "-- 1. 돌리기 전에 — 실제로 바뀔 줄이 몇인가.",
+    "--    「노드가 없는 글자」가 0 이 아니면 **씨앗 적재가 먼저다.** 이 파일은 있는 행만 고친다.",
     want,
-    `SELECT count(*) AS "바뀔 노드", ${changed.length} AS "파일에 적힌 글자"`,
-    "    FROM nodes n JOIN want w ON w.key = n.key",
-    where.replace("   WHERE", "   WHERE"),
+    tally("바뀔 노드"),
     ";",
     "",
     "-- 2. 적용.",
@@ -125,11 +139,11 @@ function main() {
     `${where}\n     AND n.key = w.key`,
     ";",
     "",
-    "-- 3. 확인 — 여기서 0 이 나와야 한다.",
+    "-- 3. 확인 — 「아직 다른 노드」가 0 이어야 한다.",
+    "--    그리고 「노드가 없는 글자」도 봐야 한다. 그게 0 이 아니면 이 0 은 «다 맞췄다» 가 아니라",
+    "--    «있는 것만 맞췄다» 는 뜻이다.",
     want,
-    'SELECT count(*) AS "아직 다른 노드"',
-    "    FROM nodes n JOIN want w ON w.key = n.key",
-    where,
+    tally("아직 다른 노드"),
     ";",
     "",
     "COMMIT;",
