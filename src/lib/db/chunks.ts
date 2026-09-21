@@ -245,6 +245,12 @@ export async function saveEnglish(
  * **가리키는 행은 후보가 아니다.** 사슬이 생기면 회차가 다시 갈린다 — A→B→C 가 되면 곡선이
  * B 와 C 에 나눠 쌓인다. 가리킬 곳은 늘 **묶음의 첫 행**이다.
  *
+ * **폴백 행도 후보가 아니다.** 그 행의 "덩어리" 는 사용자가 쓴 한국어라 **아직 영어가 아니다.**
+ * 후보로 두면 지금 당장은 아무것과도 안 맞아 조용하지만, 그 행이 나중에 열려서 나으면
+ * (`hasEnglish` 주석) 그때 진짜 영어 덩어리를 갖게 되고 **같은 덩어리를 가진 첫 행이 둘이 된다.**
+ * 이으려고 만든 규칙이 거기서 갈린다. 나은 행은 `land()` 가 다시 견줘 주니(그 길도 `findSameChunk`
+ * 를 지난다) **낫는 그 순간에 제자리를 찾는다.**
+ *
  * 맞춰 보는 규칙은 SQL 에 다시 적지 않고 `chunkKey` 하나를 쓴다. 규칙이 둘이면 한쪽은 잇고
  * 한쪽은 안 이어서 같은 말이 1회차짜리 둘로 갈린다.
  */
@@ -257,6 +263,7 @@ export async function findSameChunk(userId: string, lang: Lang3, chunk: string, 
          FROM chunks
         WHERE user_id = $1 AND lang = $2 AND id <> $3
           AND btrim(text) <> '' AND NOT (meta ? 'same_as')
+          AND coalesce(meta ->> 'content_source', '') <> 'fallback'
         ORDER BY created_at ASC`,
       [userId, lang, exceptId],
     );
