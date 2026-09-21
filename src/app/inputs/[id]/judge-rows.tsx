@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Card, Label, Row, Ja, Choice, ChoiceRow, Space, Grow, Button, Title, Lead } from "@/components/ui";
+import { Card, Label, Row, Ja, Choice, ChoiceRow, Space, Grow, Button, Title, Lead, Note } from "@/components/ui";
 import { judge, startCard } from "./actions";
 import type { JudgeItem } from "@/lib/cards/judge-items";
 
@@ -136,6 +136,28 @@ export function JudgeRows({
             <Label>아는 것</Label>
             {knownItems.map(row)}
           </Card>
+        </>
+      )}
+      {/*
+        **안 보이는 것을 셈에 넣는 한 줄** (design/screens/F03d.html). 자료에서 한자를 열아홉 뽑았는데
+        우리 표에 둘만 있으면 나머지 열일곱이 **말없이 빠진다** — 제목은 `모르는 한자 2개` 라고만 한다.
+
+        **`N` 은 「카드로 못 만드는 글자 수」가 아니라 「행으로 안 선 글자 수」다.** 갈리는 축은
+        `judgeItems` 의 `found`(= 우리 표에 노드가 있나)이고, `extractKanji` 가 중복을 지우므로
+        **글자 종류 수**다. 소리가 없어 카드가 못 서는 글자(`枠`)는 **행으로는 서니까 여기 안 센다** —
+        이 줄의 일은 안 보이는 것을 세는 것이지 카드 가능 여부를 세는 게 아니다. 그걸 섞으면
+        보이는 것을 두 번 센다.
+
+        **묶음 수와 무관하다.** 조건은 `found > 0 && found < seen` 하나뿐이다 — 다 "알아" 로 내리면
+        두 묶음이 사라지고 제목이 "다 아는 한자야" 가 되는데, **열일곱이 안 보이는 그 화면에서
+        그 말이 가장 큰 거짓말**이라 그때도 이 줄이 서야 한다.
+
+        "다른 자료를 넣어 봐" 는 안 붙인다. 넣을 자료가 잘못된 게 아니다 (PM 판정).
+      */}
+      {found > 0 && found < seen && (
+        <>
+          <Space h={14} />
+          <Note>그 밖에 {seen - found}자는 아직 카드로 못 만들어</Note>
         </>
       )}
       <Grow />

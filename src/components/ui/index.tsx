@@ -77,6 +77,11 @@ export function Lead({ children }: { children: ReactNode }) {
   return <div className={s.lead}>{children}</div>;
 }
 
+/** 목록 뒤에 서는 보조 한 줄 (F03 의 "그 밖에 N자"). 제목 밑의 머리줄(`Lead`)과 다른 자리다. */
+export function Note({ children }: { children: ReactNode }) {
+  return <div className={s.note}>{children}</div>;
+}
+
 export function Card({
   children,
   tint,
