@@ -57,8 +57,13 @@ async function main() {
   const picked = process.argv.slice(2);
   // `readdirSync` 는 한 층만 읽고 `archive/` 는 `.html` 로 안 끝나서 **원래부터 안 걸린다.**
   // 버린 화면은 글꼴도 규칙도 안 따라오는데, 도구가 거기서 울면 다음엔 도구를 꺼 버리게 된다.
-  const ids = readdirSync(DIR)
-    .filter((f) => f.endsWith(".html") && f !== "Sitemap.html")
+  const ids = readdirSync(DIR, { withFileTypes: true })
+    // **`archive/` 는 명시적으로 뺀다.** 버린 화면이라 글꼴도 규칙도 안 따라오는데, 거기서 문이
+    // 울리면 **고칠 자리가 아닌 데서 우는 것**이 된다. 그러면 다음엔 문을 꺼 버리게 된다 —
+    // 틀린 통과만큼이나 **틀린 경보**가 도구를 못 믿게 만든다. 지금은 `readdirSync` 가 한 층만
+    // 읽어서 우연히 안 걸리는데, 우연이 아니라 **적어 둔 규칙**으로 막는다.
+    .filter((e) => e.isFile() && e.name.endsWith(".html") && e.name !== "Sitemap.html")
+    .map((e) => e.name)
     .map((f) => f.slice(0, -5))
     .filter((id) => picked.length === 0 || picked.includes(id));
 

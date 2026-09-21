@@ -174,8 +174,11 @@ async function main() {
    * Sitemap.html 은 화면이 아니라 라우트 그림이라 뺀다(`design:lint` 도 같은 이유로 뺀다).
    */
   const listed = new Set([...Object.keys(ROUTES), ...Object.keys(SKIP)]);
-  const missing = readdirSync(path.resolve(process.cwd(), "design/screens"))
-    .filter((f) => f.endsWith(".html") && f !== "Sitemap.html")
+  // `archive/` 는 여기서도 명시적으로 뺀다 — 버린 화면을 "목록에 없다" 고 세면 매번 두 줄이
+  // 뜨고, 매번 뜨는 줄은 곧 안 읽는 줄이 된다 (lint 쪽에 같은 주석).
+  const missing = readdirSync(path.resolve(process.cwd(), "design/screens"), { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith(".html") && e.name !== "Sitemap.html")
+    .map((e) => e.name)
     .map((f) => f.replace(/\.html$/, ""))
     .filter((id) => !listed.has(id));
 
