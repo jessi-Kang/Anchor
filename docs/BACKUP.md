@@ -7,7 +7,7 @@
 | 1. PITR | Neon 히스토리(instant restore) | Neon 안 | 상시 | **6시간**. MVP 동안 무료 플랜을 유지한다 |
 | 2. 배포 전 스냅샷 | Neon 브랜치 스냅샷 | Neon 안 | 프로덕션 빌드마다 (`scripts/backup/neon-snapshot.ts`, `NEON_API_KEY` 있을 때) | 14일. 플랜 제한으로 실패하면 경고만 |
 | 3. 매일 JSON 백업 | 전체 테이블 + 로그인 계정 매핑(OAuth 토큰 제외)을 gzip JSON 으로 | **Neon 밖** Vercel Blob 비공개 스토어 `anchor-backups` (`/api/cron/backup`, Vercel cron) | 매일 03:17 KST | 35일 (`BACKUP_RETENTION_DAYS`) |
-| (선택) pg_dump | 원본 형식 덤프 | S3 호환 스토리지 (`.github/workflows/backup.yml`) | GitHub Actions | 외부 스토리지 계정(카드)이 있을 때만 |
+| (선택) pg_dump | 원본 형식 덤프 | S3 호환 스토리지 (`.github/workflows/backup.yml`) | GitHub Actions | 외부 스토리지 계정(카드)이 있을 때만. **안 켜져 있으면 건너뛰고 초록으로 끝난다** — 빨강이면 켜 놓고 죽은 것이다 |
 
 1·2는 Neon 장애나 계정 문제에 함께 사라질 수 있다. 3이 그 경우의 사본이다. 1이 6시간뿐이라 하루 넘게 지난 사고는 3으로만 되돌린다.
 
