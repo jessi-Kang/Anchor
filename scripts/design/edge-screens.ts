@@ -26,7 +26,8 @@
  *
  * **자가 제 일을 하는지 재는 길을 같이 둔다.**
  *   pnpm design:edge http://localhost:3000 --prove
- * 이러면 붙는 요소가 까는 띠(가짜 요소)를 끄고 잰다 — 즉 `06a140a` **이전 상태**로 만든다.
+ * 이러면 **붙는 요소가 까는 띠(가짜 요소)만** 끄고 잰다 — 즉 `06a140a` **이전 상태**로 만든다.
+ * 화면의 가짜 요소를 통째로 끄면 그건 「고치기 전」이 아니라 **다른 화면**이라 답이 뜻을 잃는다.
  * 이 갈래에서 **F14 가 빨갛게 나와야** 위의 25/25 가 뜻을 갖는다. 초록만 보고 자를 믿으면,
  * 아무것도 안 재는 자도 25/25 를 낸다 (`docs/TEAM.md` 10장).
  */
@@ -107,7 +108,25 @@ async function main() {
       await page.goto(base + route, { waitUntil: "networkidle", timeout: 20000 });
       await page.evaluate("document.fonts.ready");
       // 자를 증명하는 갈래 — 띠를 끄면 고치기 전 화면이 된다. 위 머리말 참고.
-      if (prove) await page.addStyleTag({ content: `*::before, *::after { content: none !important; }` });
+      //
+      // **붙는 요소의 가짜 요소만 끈다.** 처음엔 `*::before, *::after` 로 통째로 껐는데, 그러면
+      // 화면 어디에 있든 가짜 요소가 다 사라져 **「고치기 전」이 아니라 「다른 화면」**이 된다.
+      // 개발이 두 자를 합칠지 보다가 이걸 짚었다 — `design:fold` 의 (다) 는 **바로 그 가짜 요소가
+      // 칠하는 띠**를 읽어 가림을 재니, 같은 깃발이 한쪽에서는 「되돌려라」, 다른 쪽에서는
+      // 「내가 볼 것을 없애라」가 된다. 자는 안 합치기로 했지만 **넓게 끄는 것 자체가 틀렸다** —
+      // 머리말이 「붙는 요소가 까는 띠를 끈다」고 말하는데 코드가 더 많이 끄고 있었다.
+      if (prove) {
+        await page.evaluate(`(function () {
+          var all = document.querySelectorAll("*");
+          for (var i = 0; i < all.length; i++) {
+            var pos = getComputedStyle(all[i]).position;
+            if (pos === "sticky" || pos === "fixed") all[i].setAttribute("data-prove-off", "");
+          }
+        })()`);
+        await page.addStyleTag({
+          content: `[data-prove-off]::before, [data-prove-off]::after { content: none !important; }`,
+        });
+      }
       // **바닥까지 내린 뒤에 잰다.** 붙는 요소는 넘치는 화면에서만 겹쳐 서고, 겹치지 않으면
       // 둘레가 어차피 화면 배경이라 이 자가 볼 것이 없다.
       await page.evaluate("window.scrollTo(0, document.scrollingElement.scrollHeight)");
