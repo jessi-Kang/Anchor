@@ -23,6 +23,7 @@
     "kanji:build": "tsx scripts/kanji/build-kanjidic.ts",
     "pitch:baseline": "tsx scripts/pitch/clone-baseline.ts",
     "measure": "tsx scripts/measure.ts",
+    "measure:drive": "tsx scripts/measure-drive.ts",
     "measure:fixture": "tsx scripts/measure-fixture.ts",
     "seed:parts-sql": "tsx scripts/seed-parts-sql.ts",
     "fallbacks": "tsx scripts/fallbacks.ts",
