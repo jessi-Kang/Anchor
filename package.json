@@ -18,6 +18,7 @@
     "design:diff": "tsx scripts/design/diff-screens.ts",
     "design:fold": "tsx scripts/design/fold-screens.ts",
     "design:edge": "tsx scripts/design/edge-screens.ts",
+    "design:tap": "tsx scripts/design/tap-screens.ts",
     "db:seed": "tsx scripts/seed.ts",
     "backup:restore": "tsx scripts/backup/restore-json.ts",
     "kanji:build": "tsx scripts/kanji/build-kanjidic.ts",
