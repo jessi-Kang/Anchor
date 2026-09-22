@@ -46,6 +46,12 @@ if [ "$to_main" = yes ]; then
   git log --oneline origin/main..HEAD || true
 fi
 
+# **같은 자리, 같은 규칙: 찍고 안 막는다.** 문서가 남의 문서를 이름으로 가리킬 때 그 이름이
+# 실제로 있는지 본다. 종료 코드는 언제나 0 이다 — 헛것 하나로 멀쩡한 밀기를 막으면 사람이
+# 이 명령을 안 쓰게 된다(위 문단과 같은 까닭). 왜 이 자가 생겼는지는 스크립트 머리에 있다.
+step "① ″ 이름으로 가리킨 자리"
+pnpm docs:names || true
+
 step "② 잰다 — 합친 나무를. 종료 코드 하나"
 if ! pnpm verify >"$log" 2>&1; then
   printf '빨강이다. 안 민다.\n\n'
