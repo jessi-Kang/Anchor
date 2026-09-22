@@ -14,7 +14,7 @@
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { loadEnv } from "../lib/load-env";
-import { adminClient } from "../lib/admin-client";
+import { adminClient, reason } from "../lib/admin-client";
 import { RESTORE_ORDER } from "../../src/lib/db/backup-tables";
 
 loadEnv();
@@ -70,6 +70,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
+  console.error(reason(e));
   process.exit(1);
 });

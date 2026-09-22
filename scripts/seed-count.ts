@@ -9,7 +9,7 @@
  * "못 셌다" 와 다른 말이다.
  */
 import { loadEnv } from "./lib/load-env";
-import { adminClient } from "./lib/admin-client";
+import { adminClient, reason } from "./lib/admin-client";
 
 loadEnv();
 
@@ -25,6 +25,8 @@ const ROWS: [string, string][] = [
 
 async function main() {
   const client = adminClient();
+  // 소켓이 깨져도 프로세스가 통째로 죽지 않게 — 아래 catch 가 돌아야 한다 (seed.ts 에 까닭)
+  client.on("error", () => {});
   await client.connect();
   try {
     for (const [label, sql] of ROWS) {
@@ -32,7 +34,7 @@ async function main() {
         const { rows } = await client.query<{ count: string }>(sql);
         console.log(`  ${label.padEnd(16)} ${rows[0].count}`);
       } catch (e) {
-        console.log(`  ${label.padEnd(16)} 못 셌다 — ${e instanceof Error ? e.message : e}`);
+        console.log(`  ${label.padEnd(16)} 못 셌다 — ${reason(e)}`);
       }
     }
   } finally {
@@ -41,6 +43,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e);
+  console.error(reason(e));
   process.exit(1);
 });
