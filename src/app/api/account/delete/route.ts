@@ -208,7 +208,7 @@ export async function POST(req: Request) {
     // DB 는 이미 지워졌다. 인증 계정만 남은 상태를 로그로 남기고 성공으로 응답하지 않는다.
     console.error("account delete: auth.deleteUser failed", { userId: user.id, error });
     return Response.json(
-      { error: "데이터는 삭제됐지만 로그인 계정 삭제에 실패했다. 다시 시도해 달라." },
+      { error: "데이터는 삭제됐다. 로그인 계정만 남았고, 다시 눌러도 지금은 똑같이 안 된다." },
       { status: 502 },
     );
   }
