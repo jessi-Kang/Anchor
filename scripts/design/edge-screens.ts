@@ -17,7 +17,8 @@
  * 닿는 것은 칠해진 쪽이다.
  *
  * **재는 법.** 붙는 요소(`position: sticky|fixed`) 안의 버튼·링크마다, 테두리 상자 **바깥 4px**
- * 로 나가 그 픽셀을 읽는다. 그 색이 **버튼 제 배경색과 같으면 결함**이다 — 경계가 아니라
+ * 로 나가 그 픽셀을 읽는다. **화면마다 두 상태를 본다** — 밀려 서 있을 때(맨 위)와 제자리(바닥).
+ * 아래 `STATES` 주석에 왜 둘인지 적혀 있다. 그 색이 **버튼 제 배경색과 같으면 결함**이다 — 경계가 아니라
  * 같은 색의 연속이라는 뜻이다. 네 변을 다 보고 **한 변이라도 같으면** 건다.
  *
  * **바깥 4px 인 이유.** 고침(`06a140a`)이 깐 띠가 위아래 8px 이라 그 안쪽을 읽어야 띠를 읽는다.
@@ -89,6 +90,22 @@ const PROBE = `(function () {
 type Ctl = { text: string; fill: string; x: number; y: number; w: number; h: number };
 type Row = { id: string; route: string; verdict: string; ok: boolean };
 
+/**
+ * **두 상태에서 잰다.** 붙는 버튼은 스크롤 위치에 따라 두 곳에 선다:
+ *
+ *   맨 위(`밀려 서 있을 때`)  버튼이 창 바닥에 붙어 **본문 위에 겹쳐** 선다 — F14 에서 흰 카드와 56px 겹친다
+ *   바닥(`제자리`)           버튼이 제 흐름 자리로 돌아와 카드 **바로 밑**에 선다 — 겹침 0
+ *
+ * 처음엔 바닥에서만 쟀다. **그게 겹침이 0 인 자리**라, 정작 위험한 상태를 안 보고 있었다
+ * (PM 축이 세 지점을 재서 짚었다: `scrollY 0·60` 겹침 56px, `scrollY 124`(바닥) 겹침 0).
+ * 지금 고침은 띠를 조건 없이 깔아 두 상태의 답이 같지만, **누가 띠를 조건부로 만드는 날
+ * 바닥만 보는 자는 초록인데 결함이 산다.** 그래서 둘 다 보고 **한 상태라도 걸리면 건다.**
+ */
+const STATES: [string, string][] = [
+  ["밀려 서 있을 때", "window.scrollTo(0, 0)"],
+  ["제자리", "window.scrollTo(0, document.scrollingElement.scrollHeight)"],
+];
+
 /** 테두리 상자 바깥 4px. 띠(위아래 8px) 안쪽이라 띠를 읽고, 테두리 반픽셀은 안 섞인다 */
 const OUT = 4;
 
@@ -104,6 +121,8 @@ async function main() {
   for (const [id, route] of Object.entries(ROUTES)) {
     let ctls: Ctl[];
     let png: PNG;
+    const bad: string[] = [];
+    let seen = 0;
     try {
       await page.goto(base + route, { waitUntil: "networkidle", timeout: 20000 });
       await page.evaluate("document.fonts.ready");
@@ -127,43 +146,43 @@ async function main() {
           content: `[data-prove-off]::before, [data-prove-off]::after { content: none !important; }`,
         });
       }
-      // **바닥까지 내린 뒤에 잰다.** 붙는 요소는 넘치는 화면에서만 겹쳐 서고, 겹치지 않으면
-      // 둘레가 어차피 화면 배경이라 이 자가 볼 것이 없다.
-      await page.evaluate("window.scrollTo(0, document.scrollingElement.scrollHeight)");
-      await page.waitForTimeout(250);
-      ctls = (await page.evaluate(PROBE)) as Ctl[];
-      png = PNG.sync.read(await page.screenshot());
+      for (const [label, scroll] of STATES) {
+        await page.evaluate(scroll);
+        await page.waitForTimeout(250);
+        ctls = (await page.evaluate(PROBE)) as Ctl[];
+        png = PNG.sync.read(await page.screenshot());
+
+        const at = (x: number, y: number) => {
+          const cx = Math.round(x), cy = Math.round(y);
+          if (cx < 0 || cy < 0 || cx >= png.width || cy >= png.height) return null;
+          const i = (png.width * cy + cx) << 2;
+          return `rgb(${png.data[i]},${png.data[i + 1]},${png.data[i + 2]})`;
+        };
+
+        for (const c of ctls) {
+          const mx = c.x + c.w / 2, my = c.y + c.h / 2;
+          const sides: [string, number, number][] = [
+            ["위", mx, c.y - OUT],
+            ["아래", mx, c.y + c.h + OUT],
+            ["왼", c.x - OUT, my],
+            ["오른", c.x + c.w + OUT, my],
+          ];
+          for (const [name, px, py] of sides) {
+            const got = at(px, py);
+            if (got && got === c.fill) bad.push(`${label}: ${c.text || "(글자 없음)"} ${name} ${got}`);
+          }
+        }
+        seen = Math.max(seen, ctls.length);
+      }
     } catch {
       rows.push({ id, route, verdict: "못 열었다", ok: false });
       continue;
     }
 
-    const at = (x: number, y: number) => {
-      const cx = Math.round(x), cy = Math.round(y);
-      if (cx < 0 || cy < 0 || cx >= png.width || cy >= png.height) return null;
-      const i = (png.width * cy + cx) << 2;
-      return `rgb(${png.data[i]},${png.data[i + 1]},${png.data[i + 2]})`;
-    };
-
-    const bad: string[] = [];
-    for (const c of ctls) {
-      const mx = c.x + c.w / 2, my = c.y + c.h / 2;
-      const sides: [string, number, number][] = [
-        ["위", mx, c.y - OUT],
-        ["아래", mx, c.y + c.h + OUT],
-        ["왼", c.x - OUT, my],
-        ["오른", c.x + c.w + OUT, my],
-      ];
-      for (const [name, px, py] of sides) {
-        const got = at(px, py);
-        if (got && got === c.fill) bad.push(`${c.text || "(글자 없음)"} ${name} ${got}`);
-      }
-    }
-
     const ok = bad.length === 0;
     rows.push({
       id, route, ok,
-      verdict: ctls.length === 0 ? "붙는 버튼 없음" : ok ? `둘레 보임 (${ctls.length}개)` : bad.join(" · "),
+      verdict: seen === 0 ? "붙는 버튼 없음" : ok ? `둘레 보임 (${seen}개, 두 상태)` : bad.join(" · "),
     });
   }
 
@@ -171,7 +190,7 @@ async function main() {
 
   const w1 = Math.max(...rows.map((r) => r.id.length), 2);
   const w2 = Math.max(...rows.map((r) => r.route.length), 4);
-  console.log(`\n붙은 버튼의 둘레 — ${VIEW_W}×${VIEW_H}, 바닥까지 내린 뒤${prove ? "  [--prove: 띠 끔 = 고치기 전]" : ""}\n`);
+  console.log(`\n붙은 버튼의 둘레 — ${VIEW_W}×${VIEW_H}, 밀려 서 있을 때와 제자리 둘 다${prove ? "  [--prove: 띠 끔 = 고치기 전]" : ""}\n`);
   for (const r of rows)
     console.log(`${r.ok ? "  " : "✗ "}${r.id.padEnd(w1)}  ${r.route.padEnd(w2)}  ${r.verdict}`);
   const bad = rows.filter((r) => !r.ok);
