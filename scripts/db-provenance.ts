@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { loadEnv } from "./lib/load-env";
-import { adminClient } from "./lib/admin-client";
+import { adminClient, reason } from "./lib/admin-client";
 import { describeMigrations } from "../src/lib/db/migration-state";
 
 loadEnv();
@@ -43,7 +43,7 @@ async function main() {
     for (const l of state.lines) console.log(l);
   } catch (e) {
     // 원장을 못 읽은 것도 출처다. 조용히 넘어가면 그 뒤 수가 또 맨몸으로 나간다.
-    console.log(`DB: ${where} — 원장을 못 읽었다 (${e instanceof Error ? e.message : e})`);
+    console.log(`DB: ${where} — 원장을 못 읽었다 (${reason(e)})`);
     console.log("※ 아래 초록·빨강은 이 상태 위의 값이다.");
   } finally {
     await client.end().catch(() => undefined);

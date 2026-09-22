@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { loadEnv } from "./lib/load-env";
-import { adminClient } from "./lib/admin-client";
+import { adminClient, reason } from "./lib/admin-client";
 import { ORPHAN_SOUND_DELETE } from "../src/lib/db/node-guard";
 
 loadEnv();
@@ -48,9 +48,31 @@ async function main() {
   const seedByKanji = new Map(jaSeed.map((it) => [it.kanji, it]));
 
   const client = adminClient();
-  await client.connect();
+  /*
+    **깨진 연결을 프로세스 종료로 바꾸지 않는다.** pg 의 Client 는 소켓이 깨지면 쓰던 질의를
+    거절한 **뒤 자기 자신에게 `error` 를 쏜다.** 듣는 사람이 없으면 Node 가 그 자리에서 프로세스를
+    죽여서 **아래 catch 도 ROLLBACK 도 안 돈다.** 한 줄 들어 두면 거절된 질의가 catch 로 온다.
+  */
+  client.on("error", () => {});
+  /*
+    **어디서 죽었는지를 값으로 들고 간다.** 2026-09-22 적재 액션이 죽었을 때 로그에 남은 것은
+    까닭 없는 객체 한 덩이뿐이라, **연결·BEGIN·첫 INSERT 셋 중 어디인지**를 로그 시각과 다른
+    스크립트의 걸음 수로 되짚어야 했다. 되짚기는 맞았지만 **다음 사람이 또 되짚을 일은 아니다.**
+  */
+  let step = "BEGIN";
+  /*
+    **연결은 try 밖이다.** 안 붙은 pg Client 에 질의를 걸면 그 질의는 큐에 들어간 채
+    **영영 안 풀린다** — 아래 catch 의 ROLLBACK 이 그 꼴이 되면 `main()` 이 안 끝나고
+    이벤트 루프가 비어서 **프로세스가 조용히 0 으로 나간다.** 적재가 한 줄도 안 됐는데
+    액션은 초록이 된다. 돌려서 봤다(2026-09-22, 닿지 않는 Neon 호스트로): 연결을 try 안에
+    넣었더니 출력 한 줄 없이 exit 0 이었다. **빨강을 초록으로 바꾸는 고침은 고침이 아니다.**
+  */
+  await client.connect().catch((e) => {
+    throw new Error(`연결에서 죽었다 — ${reason(e)}`);
+  });
   try {
     await client.query("BEGIN");
+    step = "첫 INSERT";
 
     // 1. 영어 어근·덩어리
     for (const [i, it] of en.entries()) {
@@ -74,6 +96,7 @@ async function main() {
           }),
         ],
       );
+      if (i === 0) step = "적재";
     }
     console.log(`en-seed: ${en.length} 노드`);
 
@@ -284,14 +307,21 @@ async function main() {
     // 정상이면 둘 다 0 이다. 0 이 아닌 날이 "무엇이 바뀌었나" 를 묻는 날이다.
     console.log(`지운 엣지: ${dropped} · 지운 소리 노드: ${orphans}`);
   } catch (e) {
-    await client.query("ROLLBACK");
-    throw e;
+    /*
+      **ROLLBACK 이 원래 까닭을 덮지 않게 한다.** 연결이 깨져서 여기 왔으면 그 ROLLBACK 도
+      "Client has encountered a connection error and is not queryable" 로 깨지는데, 전에는
+      그것을 `await` 한 채로 두어서 **던져 올라가는 것이 ROLLBACK 의 까닭으로 바뀌었다** —
+      진짜 까닭이 사라진다. 되돌리기는 여전히 해 보되, 그 실패는 삼킨다.
+    */
+    await client.query("ROLLBACK").catch(() => {});
+    throw new Error(`${step}에서 죽었다 — ${reason(e)}`);
   } finally {
-    await client.end();
+    // 연결 전에 죽었으면 end() 도 깨진다. 끝내기 실패로 까닭을 덮지 않는다.
+    await client.end().catch(() => {});
   }
 }
 
 main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
+  console.error(reason(e));
   process.exit(1);
 });

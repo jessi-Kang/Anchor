@@ -14,7 +14,7 @@
  * 는 뜻이고 표본이 없는 것과 다른 말이다.
  */
 import { loadEnv } from "./lib/load-env";
-import { adminClient } from "./lib/admin-client";
+import { adminClient, reason } from "./lib/admin-client";
 
 loadEnv();
 
@@ -101,6 +101,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
+  console.error(reason(e));
   process.exit(1);
 });
