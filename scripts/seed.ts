@@ -37,6 +37,27 @@ type KanjiItem = { kanji: string; grade: number; freq: number | null; jlpt: numb
 
 const read = <T,>(f: string) => JSON.parse(readFileSync(path.resolve(process.cwd(), "db/seed", f), "utf8")) as T;
 
+/*
+  **한 줄씩 보내지 않고 묶어서 보낸다.** 2026-09-22 프로덕션 적재(액션 `seed` 3번째)가 적재 단계를
+  **14분 59초** 돌다가 워크플로의 15분 제한에 잘렸다. 한 트랜잭션이라 잘리는 순간 전부 되돌아가서
+  프로덕션에는 한 줄도 안 섰다.
+
+  까닭은 왕복 수였다. 전에는 한자 하나마다 노드 INSERT · 부품마다 엣지 INSERT · DELETE · 소리 INSERT ·
+  소리 엣지 · DELETE 를 따로 보냈다. 로컬에서 세어 보니 **13,431 번**이었고(2.8초 — 로컬은 왕복이
+  싸다), 액션에서 Neon 까지 한 번에 ~67ms 면 딱 15분이다. **느린 게 질의가 아니라 오가는 횟수였다.**
+
+  그래서 같은 INSERT · 같은 ON CONFLICT · 같은 DELETE 를 **줄 묶음(jsonb_to_recordset)으로** 보낸다.
+  결과가 같은지는 옛 적재와 새 적재를 각각 빈 DB 에 돌려 nodes · edges 를 통째로 대 봤다
+  (커밋 본문에 수가 있다). 묶음 크기는 한 번에 보내는 JSON 이 수백 KB 를 안 넘게 잡았다.
+*/
+const CHUNK = 500;
+const EDGE_CHUNK = 2000;
+function chunks<T>(xs: T[], n: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += n) out.push(xs.slice(i, i + n));
+  return out;
+}
+
 async function main() {
 
   const en = read<{ items: SeedItem[] }>("en-seed.json").items;
@@ -75,29 +96,31 @@ async function main() {
     step = "첫 INSERT";
 
     // 1. 영어 어근·덩어리
-    for (const [i, it] of en.entries()) {
+    const enRows = en.map((it, i) => ({
+      kind: it.kind,
+      key: it.key,
+      display: it.display,
+      meta: {
+        seed: "en-onboarding",
+        seed_order: i,
+        definition: it.definition,
+        example: it.example,
+        ...(it.es ? { es: it.es } : {}),
+        ...(it.words ? { words: it.words } : {}),
+        ...(it.attitude ? { attitude: it.attitude, intensity: it.intensity ?? 1, ko_anchor: it.ko_anchor } : {}),
+      },
+    }));
+    for (const part of chunks(enRows, CHUNK)) {
       await client.query(
         `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
-         VALUES (NULL, 'en', $1, $2, $3, $4)
+         SELECT NULL, 'en', x.kind, x.key, x.display, x.meta
+           FROM jsonb_to_recordset($1::jsonb) AS x(kind node_kind, key text, display text, meta jsonb)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
          DO UPDATE SET display = EXCLUDED.display, meta = EXCLUDED.meta`,
-        [
-          it.kind,
-          it.key,
-          it.display,
-          JSON.stringify({
-            seed: "en-onboarding",
-            seed_order: i,
-            definition: it.definition,
-            example: it.example,
-            ...(it.es ? { es: it.es } : {}),
-            ...(it.words ? { words: it.words } : {}),
-            ...(it.attitude ? { attitude: it.attitude, intensity: it.intensity ?? 1, ko_anchor: it.ko_anchor } : {}),
-          }),
-        ],
+        [JSON.stringify(part)],
       );
-      if (i === 0) step = "적재";
     }
+    step = "부품";
     console.log(`en-seed: ${en.length} 노드`);
 
     // 2. 부품 (radical). 이름이 있는 것 + kanji.json 부품에 나오는 것
@@ -134,17 +157,21 @@ async function main() {
     */
     const koSoundOf = new Map(kanji.filter((it) => it.ko).map((it) => [it.kanji, it.ko as string]));
     const partId = new Map<string, string>();
-    for (const ch of partChars) {
+    const partRows = [...partChars].map((ch) => {
       const name = partsKo[ch] ?? koSoundOf.get(ch);
-      const { rows } = await client.query<{ id: string }>(
+      return { key: ch, meta: name ? { ko_name: name } : {} };
+    });
+    for (const part of chunks(partRows, CHUNK)) {
+      const { rows } = await client.query<{ id: string; key: string }>(
         `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
-         VALUES (NULL, 'ja', 'radical', $1, $1, $2)
+         SELECT NULL, 'ja', 'radical', x.key, x.key, x.meta
+           FROM jsonb_to_recordset($1::jsonb) AS x(key text, meta jsonb)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
          DO UPDATE SET meta = EXCLUDED.meta
-         RETURNING id`,
-        [ch, JSON.stringify(name ? { ko_name: name } : {})],
+         RETURNING id, key`,
+        [JSON.stringify(part)],
       );
-      partId.set(ch, rows[0].id);
+      for (const r of rows) partId.set(r.key, r.id);
     }
     console.log(`부품: ${partChars.size} 노드`);
 
@@ -153,6 +180,10 @@ async function main() {
     const soundId = new Map<string, string>();
     let edges = 0;
     let dropped = 0;
+    /** 한자 한 줄 = 노드 하나. 부품·소리는 한자 키로 들고 있다가 노드 id 가 선 뒤에 잇는다. */
+    const kanjiRows: { key: string; reading: string | null; meta: Record<string, unknown> }[] = [];
+    const partsOf = new Map<string, { part: string; weight: number }[]>();
+    const soundOf = new Map<string, string>();
     /*
       **노드의 구멍과 엣지의 구멍은 같은 병인데 약이 다르다.** 둘 다 "적재가 파일이 말하는 상태가
       아니라 말한 적 있는 모든 상태의 합이 된다" 인데,
@@ -229,62 +260,99 @@ async function main() {
         card: cards[it.kanji] ?? null,
       };
       const reading = seed?.onyomi ?? it.on[0] ?? null;
-      const { rows } = await client.query<{ id: string }>(
+      kanjiRows.push({ key: it.kanji, reading, meta });
+      partsOf.set(
+        it.kanji,
+        [...new Set(it.parts)].map((part) => ({ part, weight: it.parts.filter((x) => x === part).length })),
+      );
+      const ko = it.ko ?? seed?.ko_sound;
+      if (ko) soundOf.set(it.kanji, ko);
+    }
+
+    step = "한자";
+    for (const part of chunks(kanjiRows, CHUNK)) {
+      const { rows } = await client.query<{ id: string; key: string }>(
         `INSERT INTO nodes (user_id, lang, kind, key, display, reading, meta)
-         VALUES (NULL, 'ja', 'kanji', $1, $1, $2, $3)
+         SELECT NULL, 'ja', 'kanji', x.key, x.key, x.reading, x.meta
+           FROM jsonb_to_recordset($1::jsonb) AS x(key text, reading text, meta jsonb)
          ON CONFLICT (lang, kind, key) WHERE user_id IS NULL
          DO UPDATE SET reading = EXCLUDED.reading, meta = EXCLUDED.meta
-         RETURNING id`,
-        [it.kanji, reading, JSON.stringify(meta)],
+         RETURNING id, key`,
+        [JSON.stringify(part)],
       );
-      const id = rows[0].id;
-      kanjiId.set(it.kanji, id);
+      for (const r of rows) kanjiId.set(r.key, r.id);
+    }
+    const allKanjiIds = kanjiRows.map((r) => kanjiId.get(r.key) as string);
 
-      // 부품 ∈ 한자
-      const keptParts: string[] = [];
-      for (const p of new Set(it.parts)) {
-        const pid = partId.get(p);
-        if (!pid || pid === id) continue;
-        await client.query(
-          `INSERT INTO edges (user_id, src, dst, rel, weight, meta) VALUES (NULL, $1, $2, 'part_of', $3, '{}')
-           ON CONFLICT (src, dst, rel) WHERE user_id IS NULL DO UPDATE SET weight = EXCLUDED.weight`,
-          [pid, id, it.parts.filter((x) => x === p).length],
-        );
-        keptParts.push(pid);
-        edges++;
-      }
-      dropped += await drop(
-        `DELETE FROM edges WHERE user_id IS NULL AND rel = 'part_of' AND dst = $1 AND src <> ALL($2::uuid[])`,
-        [id, keptParts],
+    // 한국 한자음 노드 (한 소리에 하나)
+    step = "한국 한자음";
+    const sounds = [...new Set(soundOf.values())].map((key) => ({ key }));
+    for (const part of chunks(sounds, CHUNK)) {
+      const { rows } = await client.query<{ id: string; key: string }>(
+        `INSERT INTO nodes (user_id, lang, kind, key, display, meta)
+         SELECT NULL, 'ko', 'sound', x.key, x.key, '{}'
+           FROM jsonb_to_recordset($1::jsonb) AS x(key text)
+         ON CONFLICT (lang, kind, key) WHERE user_id IS NULL DO UPDATE SET display = EXCLUDED.display
+         RETURNING id, key`,
+        [JSON.stringify(part)],
       );
+      for (const r of rows) soundId.set(r.key, r.id);
+    }
 
-      // 한국 한자음 → 한자 (ko sound 노드는 한 소리에 하나)
-      const ko = it.ko ?? seed?.ko_sound;
-      let keptSound: string | null = null;
-      if (ko) {
-        let sid = soundId.get(ko);
-        if (!sid) {
-          const { rows: s } = await client.query<{ id: string }>(
-            `INSERT INTO nodes (user_id, lang, kind, key, display, meta) VALUES (NULL, 'ko', 'sound', $1, $1, '{}')
-             ON CONFLICT (lang, kind, key) WHERE user_id IS NULL DO UPDATE SET display = EXCLUDED.display RETURNING id`,
-            [ko],
-          );
-          sid = s[0].id;
-          soundId.set(ko, sid);
-        }
-        await client.query(
-          `INSERT INTO edges (user_id, src, dst, rel) VALUES (NULL, $1, $2, 'ko_sound_of')
-           ON CONFLICT (src, dst, rel) WHERE user_id IS NULL DO NOTHING`,
-          [sid, id],
-        );
-        keptSound = sid;
-        edges++;
+    /*
+      **엣지는 「파일이 원하는 쌍」을 먼저 다 세우고, 그 밖의 줄을 한 번에 지운다.**
+      전에는 한자마다 넣고 지우고를 되풀이했는데 결과는 같다 — 지우는 조건이 「원하는 쌍이
+      아닌 것」이라 방금 넣은 줄을 지울 일이 없고, 지우는 범위도 전과 같이 **이 파일의 한자로
+      들어가는 줄**로 묶여 있다. 달라진 것은 왕복 수다(아래 머리말).
+    */
+    step = "엣지";
+    const partPairs: { src: string; dst: string; weight: number }[] = [];
+    for (const r of kanjiRows) {
+      const dst = kanjiId.get(r.key) as string;
+      for (const { part, weight } of partsOf.get(r.key) ?? []) {
+        const src = partId.get(part);
+        if (!src || src === dst) continue;
+        partPairs.push({ src, dst, weight });
       }
+    }
+    for (const part of chunks(partPairs, EDGE_CHUNK)) {
+      await client.query(
+        `INSERT INTO edges (user_id, src, dst, rel, weight, meta)
+         SELECT NULL, x.src, x.dst, 'part_of', x.weight, '{}'
+           FROM jsonb_to_recordset($1::jsonb) AS x(src uuid, dst uuid, weight real)
+         ON CONFLICT (src, dst, rel) WHERE user_id IS NULL DO UPDATE SET weight = EXCLUDED.weight`,
+        [JSON.stringify(part)],
+      );
+    }
+    edges += partPairs.length;
+
+    const soundPairs = kanjiRows
+      .filter((r) => soundOf.has(r.key))
+      .map((r) => ({ src: soundId.get(soundOf.get(r.key) as string) as string, dst: kanjiId.get(r.key) as string }));
+    for (const part of chunks(soundPairs, EDGE_CHUNK)) {
+      await client.query(
+        `INSERT INTO edges (user_id, src, dst, rel)
+         SELECT NULL, x.src, x.dst, 'ko_sound_of'
+           FROM jsonb_to_recordset($1::jsonb) AS x(src uuid, dst uuid)
+         ON CONFLICT (src, dst, rel) WHERE user_id IS NULL DO NOTHING`,
+        [JSON.stringify(part)],
+      );
+    }
+    edges += soundPairs.length;
+
+    step = "지우기";
+    for (const [rel, pairs] of [
+      ["part_of", partPairs],
+      ["ko_sound_of", soundPairs],
+    ] as const) {
       dropped += await drop(
-        `DELETE FROM edges
-          WHERE user_id IS NULL AND rel = 'ko_sound_of' AND dst = $1
-            AND ($2::uuid IS NULL OR src <> $2::uuid)`,
-        [id, keptSound],
+        `DELETE FROM edges e
+          WHERE e.user_id IS NULL AND e.rel = $1 AND e.dst = ANY($2::uuid[])
+            AND NOT EXISTS (
+              SELECT 1 FROM jsonb_to_recordset($3::jsonb) AS k(src uuid, dst uuid)
+               WHERE k.src = e.src AND k.dst = e.dst
+            )`,
+        [rel, allKanjiIds, JSON.stringify(pairs.map(({ src, dst }) => ({ src, dst })))],
       );
     }
     /*
